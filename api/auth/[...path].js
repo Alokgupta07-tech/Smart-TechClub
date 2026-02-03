@@ -185,6 +185,18 @@ module.exports = async function handler(req, res) {
 
   } catch (error) {
     console.error('Auth API error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    
+    // Provide more specific error messages for debugging
+    if (error.code === 'PROTOCOL_CONNECTION_LOST' || error.code === 'ECONNREFUSED') {
+      return res.status(500).json({ 
+        error: 'Database connection failed',
+        details: process.env.NODE_ENV === 'development' ? error.message : 'Please try again later'
+      });
+    }
+    
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Please try again later'
+    });
   }
 };

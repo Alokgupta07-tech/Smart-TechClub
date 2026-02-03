@@ -12,6 +12,19 @@ module.exports = async function handler(req, res) {
     return res.status(200).end();
   }
 
+  const db = getPool();
+
+  try {
+    // Test database connection first
+    await db.query('SELECT 1 as test');
+  } catch (dbError) {
+    console.error('Database connection failed:', dbError);
+    return res.status(500).json({ 
+      error: 'Database connection failed',
+      details: process.env.NODE_ENV === 'development' ? dbError.message : 'Internal server error'
+    });
+  }
+
   // Verify authentication
   const authResult = verifyAuth(req);
   if (authResult.error) {
@@ -24,7 +37,6 @@ module.exports = async function handler(req, res) {
     return res.status(adminCheck.status).json({ error: adminCheck.error });
   }
 
-  const db = getPool();
   const path = req.url.replace('/api/admin', '').split('?')[0];
 
   try {

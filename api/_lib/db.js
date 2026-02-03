@@ -9,18 +9,33 @@ let pool = null;
 
 function getPool() {
   if (!pool) {
-    pool = mysql.createPool({
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT || 3306,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'lockdown_hq',
+    const dbConfig = {
+      host: process.env.DATABASE_HOST || process.env.DB_HOST,
+      port: parseInt(process.env.DATABASE_PORT || process.env.DB_PORT || '3306'),
+      user: process.env.DATABASE_USER || process.env.DB_USER,
+      password: process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD || '',
+      database: process.env.DATABASE_DBNAME || process.env.DB_NAME || 'lockdown_hq',
       waitForConnections: true,
-      connectionLimit: 5, // Lower limit for serverless
+      connectionLimit: 5,
       queueLimit: 0,
-      enableKeepAlive: false, // Disable for serverless
-      connectTimeout: 10000,
+      enableKeepAlive: false,
+      connectTimeout: 30000,
+      acquireTimeout: 30000,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    };
+
+    // Debug logging for serverless (remove in production)
+    console.log('Database config:', {
+      host: dbConfig.host,
+      port: dbConfig.port,
+      user: dbConfig.user,
+      database: dbConfig.database,
+      hasPassword: !!dbConfig.password
     });
+
+    pool = mysql.createPool(dbConfig);
   }
   return pool;
 }
