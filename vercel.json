@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install && cd api && npm install",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/api/auth/:path*", "destination": "/api/auth/[...path]" },
+    { "source": "/api/admin/:path*", "destination": "/api/admin/[...path]" },
+    { "source": "/api/team/:path*", "destination": "/api/team/[...path]" },
+    { "source": "/api/game/:path*", "destination": "/api/game/[...path]" },
+    { "source": "/api/puzzles/:path*", "destination": "/api/puzzles/[...path]" },
+    { "source": "/api/gameplay/:path*", "destination": "/api/gameplay/[...path]" },
+    { "source": "/api/leaderboard", "destination": "/api/leaderboard" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Credentials", "value": "true" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
+        { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization" }
+      ]
+    }
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  }
+}

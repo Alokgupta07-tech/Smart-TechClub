@@ -1,0 +1,540 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* RESIDENT EVIL - CYBER LOCKDOWN DESIGN SYSTEM
+   Theme: Infected Terminal / Biohazard Cyber
+   Colors: Toxic greens, blood reds, deep blacks, terminal blues
+*/
+
+@layer base {
+  :root {
+    /* Core backgrounds - Deep infected blacks */
+    --background: 220 20% 4%;
+    --foreground: 120 100% 85%;
+
+    /* Cards - Slightly elevated dark surfaces */
+    --card: 220 25% 7%;
+    --card-foreground: 120 60% 90%;
+
+    /* Popover */
+    --popover: 220 25% 6%;
+    --popover-foreground: 120 60% 90%;
+
+    /* Primary - Toxic Biohazard Green */
+    --primary: 120 100% 40%;
+    --primary-foreground: 220 20% 4%;
+
+    /* Secondary - Deep Terminal Blue */
+    --secondary: 200 80% 20%;
+    --secondary-foreground: 200 80% 90%;
+
+    /* Muted - Dim terminal */
+    --muted: 220 20% 12%;
+    --muted-foreground: 120 20% 55%;
+
+    /* Accent - Cyber Blue Glow */
+    --accent: 190 100% 45%;
+    --accent-foreground: 220 20% 4%;
+
+    /* Destructive - Blood Red / Infected */
+    --destructive: 0 85% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Warning - Amber Alert */
+    --warning: 35 100% 50%;
+    --warning-foreground: 220 20% 4%;
+
+    /* Success - Cleared / Safe */
+    --success: 150 80% 40%;
+    --success-foreground: 220 20% 4%;
+
+    /* Borders & Inputs */
+    --border: 120 40% 15%;
+    --input: 220 20% 10%;
+    --ring: 120 100% 40%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Terminal Panel */
+    --sidebar-background: 220 25% 5%;
+    --sidebar-foreground: 120 60% 85%;
+    --sidebar-primary: 120 100% 40%;
+    --sidebar-primary-foreground: 220 20% 4%;
+    --sidebar-accent: 190 100% 45%;
+    --sidebar-accent-foreground: 220 20% 4%;
+    --sidebar-border: 120 40% 12%;
+    --sidebar-ring: 120 100% 40%;
+
+    /* Custom Gradients */
+    --gradient-toxic: linear-gradient(135deg, hsl(120 100% 35%) 0%, hsl(90 100% 30%) 100%);
+    --gradient-blood: linear-gradient(135deg, hsl(0 85% 45%) 0%, hsl(350 80% 35%) 100%);
+    --gradient-cyber: linear-gradient(135deg, hsl(190 100% 45%) 0%, hsl(220 80% 50%) 100%);
+    --gradient-infected: linear-gradient(180deg, hsl(120 100% 40% / 0.1) 0%, transparent 50%);
+    --gradient-terminal: linear-gradient(180deg, hsl(220 25% 8%) 0%, hsl(220 20% 4%) 100%);
+    
+    /* Glow Effects */
+    --glow-toxic: 0 0 20px hsl(120 100% 40% / 0.5), 0 0 40px hsl(120 100% 40% / 0.3);
+    --glow-blood: 0 0 20px hsl(0 85% 50% / 0.5), 0 0 40px hsl(0 85% 50% / 0.3);
+    --glow-cyber: 0 0 20px hsl(190 100% 45% / 0.5), 0 0 40px hsl(190 100% 45% / 0.3);
+    
+    /* Shadows */
+    --shadow-toxic: 0 4px 30px hsl(120 100% 40% / 0.15);
+    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.5);
+  }
+
+  .dark {
+    /* Same as root - this is a dark-first theme */
+    --background: 220 20% 4%;
+    --foreground: 120 100% 85%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Custom scrollbar - Terminal style */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.3);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.5);
+  }
+}
+
+@layer components {
+  /* Terminal Text */
+  .font-terminal {
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .font-display {
+    font-family: 'Orbitron', sans-serif;
+  }
+
+  /* Glitch Effect */
+  .glitch {
+    position: relative;
+    animation: glitch 2s infinite;
+  }
+
+  .glitch::before,
+  .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .glitch::before {
+    animation: glitch-1 0.3s infinite;
+    color: hsl(var(--destructive));
+    z-index: -1;
+  }
+
+  .glitch::after {
+    animation: glitch-2 0.3s infinite;
+    color: hsl(var(--accent));
+    z-index: -2;
+  }
+
+  /* Scanning Line Effect */
+  .scan-line {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scan-line::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.8), transparent);
+    animation: scan 3s linear infinite;
+  }
+
+  /* Terminal Card */
+  .terminal-card {
+    @apply relative overflow-hidden rounded-lg border border-primary/20 bg-card;
+    box-shadow: 
+      inset 0 1px 0 hsl(var(--primary) / 0.1),
+      var(--shadow-card);
+  }
+
+  .terminal-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.5), transparent);
+  }
+
+  /* Toxic Button */
+  .btn-toxic {
+    @apply relative overflow-hidden font-display font-bold uppercase tracking-wider;
+    background: var(--gradient-toxic);
+    box-shadow: var(--glow-toxic);
+    transition: all 0.3s ease;
+  }
+
+  .btn-toxic:hover {
+    box-shadow: 0 0 30px hsl(120 100% 40% / 0.6), 0 0 60px hsl(120 100% 40% / 0.4);
+    transform: translateY(-2px);
+  }
+
+  /* Blood/Danger Button */
+  .btn-blood {
+    @apply relative overflow-hidden font-display font-bold uppercase tracking-wider;
+    background: var(--gradient-blood);
+    box-shadow: var(--glow-blood);
+  }
+
+  /* Cyber Glow Border */
+  .cyber-border {
+    @apply relative;
+    border: 1px solid hsl(var(--primary) / 0.3);
+    box-shadow: 
+      inset 0 0 20px hsl(var(--primary) / 0.05),
+      0 0 20px hsl(var(--primary) / 0.1);
+  }
+
+  /* Status Indicators */
+  .status-pulse {
+    @apply relative;
+  }
+
+  .status-pulse::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    animation: pulse-ring 2s ease-out infinite;
+  }
+
+  /* Biohazard Badge */
+  .biohazard-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-terminal uppercase tracking-widest;
+    background: hsl(var(--destructive) / 0.15);
+    border: 1px solid hsl(var(--destructive) / 0.3);
+    color: hsl(var(--destructive));
+    box-shadow: 0 0 10px hsl(var(--destructive) / 0.2);
+  }
+
+  /* Terminal Input */
+  .terminal-input {
+    @apply w-full bg-background/50 border border-primary/20 rounded px-4 py-3 font-terminal;
+    @apply focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30;
+    @apply placeholder:text-muted-foreground/50;
+  }
+
+  /* Infected Progress Bar */
+  .infected-progress {
+    @apply relative h-2 rounded-full overflow-hidden;
+    background: hsl(var(--muted));
+  }
+
+  .infected-progress-bar {
+    @apply h-full rounded-full transition-all duration-500;
+    background: var(--gradient-toxic);
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+  }
+
+  /* Grid overlay effect */
+  .grid-overlay {
+    background-image: 
+      linear-gradient(hsl(var(--primary) / 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+
+  /* Hexagon pattern */
+  .hex-pattern {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%2300ff00' fill-opacity='0.03'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+}
+
+@layer utilities {
+  /* Text glow effects */
+  .text-glow-toxic {
+    text-shadow: 0 0 10px hsl(var(--primary) / 0.8), 0 0 20px hsl(var(--primary) / 0.5);
+  }
+
+  .text-glow-blood {
+    text-shadow: 0 0 10px hsl(var(--destructive) / 0.8), 0 0 20px hsl(var(--destructive) / 0.5);
+  }
+
+  .text-glow-cyber {
+    text-shadow: 0 0 10px hsl(var(--accent) / 0.8), 0 0 20px hsl(var(--accent) / 0.5);
+  }
+
+  /* Animated gradient text */
+  .gradient-text-toxic {
+    background: var(--gradient-toxic);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Noise texture overlay */
+  .noise-overlay {
+    position: relative;
+  }
+
+  .noise-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.03;
+    pointer-events: none;
+  }
+}
+
+/* Keyframes */
+@keyframes glitch {
+  0%, 90%, 100% { opacity: 1; }
+  91% { opacity: 0.8; transform: translateX(-2px); }
+  92% { opacity: 0.9; transform: translateX(2px); }
+  93% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes glitch-1 {
+  0%, 100% { clip-path: inset(0 0 0 0); transform: translateX(0); }
+  20% { clip-path: inset(10% 0 60% 0); transform: translateX(-3px); }
+  40% { clip-path: inset(40% 0 30% 0); transform: translateX(3px); }
+  60% { clip-path: inset(70% 0 10% 0); transform: translateX(-3px); }
+  80% { clip-path: inset(20% 0 50% 0); transform: translateX(3px); }
+}
+
+@keyframes glitch-2 {
+  0%, 100% { clip-path: inset(0 0 0 0); transform: translateX(0); }
+  20% { clip-path: inset(60% 0 10% 0); transform: translateX(3px); }
+  40% { clip-path: inset(30% 0 40% 0); transform: translateX(-3px); }
+  60% { clip-path: inset(10% 0 70% 0); transform: translateX(3px); }
+  80% { clip-path: inset(50% 0 20% 0); transform: translateX(-3px); }
+}
+
+@keyframes scan {
+  0% { top: -100%; }
+  100% { top: 100%; }
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+  70% { box-shadow: 0 0 0 10px hsl(var(--primary) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+  51% { opacity: 1; }
+  52% { opacity: 0.7; }
+  53% { opacity: 1; }
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent; }
+  50% { border-color: hsl(var(--primary)); }
+}
+
+/* ============================================
+   GLITCH & ERROR ANIMATIONS
+   ============================================ */
+
+@keyframes glitch-shake {
+  0%, 100% { transform: translate(0); }
+  10% { transform: translate(-2px, 1px); }
+  20% { transform: translate(2px, -1px); }
+  30% { transform: translate(-1px, 2px); }
+  40% { transform: translate(1px, -2px); }
+  50% { transform: translate(-2px, 1px); }
+  60% { transform: translate(2px, 1px); }
+  70% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 2px); }
+  90% { transform: translate(-2px, -2px); }
+}
+
+@keyframes glitch-1 {
+  0% { clip-path: inset(40% 0 61% 0); transform: translate(0); }
+  20% { clip-path: inset(92% 0 1% 0); transform: translate(-5px, 2px); }
+  40% { clip-path: inset(43% 0 1% 0); transform: translate(5px, -2px); }
+  60% { clip-path: inset(25% 0 58% 0); transform: translate(-5px, 2px); }
+  80% { clip-path: inset(54% 0 7% 0); transform: translate(5px, -2px); }
+  100% { clip-path: inset(58% 0 43% 0); transform: translate(0); }
+}
+
+@keyframes glitch-2 {
+  0% { clip-path: inset(25% 0 60% 0); transform: translate(0); }
+  20% { clip-path: inset(54% 0 7% 0); transform: translate(5px, -2px); }
+  40% { clip-path: inset(58% 0 43% 0); transform: translate(-5px, 2px); }
+  60% { clip-path: inset(40% 0 61% 0); transform: translate(5px, -2px); }
+  80% { clip-path: inset(92% 0 1% 0); transform: translate(-5px, 2px); }
+  100% { clip-path: inset(43% 0 1% 0); transform: translate(0); }
+}
+
+@keyframes flash {
+  0%, 50%, 100% { opacity: 0; }
+  25%, 75% { opacity: 1; }
+}
+
+@keyframes glitch-bar {
+  0% { transform: translateX(-100%); opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  10%, 30%, 50%, 70%, 90% { transform: translate(-2px, -2px); }
+  20%, 40%, 60%, 80% { transform: translate(2px, 2px); }
+}
+
+@keyframes glitch-text {
+  0% { text-shadow: 2px 0 red, -2px 0 cyan; }
+  25% { text-shadow: -2px 0 red, 2px 0 cyan; }
+  50% { text-shadow: 2px 0 red, -2px 0 cyan; }
+  75% { text-shadow: -2px 0 red, 2px 0 cyan; }
+  100% { text-shadow: 2px 0 red, -2px 0 cyan; }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes fade-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes fade-out-slow {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes pulse-once {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes particle {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx, 50px), var(--ty, -50px)) scale(0); opacity: 0; }
+}
+
+@keyframes scale-in {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Utility animation classes */
+.animate-glitch-shake {
+  animation: glitch-shake 0.3s ease-in-out infinite;
+}
+
+.animate-glitch-1 {
+  animation: glitch-1 0.3s linear infinite;
+}
+
+.animate-glitch-2 {
+  animation: glitch-2 0.3s linear infinite;
+}
+
+.animate-flash {
+  animation: flash 0.3s ease-in-out;
+}
+
+.animate-glitch-bar {
+  animation: glitch-bar 0.5s ease-out;
+}
+
+.animate-shake {
+  animation: shake 0.3s ease-in-out;
+}
+
+.animate-glitch-text {
+  animation: glitch-text 0.2s linear infinite;
+}
+
+.animate-scanline {
+  animation: scanline 3s linear infinite;
+}
+
+.animate-fade-out {
+  animation: fade-out 0.5s ease-out forwards;
+}
+
+.animate-fade-out-slow {
+  animation: fade-out-slow 2s ease-out forwards;
+}
+
+.animate-pulse-once {
+  animation: pulse-once 1s ease-out;
+}
+
+.animate-particle {
+  animation: particle 1s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out forwards;
+}
+
+/* Glitch intensity classes */
+.glitch-subtle {
+  animation: glitch-shake 0.2s ease-in-out;
+}
+
+.glitch-moderate {
+  animation: glitch-shake 0.5s ease-in-out;
+}
+
+.glitch-intense {
+  animation: glitch-shake 1s ease-in-out;
+}
+
+/* Color filters for glitch layers */
+.filter-glitch-red {
+  filter: drop-shadow(2px 0 red) brightness(1.2);
+}
+
+.filter-glitch-blue {
+  filter: drop-shadow(-2px 0 cyan) brightness(1.2);
+}
