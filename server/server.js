@@ -11,6 +11,7 @@ const puzzleRoutes = require('./routes/puzzleRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const gameplayRoutes = require('./routes/gameplayRoutes');
 const featureRoutes = require('./routes/featureRoutes');
+const timeTrackingRoutes = require('./routes/timeTrackingRoutes');
 
 // Import database (this tests connection)
 require('./config/db');
@@ -75,11 +76,22 @@ app.get('/', (req, res) => {
   });
 });
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    message: 'Backend API is running successfully',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/puzzles', puzzleRoutes);
 app.use('/api/game', gameRoutes);
+app.use('/api/game/time', timeTrackingRoutes);  // Time tracking routes
 app.use('/api/gameplay', gameplayRoutes);
 app.use('/api', featureRoutes);
 

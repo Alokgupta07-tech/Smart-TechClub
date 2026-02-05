@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const timeTrackingController = require('../controllers/timeTrackingController');
 const authMiddleware = require('../middleware/auth');
 const { adminOnly } = require('../middleware/roleGuard');
 
@@ -26,5 +27,13 @@ router.get('/monitor/live', adminController.getLiveMonitoring);
 router.get('/activity', adminController.getActivityLogs);
 router.get('/suspicious', adminController.getSuspiciousActivity);
 router.get('/export/results', adminController.exportResults);
+
+// Time tracking admin endpoints
+router.get('/team-timings', timeTrackingController.getAdminTeamTimings);
+router.get('/team-timings/:teamId', timeTrackingController.getTeamTimingDetails);
+router.get('/game-settings', timeTrackingController.getGameSettings);
+router.put('/game-settings/:key', timeTrackingController.updateGameSetting);
+router.post('/team/:teamId/end-session', timeTrackingController.adminEndTeamSession);
+router.post('/team/:teamId/recalculate-time', timeTrackingController.recalculateTeamTime);
 
 module.exports = router;

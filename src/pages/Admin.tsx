@@ -24,8 +24,10 @@ import {
   LogOut,
   Timer,
   Download,
-  Loader2
+  Loader2,
+  Stopwatch
 } from "lucide-react";
+import AdminTimeDashboard from "@/components/AdminTimeDashboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -59,6 +61,7 @@ const Admin = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<"teams" | "timeTracking">("teams");
 
   // Fetch real data from MySQL backend
   const { data: teams, isLoading: teamsLoading, error: teamsError } = useTeams();
@@ -498,7 +501,23 @@ const Admin = () => {
       <main className="pt-24 pb-16 px-4">
         <div className="container mx-auto">
           {/* Quick Navigation */}
-          <div className="mb-6 flex gap-3">
+          <div className="mb-6 flex gap-3 flex-wrap">
+            <Button 
+              onClick={() => setActivePanel('teams')} 
+              variant={activePanel === 'teams' ? 'default' : 'terminal'}
+              className="gap-2"
+            >
+              <Users className="w-4 h-4" />
+              Teams Overview
+            </Button>
+            <Button 
+              onClick={() => setActivePanel('timeTracking')} 
+              variant={activePanel === 'timeTracking' ? 'default' : 'terminal'}
+              className="gap-2"
+            >
+              <Timer className="w-4 h-4" />
+              Time Tracking
+            </Button>
             <Button 
               onClick={() => navigate('/admin/puzzles')} 
               variant="terminal" 
@@ -560,6 +579,10 @@ const Admin = () => {
             )}
           </div>
 
+          {/* Conditional Panel Rendering */}
+          {activePanel === 'timeTracking' ? (
+            <AdminTimeDashboard />
+          ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Teams List */}
             <div className="lg:col-span-2">
@@ -845,6 +868,7 @@ const Admin = () => {
               </TerminalCard>
             </div>
           </div>
+          )}
         </div>
       </main>
 
