@@ -5,9 +5,6 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  
-  // Debug checkpoint - return immediately to test
-  return res.status(200).json({ debug: 'handler reached', method: req.method, url: req.url });
 
   try {
     const { getSupabase } = require('../_lib/supabase');
@@ -70,6 +67,6 @@ module.exports = async function handler(req, res) {
 
   } catch (error) {
     console.error('Puzzles API error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };
