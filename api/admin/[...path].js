@@ -356,11 +356,11 @@ module.exports = async function handler(req, res) {
         .select('id')
         .eq('is_active', true)
         .eq('level', 1);
-      const totalQuestions = puzzles?.length || 10;
+      var totalQuestions = (puzzles && puzzles.length) ? puzzles.length : 10;
       
       // Build team info with JS calculations
-      const teamsWithDetails = (teams || []).map(team => {
-        let totalTimeSeconds = 0;
+      var teamsWithDetails = (teams || []).map(function(team) {
+        var totalTimeSeconds = 0;
         if (team.start_time && team.end_time) {
           totalTimeSeconds = Math.floor((new Date(team.end_time) - new Date(team.start_time)) / 1000);
         } else if (team.start_time && team.status === 'active') {
@@ -401,19 +401,21 @@ module.exports = async function handler(req, res) {
       
       return res.json({
         success: true,
-        questions: (puzzles || []).map(p => ({
-          id: p.id,
-          title: p.title,
-          level: p.level,
-          puzzleNumber: p.puzzle_number,
-          totalAttempts: 0,
-          completedCount: 0,
-          skippedCount: 0,
-          avgTime: 0,
-          minTime: 0,
-          maxTime: 0,
-          totalHintsUsed: 0
-        })),
+        questions: (puzzles || []).map(function(p) {
+          return {
+            id: p.id,
+            title: p.title,
+            level: p.level,
+            puzzleNumber: p.puzzle_number,
+            totalAttempts: 0,
+            completedCount: 0,
+            skippedCount: 0,
+            avgTime: 0,
+            minTime: 0,
+            maxTime: 0,
+            totalHintsUsed: 0
+          };
+        }),
         overallAvgTime: 600
       });
     }
