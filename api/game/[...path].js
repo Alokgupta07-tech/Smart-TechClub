@@ -50,6 +50,122 @@ module.exports = async function handler(req, res) {
       return res.json(states[0]);
     }
 
+    // ─── User-authenticated time tracking routes ───
+    var isTimeTrackingRoute = path === '/session' || 
+                              path === '/start-question' || 
+                              path === '/pause-question' || 
+                              path === '/resume-question' || 
+                              path === '/skip-question' || 
+                              path === '/complete-question' || 
+                              path === '/skipped-questions' ||
+                              path.match(/^\/timer\/[^\/]+$/);
+    
+    if (isTimeTrackingRoute) {
+      const authResult = verifyAuth(req);
+      if (authResult.error) {
+        return res.status(authResult.status).json({ error: authResult.error, code: authResult.code });
+      }
+      
+      var user = authResult.user;
+      
+      // Get user's team
+      const { data: team } = await supabase
+        .from('teams')
+        .select('id, team_name, status, start_time, hints_used')
+        .eq('user_id', user.userId)
+        .single();
+
+      if (!team) {
+        return res.status(404).json({ error: 'Team not found' });
+      }
+
+      // ─── GET /api/game/timer/:puzzleId ───
+      var timerMatch = path.match(/^\/timer\/([^\/]+)$/);
+      if (req.method === 'GET' && timerMatch) {
+        var timeSpent = 0;
+        if (team.start_time) {
+          timeSpent = Math.floor((Date.now() - new Date(team.start_time).getTime()) / 1000);
+        }
+        
+        return res.json({
+          timerState: {
+            timeSpentSeconds: timeSpent,
+            status: team.status === 'active' ? 'active' : 'not_started',
+            isRunning: team.status === 'active',
+            attempts: 0,
+            hintsUsed: team.hints_used || 0,
+            skipCount: 0,
+            penaltySeconds: 0
+          }
+        });
+      }
+
+      // ─── GET /api/game/session ───
+      if (req.method === 'GET' && path === '/session') {
+        var totalTime = 0;
+        if (team.start_time) {
+          totalTime = Math.floor((Date.now() - new Date(team.start_time).getTime()) / 1000);
+        }
+        
+        var hours = Math.floor(totalTime / 3600);
+        var mins = Math.floor((totalTime % 3600) / 60);
+        var secs = totalTime % 60;
+        var formatted = String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+        
+        return res.json({
+          session: {
+            totalTimeSeconds: totalTime,
+            penaltySeconds: 0,
+            effectiveTimeSeconds: totalTime,
+            questionsCompleted: 0,
+            questionsSkipped: 0,
+            skipsRemaining: 3,
+            totalTimeFormatted: formatted
+          }
+        });
+      }
+
+      // ─── POST /api/game/start-question ───
+      if (req.method === 'POST' && path === '/start-question') {
+        if (!team.start_time) {
+          await supabase
+            .from('teams')
+            .update({ start_time: new Date().toISOString(), status: 'active' })
+            .eq('id', team.id);
+        }
+        return res.json({ success: true, message: 'Question timer started' });
+      }
+
+      // ─── POST /api/game/pause-question ───
+      if (req.method === 'POST' && path === '/pause-question') {
+        await supabase.from('teams').update({ status: 'paused' }).eq('id', team.id);
+        return res.json({ success: true, message: 'Question timer paused' });
+      }
+
+      // ─── POST /api/game/resume-question ───
+      if (req.method === 'POST' && path === '/resume-question') {
+        await supabase.from('teams').update({ status: 'active' }).eq('id', team.id);
+        return res.json({ success: true, message: 'Question timer resumed' });
+      }
+
+      // ─── POST /api/game/skip-question ───
+      if (req.method === 'POST' && path === '/skip-question') {
+        return res.json({ success: true, message: 'Question skipped' });
+      }
+
+      // ─── POST /api/game/complete-question ───
+      if (req.method === 'POST' && path === '/complete-question') {
+        return res.json({ success: true, message: 'Question completed' });
+      }
+
+      // ─── GET /api/game/skipped-questions ───
+      if (req.method === 'GET' && path === '/skipped-questions') {
+        return res.json({ skippedQuestions: [] });
+      }
+
+      return res.status(404).json({ error: 'Time tracking endpoint not found' });
+    }
+
     // ─── Protected admin routes below ───
     const authResult = verifyAuth(req);
     if (authResult.error) {

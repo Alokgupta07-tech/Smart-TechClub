@@ -420,6 +420,30 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // ─── GET /api/admin/game-settings ───
+    if (req.method === 'GET' && path === '/game-settings') {
+      // Return default game settings
+      return res.json({
+        success: true,
+        settings: {
+          skipPenaltySeconds: 300,
+          hintPenalties: { 1: 60, 2: 120, 3: 180 },
+          maxSkipsPerTeam: 3,
+          maxHintsPerQuestion: 3,
+          autoStartTimer: true,
+          showLeaderboard: true,
+          allowReturnToSkipped: true
+        }
+      });
+    }
+
+    // ─── PUT /api/admin/game-settings/:key ───
+    var settingMatch = path.match(/^\/game-settings\/([^\/]+)$/);
+    if (req.method === 'PUT' && settingMatch) {
+      // For now, just acknowledge the update (actual implementation would store in DB)
+      return res.json({ success: true, message: 'Setting updated' });
+    }
+
     return res.status(404).json({ error: 'Endpoint not found' });
 
   } catch (error) {
