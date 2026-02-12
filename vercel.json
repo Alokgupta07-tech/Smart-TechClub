@@ -6,6 +6,7 @@
   "framework": "vite",
   "skewProtection": true,
   "rewrites": [
+    { "source": "/api/health", "destination": "/api/health" },
     { "source": "/api/puzzles", "destination": "/api/puzzles/index" },
     { "source": "/api/puzzles/:path*", "destination": "/api/puzzles/[...path]" },
     { "source": "/api/auth/:path*", "destination": "/api/auth/[...path]" },
