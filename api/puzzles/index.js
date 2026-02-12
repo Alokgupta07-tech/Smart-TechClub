@@ -40,12 +40,8 @@ module.exports = async function handler(req, res) {
       if (level) {
         query = query.eq('level', level);
       }
-      query = query.order('level', { ascending: true }).order('sequence', { ascending: true });
+      query = query.order('level', { ascending: true }).order('puzzle_number', { ascending: true });
       var result = await query;
-      
-      // DEBUG: After query
-      return res.status(200).json({ debug: 'after-query', hasData: !!result.data, count: (result.data || []).length, error: result.error });
-      
       if (result.error) throw result.error;
       return res.json(result.data || []);
     }

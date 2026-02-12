@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
         query = query.eq('level', level);
       }
 
-      query = query.order('level', { ascending: true }).order('sequence', { ascending: true });
+      query = query.order('level', { ascending: true }).order('puzzle_number', { ascending: true });
 
       const { data: puzzles, error } = await query;
       if (error) throw error;
