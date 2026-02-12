@@ -1,16 +1,25 @@
 module.exports = async function handler(req, res) {
-  const { getSupabase } = require('../_lib/supabase');
-  const { verifyAuth, requireAdmin, setCorsHeaders } = require('../_lib/auth');
-  const crypto = require('crypto');
-
-  setCorsHeaders(res);
+  // Set CORS headers early
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const supabase = getSupabase();
-  const path = req.url.replace('/api/puzzles', '').split('?')[0];
-  const level = req.query && req.query.level ? req.query.level : null;
-
   try {
+    const { getSupabase } = require('../_lib/supabase');
+    const { verifyAuth, requireAdmin, setCorsHeaders } = require('../_lib/auth');
+    const crypto = require('crypto');
+
+    const supabase = getSupabase();
+    const path = req.url.replace('/api/puzzles', '').split('?')[0];
+    
+    // Parse level from query string manually (req.query may not exist)
+    let level = null;
+    const qmark = req.url.indexOf('?');
+    if (qmark !== -1) {
+      const params = new URLSearchParams(req.url.slice(qmark + 1));
+      level = params.get('level');
+    }
     // ─── GET /api/puzzles — List all puzzles (admin) ───
     if (req.method === 'GET' && (path === '' || path === '/')) {
       const authResult = verifyAuth(req);
