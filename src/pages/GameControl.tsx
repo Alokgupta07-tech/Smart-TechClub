@@ -113,15 +113,20 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${selectedLevel}/status`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch evaluation status');
+        // Evaluation endpoints not implemented yet - return null
+        return null;
       }
       return response.json();
     },
     refetchInterval: 5000,
+    retry: false, // Don't retry on 404
+    enabled: false, // Disable until evaluation feature is implemented
   });
 
   const evaluationStatus: EvaluationStatus | undefined = evaluationData;
 
+  // DISABLED: Evaluation endpoints not implemented yet
+  /*
   // Close Submissions mutation
   const closeSubmissions = useMutation({
     mutationFn: async (levelId: number) => {
@@ -239,7 +244,7 @@ export default function GameControl() {
       });
     },
   });
-  // ======= END NEW CODE =======
+  */
 
   // Start game mutation
   const startGame = useMutation({
@@ -715,6 +720,8 @@ export default function GameControl() {
       </Card>
 
       {/* ======= NEW: Level Evaluation Controls ======= */}
+      {/* DISABLED: Evaluation feature not yet implemented */}
+      {false && (
       <Card className="bg-black/40 border-cyan-500/30">
         <CardHeader>
           <CardTitle className="text-cyan-500 flex items-center gap-2">
@@ -926,6 +933,7 @@ export default function GameControl() {
           )}
         </CardContent>
       </Card>
+      )}
       {/* ======= END NEW: Level Evaluation Controls ======= */}
 
       {/* Broadcast Dialog */}

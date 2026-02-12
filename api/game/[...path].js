@@ -46,46 +46,52 @@ module.exports = async function handler(req, res) {
 
     // ─── POST /api/game/start ───
     if (req.method === 'POST' && path === '/start') {
+      // Update first row (should only be one game_state row)
+      const { data: existing } = await supabase.from('game_state').select('id').limit(1).single();
       const { error } = await supabase
         .from('game_state')
         .update({ game_active: true, game_started_at: new Date().toISOString() })
-        .limit(1);
+        .eq('id', existing?.id || 1);
       if (error) throw error;
       return res.json({ message: 'Game started' });
     }
 
     // ─── POST /api/game/pause ───
     if (req.method === 'POST' && path === '/pause') {
+      const { data: existing } = await supabase.from('game_state').select('id').limit(1).single();
       const { error } = await supabase
         .from('game_state')
         .update({ game_active: false })
-        .limit(1);
+        .eq('id', existing?.id || 1);
       if (error) throw error;
       return res.json({ message: 'Game paused' });
     }
 
     // ─── POST /api/game/resume ───
     if (req.method === 'POST' && path === '/resume') {
+      const { data: existing } = await supabase.from('game_state').select('id').limit(1).single();
       const { error } = await supabase
         .from('game_state')
         .update({ game_active: true })
-        .limit(1);
+        .eq('id', existing?.id || 1);
       if (error) throw error;
       return res.json({ message: 'Game resumed' });
     }
 
     // ─── POST /api/game/end ───
     if (req.method === 'POST' && path === '/end') {
+      const { data: existing } = await supabase.from('game_state').select('id').limit(1).single();
       const { error } = await supabase
         .from('game_state')
         .update({ game_active: false, game_ended_at: new Date().toISOString() })
-        .limit(1);
+        .eq('id', existing?.id || 1);
       if (error) throw error;
       return res.json({ message: 'Game ended' });
     }
 
     // ─── POST /api/game/reset ───
     if (req.method === 'POST' && path === '/reset') {
+      const { data: existing } = await supabase.from('game_state').select('id').limit(1).single();
       const { error: gsErr } = await supabase
         .from('game_state')
         .update({ 
@@ -96,7 +102,7 @@ module.exports = async function handler(req, res) {
           game_started_at: null, 
           game_ended_at: null 
         })
-        .limit(1);
+        .eq('id', existing?.id || 1);
       if (gsErr) throw gsErr;
 
       // Reset all teams
@@ -116,10 +122,11 @@ module.exports = async function handler(req, res) {
       if (level === 1) updates.level1_open = true;
       if (level === 2) updates.level2_open = true;
       
+      const { data: existing } = await supabase.from('game_state').select('id').limit(1).single();
       const { error } = await supabase
         .from('game_state')
         .update(updates)
-        .limit(1);
+        .eq('id', existing?.id || 1);
       if (error) throw error;
       return res.json({ message: `Level ${level} unlocked` });
     }
