@@ -1,18 +1,21 @@
 module.exports = async function handler(req, res) {
-  const { v4: uuidv4 } = require('uuid');
-  const bcrypt = require('bcryptjs');
-  const { getSupabase } = require('../_lib/supabase');
-  const { generateAccessToken, generateRefreshToken, verifyRefreshToken, setCorsHeaders } = require('../_lib/auth');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
-  const SALT_ROUNDS = 10;
-
-  setCorsHeaders(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const supabase = getSupabase();
-  const path = req.url.replace('/api/auth', '').split('?')[0];
-
   try {
+    const { v4: uuidv4 } = require('uuid');
+    const bcrypt = require('bcryptjs');
+    const { getSupabase } = require('../_lib/supabase');
+    const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../_lib/auth');
+
+    const SALT_ROUNDS = 10;
+    const supabase = getSupabase();
+    const path = req.url.replace('/api/auth', '').split('?')[0];
+
     // ─── POST /api/auth/register ───
     if (req.method === 'POST' && path === '/register') {
       const { name, email, password, teamName, members } = req.body;
@@ -24,7 +27,6 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'Password must be at least 8 characters' });
       }
 
-      // Check existing user
       const { data: existing } = await supabase
         .from('users')
         .select('id')
@@ -39,18 +41,16 @@ module.exports = async function handler(req, res) {
       const userId = uuidv4();
       const teamId = uuidv4();
 
-      // Create user
       const { error: userErr } = await supabase.from('users').insert({
         id: userId,
-        name,
-        email,
+        name: name,
+        email: email,
         password_hash: passwordHash,
         role: 'team',
         is_verified: true
       });
       if (userErr) throw userErr;
 
-      // Create team
       const { error: teamErr } = await supabase.from('teams').insert({
         id: teamId,
         user_id: userId,
@@ -58,21 +58,22 @@ module.exports = async function handler(req, res) {
       });
       if (teamErr) throw teamErr;
 
-      // Create team members
       if (members && Array.isArray(members) && members.length > 0) {
-        const memberRows = members.map(m => ({
-          id: uuidv4(),
-          team_id: teamId,
-          name: m.name,
-          email: m.email,
-          phone: m.phone || null,
-          role: m.role || 'member'
-        }));
+        const memberRows = members.map(function(m) {
+          return {
+            id: uuidv4(),
+            team_id: teamId,
+            name: m.name,
+            email: m.email,
+            phone: m.phone || null,
+            role: m.role || 'member'
+          };
+        });
         const { error: memErr } = await supabase.from('team_members').insert(memberRows);
         if (memErr) throw memErr;
       }
 
-      return res.status(201).json({ message: 'Registration successful.', userId, email });
+      return res.status(201).json({ message: 'Registration successful.', userId: userId, email: email });
     }
 
     // ─── POST /api/auth/login ───
@@ -95,13 +96,12 @@ module.exports = async function handler(req, res) {
       }
 
       const user = users[0];
-
       const isValid = await bcrypt.compare(password, user.password_hash);
       if (!isValid) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      let teamId = null;
+      var teamId = null;
       if (user.role === 'team') {
         const { data: teams } = await supabase
           .from('teams')
@@ -115,12 +115,11 @@ module.exports = async function handler(req, res) {
         userId: user.id,
         email: user.email,
         role: user.role,
-        teamId
+        teamId: teamId
       });
 
       const refreshToken = generateRefreshToken({ userId: user.id });
 
-      // Store refresh token
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       await supabase.from('refresh_tokens').insert({
         user_id: user.id,
@@ -130,8 +129,8 @@ module.exports = async function handler(req, res) {
 
       return res.json({
         message: 'Login successful',
-        accessToken,
-        refreshToken,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
         role: user.role,
         user: {
           id: user.id,
@@ -144,19 +143,19 @@ module.exports = async function handler(req, res) {
 
     // ─── POST /api/auth/refresh ───
     if (req.method === 'POST' && path === '/refresh') {
-      const { refreshToken } = req.body;
-      if (!refreshToken) {
+      const refreshTkn = req.body.refreshToken;
+      if (!refreshTkn) {
         return res.status(400).json({ error: 'Refresh token required' });
       }
 
       try {
-        const decoded = verifyRefreshToken(refreshToken);
+        const decoded = verifyRefreshToken(refreshTkn);
 
         const { data: tokens } = await supabase
           .from('refresh_tokens')
           .select('*')
           .eq('user_id', decoded.userId)
-          .eq('token', refreshToken)
+          .eq('token', refreshTkn)
           .gt('expires_at', new Date().toISOString())
           .limit(1);
 
@@ -175,21 +174,21 @@ module.exports = async function handler(req, res) {
         }
 
         const user = users[0];
-        let teamId = null;
+        var tid = null;
         if (user.role === 'team') {
           const { data: teams } = await supabase
             .from('teams')
             .select('id')
             .eq('user_id', user.id)
             .limit(1);
-          if (teams && teams.length > 0) teamId = teams[0].id;
+          if (teams && teams.length > 0) tid = teams[0].id;
         }
 
         const newAccessToken = generateAccessToken({
           userId: user.id,
           email: user.email,
           role: user.role,
-          teamId
+          teamId: tid
         });
 
         return res.json({ accessToken: newAccessToken });
@@ -200,9 +199,9 @@ module.exports = async function handler(req, res) {
 
     // ─── POST /api/auth/logout ───
     if (req.method === 'POST' && path === '/logout') {
-      const { refreshToken } = req.body;
-      if (refreshToken) {
-        await supabase.from('refresh_tokens').delete().eq('token', refreshToken);
+      const logoutToken = req.body.refreshToken;
+      if (logoutToken) {
+        await supabase.from('refresh_tokens').delete().eq('token', logoutToken);
       }
       return res.json({ message: 'Logged out successfully' });
     }
