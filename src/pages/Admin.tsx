@@ -73,9 +73,6 @@ const Admin = () => {
   const { data: alerts, isLoading: alertsLoading } = useAlerts();
   const teamAction = useTeamAction();
 
-  // Debug log
-  console.log('Admin stats:', { stats, statsLoading, statsError });
-
   // ============================================
   // DERIVED STATE - NO HARDCODED VALUES
   // ============================================

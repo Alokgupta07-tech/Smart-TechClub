@@ -104,8 +104,8 @@ module.exports = async function handler(req, res) {
       return res.json({ message: 'Game ended' });
     }
 
-    // ─── POST /api/game/reset ───
-    if (req.method === 'POST' && path === '/reset') {
+    // ─── POST /api/game/reset or /restart ───
+    if (req.method === 'POST' && (path === '/reset' || path === '/restart')) {
       const gameStateId = await getGameStateId(supabase);
       const { error: gsErr } = await supabase
         .from('game_state')
