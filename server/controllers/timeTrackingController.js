@@ -220,6 +220,41 @@ exports.unskipQuestion = async (req, res) => {
 };
 
 /**
+ * POST /api/game/go-to-question
+ * Navigate to any previously visited question
+ */
+exports.goToQuestion = async (req, res) => {
+  try {
+    const teamId = req.user.team_id;
+    const { puzzle_id } = req.body;
+    
+    if (!teamId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Team ID not found in token'
+      });
+    }
+    
+    if (!puzzle_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'puzzle_id is required'
+      });
+    }
+    
+    const result = await timeTrackingService.goToQuestion(teamId, puzzle_id, req);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error navigating to question:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to navigate to question'
+    });
+  }
+};
+
+/**
  * POST /api/game/end-session
  * End team's game session
  */
@@ -516,6 +551,27 @@ exports.recalculateTeamTime = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to recalculate team time'
+    });
+  }
+};
+
+/**
+ * GET /api/admin/question-analytics
+ * Get analytics data for all questions (Admin only)
+ */
+exports.getQuestionAnalytics = async (req, res) => {
+  try {
+    const analytics = await timeTrackingService.getQuestionAnalytics();
+    
+    res.json({
+      success: true,
+      ...analytics
+    });
+  } catch (error) {
+    console.error('Error getting question analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get question analytics'
     });
   }
 };

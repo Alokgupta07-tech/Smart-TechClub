@@ -7,8 +7,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchWithAuth } from '@/lib/api';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface TimerState {
   timeSpentSeconds: number;
@@ -27,6 +28,7 @@ interface SessionState {
   questionsCompleted: number;
   questionsSkipped: number;
   skipsRemaining: number;
+  totalTimeFormatted?: string;
 }
 
 interface UseTimeTrackingOptions {
@@ -45,19 +47,11 @@ export function useTimeTracking({
   const [isRunning, setIsRunning] = useState(false);
   const lastSyncRef = useRef<number>(0);
 
-  // Get auth header
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('accessToken');
-    return { Authorization: `Bearer ${token}` };
-  };
-
   // Fetch timer state from server (source of truth)
   const { data: timerState, isLoading: timerLoading, refetch: refetchTimer } = useQuery<TimerState>({
     queryKey: ['timer', puzzleId],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/game/timer/${puzzleId}`, {
-        headers: getAuthHeader()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/game/timer/${puzzleId}`);
       if (!response.ok) throw new Error('Failed to fetch timer state');
       const data = await response.json();
       return data.timerState;
@@ -70,9 +64,7 @@ export function useTimeTracking({
   const { data: sessionState, refetch: refetchSession } = useQuery<SessionState>({
     queryKey: ['session'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/game/session`, {
-        headers: getAuthHeader()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/game/session`);
       if (!response.ok) throw new Error('Failed to fetch session state');
       const data = await response.json();
       return data.session;
@@ -103,11 +95,10 @@ export function useTimeTracking({
   // START QUESTION
   const startMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`${API_BASE}/game/start-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/start-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeader()
         },
         body: JSON.stringify({ puzzle_id: puzzleId })
       });
@@ -126,11 +117,10 @@ export function useTimeTracking({
   // PAUSE QUESTION
   const pauseMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`${API_BASE}/game/pause-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/pause-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeader()
         },
         body: JSON.stringify({ puzzle_id: puzzleId })
       });
@@ -149,11 +139,10 @@ export function useTimeTracking({
   // RESUME QUESTION
   const resumeMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`${API_BASE}/game/resume-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/resume-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeader()
         },
         body: JSON.stringify({ puzzle_id: puzzleId })
       });
@@ -172,11 +161,10 @@ export function useTimeTracking({
   // SKIP QUESTION
   const skipMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`${API_BASE}/game/skip-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/skip-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeader()
         },
         body: JSON.stringify({ puzzle_id: puzzleId })
       });
@@ -196,11 +184,10 @@ export function useTimeTracking({
   // COMPLETE QUESTION
   const completeMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`${API_BASE}/game/complete-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/complete-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeader()
         },
         body: JSON.stringify({ puzzle_id: puzzleId })
       });
@@ -229,7 +216,7 @@ export function useTimeTracking({
     // Timer state
     timeSpentSeconds: localTime,
     timeFormatted: formatTime(localTime),
-    status: timerState?.status || 'not_started',
+    status: (timerState?.status || 'not_started') as TimerState['status'],
     isRunning,
     isLoading: timerLoading,
     
@@ -270,17 +257,10 @@ export function useTimeTracking({
 
 // Hook for fetching skipped questions
 export function useSkippedQuestions() {
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('accessToken');
-    return { Authorization: `Bearer ${token}` };
-  };
-
   return useQuery({
     queryKey: ['skippedQuestions'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/game/skipped-questions`, {
-        headers: getAuthHeader()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/game/skipped-questions`);
       if (!response.ok) throw new Error('Failed to fetch skipped questions');
       return response.json();
     }
@@ -289,17 +269,10 @@ export function useSkippedQuestions() {
 
 // Hook for admin team timings
 export function useAdminTeamTimings(autoRefresh = true) {
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('accessToken');
-    return { Authorization: `Bearer ${token}` };
-  };
-
   return useQuery({
     queryKey: ['adminTeamTimings'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/admin/team-timings`, {
-        headers: getAuthHeader()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/team-timings`);
       if (!response.ok) throw new Error('Failed to fetch team timings');
       return response.json();
     },
@@ -309,17 +282,10 @@ export function useAdminTeamTimings(autoRefresh = true) {
 
 // Hook for admin question analytics
 export function useQuestionAnalytics() {
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('accessToken');
-    return { Authorization: `Bearer ${token}` };
-  };
-
   return useQuery({
     queryKey: ['questionAnalytics'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/admin/question-analytics`, {
-        headers: getAuthHeader()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/question-analytics`);
       if (!response.ok) throw new Error('Failed to fetch analytics');
       return response.json();
     },
@@ -330,18 +296,11 @@ export function useQuestionAnalytics() {
 // Hook for game settings
 export function useGameSettings() {
   const queryClient = useQueryClient();
-  
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('accessToken');
-    return { Authorization: `Bearer ${token}` };
-  };
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['gameSettings'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/admin/game-settings`, {
-        headers: getAuthHeader()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/game-settings`);
       if (!response.ok) throw new Error('Failed to fetch settings');
       return response.json();
     }
@@ -349,11 +308,10 @@ export function useGameSettings() {
 
   const updateSetting = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: any }) => {
-      const response = await fetch(`${API_BASE}/admin/game-settings/${key}`, {
+      const response = await fetchWithAuth(`${API_BASE}/admin/game-settings/${key}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeader()
         },
         body: JSON.stringify({ value })
       });

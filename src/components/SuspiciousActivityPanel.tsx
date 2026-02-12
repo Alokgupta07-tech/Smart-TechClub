@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/lib/api';
 
 interface SuspiciousAlert {
   id: string;
@@ -28,23 +29,19 @@ interface SuspiciousAlert {
   created_at: string;
 }
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const fetchAlerts = async (unreviewedOnly: boolean): Promise<SuspiciousAlert[]> => {
-  const accessToken = localStorage.getItem('accessToken');
-  const response = await fetch(
-    `${API_BASE}/admin/suspicious?unreviewedOnly=${unreviewedOnly}&limit=100`, 
-    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+  const response = await fetchWithAuth(
+    `${API_BASE}/admin/suspicious?unreviewedOnly=${unreviewedOnly}&limit=100`
   );
   if (!response.ok) throw new Error('Failed to fetch alerts');
   return response.json();
 };
 
 const reviewAlert = async (alertId: string): Promise<void> => {
-  const accessToken = localStorage.getItem('accessToken');
-  const response = await fetch(`${API_BASE}/admin/suspicious/${alertId}/review`, {
+  const response = await fetchWithAuth(`${API_BASE}/admin/suspicious/${alertId}/review`, {
     method: 'PATCH',
-    headers: { 'Authorization': `Bearer ${accessToken}` }
   });
   if (!response.ok) throw new Error('Failed to review alert');
 };

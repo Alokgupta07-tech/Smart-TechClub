@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Trophy, TrendingUp, TrendingDown, Minus, Clock, Lightbulb, Target } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { fetchWithAuth } from '@/lib/api';
 
 interface LeaderboardEntry {
   rank: number;
@@ -18,13 +19,10 @@ interface LeaderboardEntry {
   effectiveTime: number;
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 const fetchLeaderboard = async (): Promise<LeaderboardEntry[]> => {
-  const accessToken = localStorage.getItem('accessToken');
-  const response = await fetch('http://localhost:5000/api/leaderboard', {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`
-    }
-  });
+  const response = await fetchWithAuth(`${API_BASE}/leaderboard`);
   if (!response.ok) throw new Error('Failed to fetch leaderboard');
   return response.json();
 };

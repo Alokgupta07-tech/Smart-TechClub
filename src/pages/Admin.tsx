@@ -1,6 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchWithAuth } from '@/lib/api';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 import { 
   Users, 
   Clock, 
@@ -25,9 +29,11 @@ import {
   Timer,
   Download,
   Loader2,
-  Stopwatch
+  Layers
 } from "lucide-react";
 import AdminTimeDashboard from "@/components/AdminTimeDashboard";
+import AdminQualificationPanel from "@/components/AdminQualificationPanel";
+import AdminLevelManagement from "@/components/AdminLevelManagement";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -56,18 +62,19 @@ const Admin = () => {
   // ============================================
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const [eventStatus, setEventStatus] = useState<"waiting" | "active" | "paused" | "ended">("active");
-  const [globalTimer, setGlobalTimer] = useState(5432);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [activePanel, setActivePanel] = useState<"teams" | "timeTracking">("teams");
+  const [activePanel, setActivePanel] = useState<"teams" | "timeTracking" | "qualification" | "levels">("levels");
 
   // Fetch real data from MySQL backend
   const { data: teams, isLoading: teamsLoading, error: teamsError } = useTeams();
-  const { data: stats, isLoading: statsLoading } = useAdminStats();
+  const { data: stats, isLoading: statsLoading, error: statsError } = useAdminStats();
   const { data: alerts, isLoading: alertsLoading } = useAlerts();
   const teamAction = useTeamAction();
+
+  // Debug log
+  console.log('Admin stats:', { stats, statsLoading, statsError });
 
   // ============================================
   // DERIVED STATE - NO HARDCODED VALUES
@@ -103,27 +110,6 @@ const Admin = () => {
     );
   };
 
-  const handleEventAction = (action: string) => {
-    switch (action) {
-      case "start":
-        setEventStatus("active");
-        toast.success("Event started!");
-        break;
-      case "pause":
-        setEventStatus("paused");
-        toast.warning("Event paused");
-        break;
-      case "resume":
-        setEventStatus("active");
-        toast.success("Event resumed");
-        break;
-      case "end":
-        setEventStatus("ended");
-        toast.info("Event ended");
-        break;
-    }
-  };
-
   const handleTeamAction = (teamId: string, action: 'pause' | 'resume' | 'disqualify' | 'reset') => {
     teamAction.mutate({ teamId, action });
   };
@@ -134,12 +120,8 @@ const Admin = () => {
     }
 
     try {
-      const accessToken = localStorage.getItem('accessToken');
-      const response = await fetch(`http://localhost:5000/api/admin/teams/${teamId}`, {
+      const response = await fetchWithAuth(`${API_BASE}/admin/teams/${teamId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
       });
 
       if (!response.ok) throw new Error('Failed to delete team');
@@ -157,11 +139,9 @@ const Admin = () => {
     const actionText = newStatus === 'disqualified' ? 'disqualify' : 'qualify';
 
     try {
-      const accessToken = localStorage.getItem('accessToken');
-      const response = await fetch(`http://localhost:5000/api/admin/teams/${teamId}/status`, {
+      const response = await fetchWithAuth(`${API_BASE}/admin/teams/${teamId}/status`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status: newStatus })
@@ -179,11 +159,9 @@ const Admin = () => {
 
   const handleApproveTeam = async (teamId: string, teamName: string) => {
     try {
-      const accessToken = localStorage.getItem('accessToken');
-      const response = await fetch(`http://localhost:5000/api/admin/teams/${teamId}/status`, {
+      const response = await fetchWithAuth(`${API_BASE}/admin/teams/${teamId}/status`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status: 'active' })
@@ -212,16 +190,14 @@ const Admin = () => {
     }
 
     try {
-      const accessToken = localStorage.getItem('accessToken');
       let successCount = 0;
       let failCount = 0;
 
       for (const team of waitingTeams) {
         try {
-          const response = await fetch(`http://localhost:5000/api/admin/teams/${team.id}/status`, {
+          const response = await fetchWithAuth(`${API_BASE}/admin/teams/${team.id}/status`, {
             method: 'PUT',
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({ status: 'active' })
@@ -264,16 +240,14 @@ const Admin = () => {
     }
 
     try {
-      const accessToken = localStorage.getItem('accessToken');
       let successCount = 0;
       let failCount = 0;
 
       for (const team of activeTeams) {
         try {
-          const response = await fetch(`http://localhost:5000/api/admin/teams/${team.id}/status`, {
+          const response = await fetchWithAuth(`${API_BASE}/admin/teams/${team.id}/status`, {
             method: 'PUT',
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({ status: 'waiting' })
@@ -312,12 +286,8 @@ const Admin = () => {
     }
 
     try {
-      const accessToken = localStorage.getItem('accessToken');
-      const response = await fetch('http://localhost:5000/api/game/restart', {
+      const response = await fetchWithAuth('${API_BASE}/game/restart', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
       });
 
       if (!response.ok) throw new Error('Failed to reset game');
@@ -332,12 +302,7 @@ const Admin = () => {
 
   const handleExportResults = async () => {
     try {
-      const accessToken = localStorage.getItem('accessToken');
-      const response = await fetch('http://localhost:5000/api/admin/export/results', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
+      const response = await fetchWithAuth('${API_BASE}/admin/export/results');
 
       if (!response.ok) throw new Error('Failed to export results');
 
@@ -370,22 +335,15 @@ const Admin = () => {
 
   const handleViewDetails = async (teamId: string) => {
     try {
-      const accessToken = localStorage.getItem('accessToken');
-      const response = await fetch(`http://localhost:5000/api/admin/teams/${teamId}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/teams/${teamId}`);
 
       if (!response.ok) throw new Error('Failed to fetch team details');
 
       const teamData = await response.json();
-      console.log('Team data received:', teamData);
       setSelectedTeam(teamData);
       setIsDetailsOpen(true);
     } catch (error) {
       toast.error('Failed to load team details');
-      console.error('Error fetching team details:', error);
     }
   };
 
@@ -412,80 +370,43 @@ const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background noise-overlay">
+    <div className="min-h-screen !bg-gray-900 noise-overlay">
       {/* Admin Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-background/90 backdrop-blur-xl">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 !bg-gray-900/95 backdrop-blur-xl">
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-4">
               <Link to="/" className="flex items-center gap-3">
-                <BiohazardIcon className="w-8 h-8 text-destructive" />
+                <BiohazardIcon className="w-8 h-8 !text-red-500" />
                 <div>
-                  <span className="font-display text-sm tracking-widest text-destructive">ADMIN</span>
-                  <span className="block text-[10px] font-terminal text-muted-foreground">MISSION CONTROL</span>
+                  <span className="font-display text-sm tracking-widest !text-red-500">ADMIN</span>
+                  <span className="block text-[10px] font-terminal !text-gray-400">MISSION CONTROL</span>
                 </div>
               </Link>
             </div>
 
-            {/* Global Timer */}
-            <div className="flex items-center gap-4">
-              <div className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg border",
-                eventStatus === "active" 
-                  ? "bg-primary/10 border-primary/30" 
-                  : eventStatus === "paused"
-                    ? "bg-warning/10 border-warning/30"
-                    : "bg-muted/10 border-muted/30"
-              )}>
-                <Timer className={cn(
-                  "w-4 h-4",
-                  eventStatus === "active" ? "text-primary" : eventStatus === "paused" ? "text-warning" : "text-muted-foreground"
-                )} />
-                <span className={cn(
-                  "font-terminal text-lg",
-                  eventStatus === "active" ? "text-primary text-glow-toxic" : "text-muted-foreground"
-                )}>
-                  {formatTime(globalTimer)}
-                </span>
-                <span className="text-xs font-terminal text-muted-foreground uppercase">
-                  {eventStatus}
-                </span>
-              </div>
-
-              {/* Event Controls */}
-              <div className="flex items-center gap-2">
-                {eventStatus === "waiting" && (
-                  <Button variant="toxic" size="sm" onClick={() => handleEventAction("start")} className="gap-2">
-                    <Play className="w-4 h-4" /> START
-                  </Button>
-                )}
-                {eventStatus === "active" && (
-                  <Button variant="terminal" size="sm" onClick={() => handleEventAction("pause")} className="gap-2">
-                    <Pause className="w-4 h-4" /> PAUSE
-                  </Button>
-                )}
-                {eventStatus === "paused" && (
-                  <Button variant="toxic" size="sm" onClick={() => handleEventAction("resume")} className="gap-2">
-                    <Play className="w-4 h-4" /> RESUME
-                  </Button>
-                )}
-                <Button variant="blood" size="sm" onClick={() => handleEventAction("end")} className="gap-2">
-                  <XCircle className="w-4 h-4" /> END
-                </Button>
-              </div>
+            {/* Quick Actions */}
+            <div className="flex items-center gap-2">
+              <Button 
+                size="sm" 
+                onClick={() => navigate('/admin/game-control')} 
+                className="gap-2 !bg-green-700 !text-white hover:!bg-green-600"
+              >
+                <Play className="w-4 h-4" /> Game Control
+              </Button>
             </div>
 
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="!text-gray-300 hover:!text-white">
                 <Bell className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="!text-gray-300 hover:!text-white">
                 <Settings className="w-5 h-5" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="gap-2 text-destructive"
+                className="gap-2 !text-red-400 hover:!text-red-300"
                 onClick={async () => {
                   await logout();
                   navigate("/");
@@ -498,46 +419,62 @@ const Admin = () => {
         </div>
       </header>
 
-      <main className="pt-24 pb-16 px-4">
+      <main className="pt-24 pb-16 px-4 !bg-gray-900">
         <div className="container mx-auto">
           {/* Quick Navigation */}
           <div className="mb-6 flex gap-3 flex-wrap">
             <Button 
               onClick={() => setActivePanel('teams')} 
-              variant={activePanel === 'teams' ? 'default' : 'terminal'}
-              className="gap-2"
+              variant={activePanel === 'teams' ? 'default' : 'outline'}
+              className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
             >
               <Users className="w-4 h-4" />
               Teams Overview
             </Button>
             <Button 
               onClick={() => setActivePanel('timeTracking')} 
-              variant={activePanel === 'timeTracking' ? 'default' : 'terminal'}
-              className="gap-2"
+              variant={activePanel === 'timeTracking' ? 'default' : 'outline'}
+              className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
             >
               <Timer className="w-4 h-4" />
               Time Tracking
             </Button>
             <Button 
+              onClick={() => setActivePanel('qualification')} 
+              variant={activePanel === 'qualification' ? 'default' : 'outline'}
+              className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
+            >
+              <Trophy className="w-4 h-4" />
+              Qualification
+            </Button>
+            <Button 
+              onClick={() => setActivePanel('levels')} 
+              variant={activePanel === 'levels' ? 'default' : 'outline'}
+              className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
+            >
+              <Layers className="w-4 h-4" />
+              Level Management
+            </Button>
+            <Button 
               onClick={() => navigate('/admin/puzzles')} 
-              variant="terminal" 
-              className="gap-2"
+              variant="outline" 
+              className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
             >
               <Settings className="w-4 h-4" />
               Puzzle Management
             </Button>
             <Button 
               onClick={() => navigate('/admin/game-control')} 
-              variant="terminal" 
-              className="gap-2"
+              variant="outline" 
+              className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
             >
               <Play className="w-4 h-4" />
               Game Control
             </Button>
             <Button 
               onClick={() => navigate('/admin/monitoring')} 
-              variant="terminal" 
-              className="gap-2"
+              variant="outline" 
+              className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
             >
               <Eye className="w-4 h-4" />
               Live Monitoring
@@ -549,32 +486,32 @@ const Admin = () => {
             {statsLoading ? (
               // Loading skeleton
               Array.from({ length: 6 }).map((_, i) => (
-                <TerminalCard key={i} className="text-center animate-pulse">
-                  <div className="w-5 h-5 mx-auto mb-2 bg-muted rounded" />
-                  <div className="h-6 bg-muted rounded mb-2" />
-                  <div className="h-4 bg-muted rounded" />
-                </TerminalCard>
+                <div key={i} className="!bg-gray-800 border !border-green-500/30 rounded-lg p-4 text-center animate-pulse">
+                  <div className="w-5 h-5 mx-auto mb-2 !bg-gray-700 rounded" />
+                  <div className="h-6 !bg-gray-700 rounded mb-2" />
+                  <div className="h-4 !bg-gray-700 rounded" />
+                </div>
               ))
             ) : stats ? (
               // Real data from API
               [
-                { label: "TOTAL TEAMS", value: stats.totalTeams, icon: Users, color: "text-primary" },
-                { label: "ACTIVE", value: stats.active, icon: Zap, color: "text-success" },
-                { label: "COMPLETED", value: stats.completed, icon: Trophy, color: "text-warning" },
-                { label: "WAITING", value: stats.waiting, icon: Clock, color: "text-muted-foreground" },
-                { label: "AVG TIME", value: stats.avgTime, icon: Timer, color: "text-accent" },
-                { label: "HINTS USED", value: stats.hintsUsed, icon: AlertTriangle, color: "text-warning" }
+                { label: "TOTAL TEAMS", value: stats.totalTeams ?? 0, icon: Users, color: "!text-green-400" },
+                { label: "ACTIVE", value: stats.active ?? 0, icon: Zap, color: "!text-emerald-400" },
+                { label: "COMPLETED", value: stats.completed ?? 0, icon: Trophy, color: "!text-yellow-400" },
+                { label: "WAITING", value: stats.waiting ?? 0, icon: Clock, color: "!text-gray-300" },
+                { label: "AVG TIME", value: stats.avgTime ?? '00:00:00', icon: Timer, color: "!text-cyan-400" },
+                { label: "HINTS USED", value: stats.hintsUsed ?? 0, icon: AlertTriangle, color: "!text-orange-400" }
               ].map((stat, i) => (
-                <TerminalCard key={i} className="text-center">
+                <div key={i} className="!bg-gray-800 border !border-green-500/30 rounded-lg p-4 text-center">
                   <stat.icon className={cn("w-5 h-5 mx-auto mb-2", stat.color)} />
-                  <div className="text-xl font-display font-bold">{stat.value}</div>
-                  <div className="text-xs font-terminal text-muted-foreground">{stat.label}</div>
-                </TerminalCard>
+                  <div className="text-xl font-bold !text-white">{stat.value}</div>
+                  <div className="text-xs !text-gray-400">{stat.label}</div>
+                </div>
               ))
             ) : (
-              // Empty state
-              <div className="col-span-6 text-center py-8 text-muted-foreground">
-                No statistics available
+              // Empty state or error
+              <div className="col-span-6 text-center py-8 !text-white !bg-gray-800 rounded-lg">
+                {statsError ? `Error: ${statsError.message}` : 'No statistics available'}
               </div>
             )}
           </div>
@@ -582,6 +519,10 @@ const Admin = () => {
           {/* Conditional Panel Rendering */}
           {activePanel === 'timeTracking' ? (
             <AdminTimeDashboard />
+          ) : activePanel === 'qualification' ? (
+            <AdminQualificationPanel />
+          ) : activePanel === 'levels' ? (
+            <AdminLevelManagement />
           ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Teams List */}
@@ -956,4 +897,5 @@ const Admin = () => {
 };
 
 export default Admin;
+
 

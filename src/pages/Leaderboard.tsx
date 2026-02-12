@@ -18,12 +18,13 @@ const Leaderboard = () => {
   // ============================================
   // CALCULATE STATS FROM REAL DATA
   // ============================================
-  const stats = leaderboard ? {
-    totalTeams: leaderboard.length,
-    completed: leaderboard.filter(t => t.status === 'completed').length,
-    inProgress: leaderboard.filter(t => t.status === 'active').length,
-    waiting: leaderboard.filter(t => t.status === 'waiting').length
-  } : { totalTeams: 0, completed: 0, inProgress: 0, waiting: 0 };
+  const leaderboardArray = Array.isArray(leaderboard) ? leaderboard : [];
+  const stats = {
+    totalTeams: leaderboardArray.length,
+    completed: leaderboardArray.filter(t => t.status === 'completed').length,
+    inProgress: leaderboardArray.filter(t => t.status === 'active').length,
+    waiting: leaderboardArray.filter(t => t.status === 'waiting').length
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -136,21 +137,21 @@ const Leaderboard = () => {
                     <Loader2 className="w-8 h-8 text-primary animate-spin" />
                     <span className="ml-3 text-muted-foreground font-terminal">Loading leaderboard...</span>
                   </div>
-                ) : leaderboard && leaderboard.length > 0 ? (
+                ) : leaderboardArray.length > 0 ? (
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-primary/20">
                         <th className="text-left py-3 px-4 text-xs font-terminal text-muted-foreground">#</th>
                         <th className="text-left py-3 px-4 text-xs font-terminal text-muted-foreground">TEAM</th>
-                        <th className="text-left py-3 px-4 text-xs font-terminal text-muted-foreground hidden md:table-cell">LVL 1</th>
-                        <th className="text-left py-3 px-4 text-xs font-terminal text-muted-foreground hidden md:table-cell">LVL 2</th>
-                        <th className="text-left py-3 px-4 text-xs font-terminal text-muted-foreground">TOTAL</th>
+                        <th className="text-left py-3 px-4 text-xs font-terminal text-muted-foreground hidden md:table-cell">LEVEL</th>
+                        <th className="text-left py-3 px-4 text-xs font-terminal text-muted-foreground hidden md:table-cell">SOLVED</th>
+                        <th className="text-left py-3 px-4 text-xs font-terminal text-muted-foreground">TIME</th>
                         <th className="text-left py-3 px-4 text-xs font-terminal text-muted-foreground">HINTS</th>
                         <th className="text-left py-3 px-4 text-xs font-terminal text-muted-foreground">STATUS</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {leaderboard.map((team, index) => (
+                      {leaderboardArray.map((team: any, index: number) => (
                         <tr 
                           key={team.id}
                           className={cn(
@@ -173,13 +174,19 @@ const Leaderboard = () => {
                             </span>
                           </td>
                           <td className="py-4 px-4 hidden md:table-cell">
-                            <span className="font-terminal text-sm text-muted-foreground">
-                              {team.level1Time || "--:--:--"}
+                            <span className={cn(
+                              "font-terminal text-sm px-2 py-1 rounded",
+                              team.level >= 2 ? "bg-primary/20 text-primary" : "bg-muted/20 text-muted-foreground"
+                            )}>
+                              Level {team.level || 1}
                             </span>
                           </td>
                           <td className="py-4 px-4 hidden md:table-cell">
-                            <span className="font-terminal text-sm text-muted-foreground">
-                              {team.level2Time || "--:--:--"}
+                            <span className={cn(
+                              "font-terminal text-sm",
+                              team.puzzlesSolved > 0 ? "text-success" : "text-muted-foreground"
+                            )}>
+                              {team.puzzlesSolved || 0} puzzles
                             </span>
                           </td>
                           <td className="py-4 px-4">

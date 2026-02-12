@@ -3,6 +3,17 @@ const notificationService = require('../services/notificationService');
 const db = require('../config/db');
 
 /**
+ * Check if error is a table/column not found error
+ */
+function isTableNotFoundError(error) {
+  if (!error) return false;
+  if (error.code === 'ER_NO_SUCH_TABLE' || error.code === 'ER_BAD_FIELD_ERROR') return true;
+  if (error.code === '42P01' || error.code === '42703' || error.code === 'PGRST205') return true;
+  if (error.message && (error.message.includes('does not exist') || error.message.includes('Could not find'))) return true;
+  return false;
+}
+
+/**
  * GET /api/notifications
  * Get notifications for current team
  */
@@ -28,17 +39,32 @@ exports.getNotifications = async (req, res) => {
  */
 exports.getUnreadNotifications = async (req, res) => {
   try {
-    const teamId = req.user.teamId;
+    const teamId = req.user.teamId || req.user.team_id;
     
+    // Admin users don't have teamId - return empty for them
     if (!teamId) {
-      return res.status(400).json({ error: 'Team ID required' });
+      return res.json({
+        count: 0,
+        notifications: []
+      });
     }
 
-    const notifications = await notificationService.getUnreadNotifications(teamId);
-    res.json({
-      count: notifications.length,
-      notifications
-    });
+    try {
+      const notifications = await notificationService.getUnreadNotifications(teamId);
+      res.json({
+        count: notifications.length,
+        notifications
+      });
+    } catch (dbError) {
+      // If notifications table doesn't exist, return empty
+      if (isTableNotFoundError(dbError)) {
+        return res.json({
+          count: 0,
+          notifications: []
+        });
+      }
+      throw dbError;
+    }
   } catch (error) {
     console.error('Get unread notifications error:', error);
     res.status(500).json({ error: 'Failed to fetch notifications' });

@@ -31,12 +31,16 @@ const authAPI: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor - Attach access token
+// Request interceptor - Attach access token (skip for public auth endpoints)
 authAPI.interceptors.request.use(
   (config) => {
-    const accessToken = localStorage.getItem('accessToken');
-    if (accessToken) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
+    const url = config.url || '';
+    const isPublicAuth = url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/refresh') || url.includes('/auth/verify-email') || url.includes('/auth/resend-otp') || url.includes('/auth/forgot-password') || url.includes('/auth/reset-password') || url.includes('/auth/verify-2fa');
+    if (!isPublicAuth) {
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) {
+        config.headers.Authorization = `Bearer ${accessToken}`;
+      }
     }
     return config;
   },
@@ -86,7 +90,10 @@ authAPI.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('userRole');
-        window.location.href = '/login';
+        // Only redirect to login if not already there
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       }
     }

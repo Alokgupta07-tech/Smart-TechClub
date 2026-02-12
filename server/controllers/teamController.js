@@ -1,4 +1,6 @@
 const db = require('../config/db');
+const { supabaseAdmin } = require('../config/supabase');
+const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
 
 /**
  * TEAM CONTROLLER
@@ -13,17 +15,77 @@ async function getMyTeam(req, res) {
   try {
     const userId = req.user.userId;
 
-    const [teams] = await db.query(`
-      SELECT * FROM teams WHERE user_id = ?
-    `, [userId]);
+    let team, gameStateRow;
 
-    if (teams.length === 0) {
-      return res.status(404).json({ error: 'Team not found' });
+    if (USE_SUPABASE) {
+      // --- Supabase branch ---
+      const { data: teams, error: tErr } = await supabaseAdmin
+        .from('teams')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (tErr) throw tErr;
+      if (!teams || teams.length === 0) {
+        return res.status(404).json({ error: 'Team not found' });
+      }
+      team = teams[0];
+
+      const { data: gsRows, error: gsErr } = await supabaseAdmin
+        .from('game_state')
+        .select('level1_open, level2_open, game_started_at')
+        .limit(1);
+
+      if (gsErr) throw gsErr;
+      // Normalize Supabase column names to match MySQL names
+      if (gsRows && gsRows.length > 0) {
+        const gs = gsRows[0];
+        gameStateRow = {
+          level_1_unlocked: gs.level1_open,
+          level_2_unlocked: gs.level2_open,
+          game_started_at: gs.game_started_at
+        };
+      } else {
+        gameStateRow = null;
+      }
+    } else {
+      // --- MySQL branch ---
+      const [teams] = await db.query(`
+        SELECT * FROM teams WHERE user_id = ?
+      `, [userId]);
+
+      if (teams.length === 0) {
+        return res.status(404).json({ error: 'Team not found' });
+      }
+      team = teams[0];
+
+      const [gameState] = await db.query(`
+        SELECT level_1_unlocked, level_2_unlocked, game_started_at
+        FROM game_state 
+        LIMIT 1
+      `);
+      gameStateRow = gameState && gameState.length > 0 ? gameState[0] : null;
     }
 
-    const team = teams[0];
-    
-    // Convert to camelCase
+    // Calculate time elapsed if team has start_time
+    let timeElapsed = '00:00:00';
+    if (team.start_time) {
+      const start = new Date(team.start_time);
+      // Use end_time if completed, otherwise use current time
+      const end = team.end_time ? new Date(team.end_time) : new Date();
+      const diffMs = end - start;
+      const hours = Math.floor(diffMs / 3600000);
+      const minutes = Math.floor((diffMs % 3600000) / 60000);
+      const seconds = Math.floor((diffMs % 60000) / 1000);
+      timeElapsed = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    // Determine qualification status
+    const qualifiedForLevel2 = team.level >= 2;
+    const level1Completed = team.progress >= 100 || team.level >= 2;
+    const level2Unlocked = gameStateRow?.level_2_unlocked || false;
+    const canStartLevel2 = qualifiedForLevel2 && level2Unlocked;
+
+    // Convert to camelCase with enhanced data
     const formattedTeam = {
       id: team.id,
       teamName: team.team_name,
@@ -33,8 +95,19 @@ async function getMyTeam(req, res) {
       startTime: team.start_time,
       endTime: team.end_time,
       hintsUsed: team.hints_used,
-      timeElapsed: '00:00:00', // Will be calculated when event is active
-      createdAt: team.created_at
+      timeElapsed: timeElapsed,
+      createdAt: team.created_at,
+      // Qualification status
+      qualifiedForLevel2: qualifiedForLevel2,
+      level1Completed: level1Completed,
+      level2Unlocked: level2Unlocked,
+      canStartLevel2: canStartLevel2,
+      // Game state info
+      gameState: {
+        level1Unlocked: gameStateRow?.level_1_unlocked || false,
+        level2Unlocked: gameStateRow?.level_2_unlocked || false,
+        gameStartedAt: gameStateRow?.game_started_at || null
+      }
     };
 
     res.json(formattedTeam);
@@ -57,7 +130,15 @@ async function updateTeamName(req, res) {
       return res.status(400).json({ error: 'Team name must be at least 3 characters' });
     }
 
-    await db.query('UPDATE teams SET team_name = ? WHERE user_id = ?', [teamName, userId]);
+    if (USE_SUPABASE) {
+      const { error } = await supabaseAdmin
+        .from('teams')
+        .update({ team_name: teamName })
+        .eq('user_id', userId);
+      if (error) throw error;
+    } else {
+      await db.query('UPDATE teams SET team_name = ? WHERE user_id = ?', [teamName, userId]);
+    }
 
     res.json({ message: 'Team name updated', teamName });
   } catch (error) {
@@ -74,16 +155,31 @@ async function getProfile(req, res) {
   try {
     const userId = req.user.userId;
 
-    const [users] = await db.query(`
-      SELECT id, name, email, role, is_verified, two_fa_enabled, created_at
-      FROM users WHERE id = ?
-    `, [userId]);
+    let user;
 
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+    if (USE_SUPABASE) {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('id, name, email, role, is_verified, two_fa_enabled, created_at')
+        .eq('id', userId);
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      user = data[0];
+    } else {
+      const [users] = await db.query(`
+        SELECT id, name, email, role, is_verified, two_fa_enabled, created_at
+        FROM users WHERE id = ?
+      `, [userId]);
+
+      if (users.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      user = users[0];
     }
 
-    res.json({ user: users[0] });
+    res.json({ user });
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ error: 'Failed to fetch profile' });
@@ -103,7 +199,15 @@ async function toggle2FA(req, res) {
       return res.status(400).json({ error: 'enabled must be true or false' });
     }
 
-    await db.query('UPDATE users SET two_fa_enabled = ? WHERE id = ?', [enabled, userId]);
+    if (USE_SUPABASE) {
+      const { error } = await supabaseAdmin
+        .from('users')
+        .update({ two_fa_enabled: enabled })
+        .eq('id', userId);
+      if (error) throw error;
+    } else {
+      await db.query('UPDATE users SET two_fa_enabled = ? WHERE id = ?', [enabled, userId]);
+    }
 
     res.json({ 
       message: `2FA ${enabled ? 'enabled' : 'disabled'}`, 

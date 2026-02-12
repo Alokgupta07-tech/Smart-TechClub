@@ -19,7 +19,10 @@ router.get('/audit-logs', adminController.getAudit);
 router.get('/alerts', adminController.getAlerts);
 router.get('/teams', adminController.getAllTeams);
 router.get('/teams/:id', adminController.getTeamById);
-router.put('/teams/:id/status', adminController.updateTeamStatus);router.delete('/teams/:id', adminController.deleteTeam);router.patch('/team/:id/action', adminController.teamAction);
+router.put('/teams/:id/status', adminController.updateTeamStatus);
+router.post('/teams/:id/qualify-level2', adminController.qualifyTeamForLevel2);
+router.delete('/teams/:id', adminController.deleteTeam);
+router.patch('/team/:id/action', adminController.teamAction);
 router.get('/stats', adminController.getStats);
 
 // Live monitoring
@@ -31,6 +34,7 @@ router.get('/export/results', adminController.exportResults);
 // Time tracking admin endpoints
 router.get('/team-timings', timeTrackingController.getAdminTeamTimings);
 router.get('/team-timings/:teamId', timeTrackingController.getTeamTimingDetails);
+router.get('/question-analytics', timeTrackingController.getQuestionAnalytics);
 router.get('/game-settings', timeTrackingController.getGameSettings);
 router.put('/game-settings/:key', timeTrackingController.updateGameSetting);
 router.post('/team/:teamId/end-session', timeTrackingController.adminEndTeamSession);

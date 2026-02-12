@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +26,15 @@ const AdminLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Clear stale tokens when landing on login page
+  useEffect(() => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userId');
+  }, []);
+
   const { register, handleSubmit, formState: { errors } } = useForm<AdminLoginForm>({
     resolver: zodResolver(adminLoginSchema)
   });
@@ -34,9 +43,7 @@ const AdminLogin = () => {
     setIsLoading(true);
     
     try {
-      console.log('Attempting admin login with:', data.email);
       const response = await login(data.email, data.password);
-      console.log('Admin login response:', response);
       
       if (response.role === 'admin') {
         toast.success("Access Granted", {
@@ -125,6 +132,7 @@ const AdminLogin = () => {
                     {...register("password")}
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
+                    autoComplete="current-password"
                     className="pl-11 pr-11 h-12 bg-background/50 border-destructive/20 focus:border-destructive/50 font-terminal"
                   />
                   <button
@@ -163,6 +171,12 @@ const AdminLogin = () => {
                 )}
               </Button>
             </form>
+
+            <div className="text-center mt-4">
+              <Link to="/forgot-password" className="text-xs font-terminal text-muted-foreground hover:text-destructive transition-colors underline">
+                FORGOT PASSWORD?
+              </Link>
+            </div>
 
             <div className="mt-6 pt-6 border-t border-destructive/20">
               <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground font-terminal">

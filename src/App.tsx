@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,19 +7,34 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ProtectedRoute, AdminRoute, TeamRoute } from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
-import Register from "./pages/Register";
-import Rules from "./pages/Rules";
-import Leaderboard from "./pages/Leaderboard";
-import Login from "./pages/Login";
-import AdminLogin from "./pages/AdminLogin";
-import Dashboard from "./pages/Dashboard";
-import Admin from "./pages/Admin";
-import NotFound from "./pages/NotFound";
-import PuzzleManagement from "./pages/PuzzleManagement";
-import GameControl from "./pages/GameControl";
-import TeamGameplay from "./pages/TeamGameplay";
-import LiveMonitoring from "./pages/LiveMonitoring";
+
+// Lazy load pages for better code splitting
+const Index = lazy(() => import("./pages/Index"));
+const Register = lazy(() => import("./pages/Register"));
+const Rules = lazy(() => import("./pages/Rules"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const Login = lazy(() => import("./pages/Login"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Admin = lazy(() => import("./pages/Admin"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const PuzzleManagement = lazy(() => import("./pages/PuzzleManagement"));
+const GameControl = lazy(() => import("./pages/GameControl"));
+const TeamGameplay = lazy(() => import("./pages/TeamGameplay"));
+const LiveMonitoring = lazy(() => import("./pages/LiveMonitoring"));
+const Results = lazy(() => import("./pages/Results"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+      <div className="text-primary font-terminal">LOADING...</div>
+    </div>
+  </div>
+);
 
 const queryClient = new QueryClient();
 
@@ -27,9 +43,10 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <NotificationProvider>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Index />} />
@@ -37,6 +54,8 @@ const App = () => (
             <Route path="/rules" element={<Rules />} />
             <Route path="/login" element={<Login />} />
             <Route path="/admin-login" element={<AdminLogin />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             
             {/* Protected routes - any authenticated user */}
             <Route path="/leaderboard" element={
@@ -55,6 +74,12 @@ const App = () => (
             <Route path="/gameplay" element={
               <TeamRoute>
                 <TeamGameplay />
+              </TeamRoute>
+            } />
+            
+            <Route path="/results" element={
+              <TeamRoute>
+                <Results />
               </TeamRoute>
             } />
             
@@ -97,6 +122,7 @@ const App = () => (
             
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
           </NotificationProvider>
         </AuthProvider>
       </BrowserRouter>

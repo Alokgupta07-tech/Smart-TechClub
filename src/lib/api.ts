@@ -6,33 +6,75 @@
 
 import { Team, AdminStats, Alert, LeaderboardEntry, ApiResponse, TeamActionPayload } from '@/types/api';
 
-// API Base URL - Update this to your backend URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// API Base URL - uses relative path for Vercel, localhost for dev
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 /**
- * Generic fetch wrapper with error handling
+ * Try to refresh the access token using the refresh token
+ */
+async function tryRefreshToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (data.accessToken) {
+      localStorage.setItem('accessToken', data.accessToken);
+      return data.accessToken;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generic fetch wrapper with error handling and automatic token refresh
  */
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   try {
     const accessToken = localStorage.getItem('accessToken');
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        // Add auth token if needed
-        ...(options?.headers || {}),
-      },
-      ...options,
-    });
+    const makeRequest = (token: string | null) =>
+      fetch(`${API_BASE_URL}${endpoint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(options?.headers || {}),
+        },
+        ...options,
+      });
+
+    let response = await makeRequest(accessToken);
+
+    // On 401, try refreshing the token once
+    if (response.status === 401) {
+      const errorData = await response.json().catch(() => ({}));
+      if (errorData.code === 'TOKEN_EXPIRED') {
+        const newToken = await tryRefreshToken();
+        if (newToken) {
+          response = await makeRequest(newToken);
+        }
+      }
+    }
 
     if (!response.ok) {
-      // Handle 401 Unauthorized - clear tokens and redirect to login
       if (response.status === 401) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('userRole');
         localStorage.removeItem('userEmail');
-        window.location.href = '/login';
+        // Only redirect to login if not already there
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
         throw new Error('Session expired. Please login again.');
       }
       throw new Error(`API Error: ${response.statusText}`);
@@ -91,7 +133,12 @@ export async function performTeamAction(payload: TeamActionPayload): Promise<Api
  * Get leaderboard rankings (public endpoint)
  */
 export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
-  return fetchAPI<LeaderboardEntry[]>('/leaderboard');
+  const response = await fetchAPI<{ results_published: boolean; teams: LeaderboardEntry[] } | LeaderboardEntry[]>('/leaderboard');
+  // Handle both response formats: { teams: [...] } or direct array
+  if (Array.isArray(response)) {
+    return response;
+  }
+  return response.teams || [];
 }
 
 /**
@@ -103,6 +150,33 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
  */
 export function getAuthToken(): string | null {
   return localStorage.getItem('accessToken');
+}
+
+/**
+ * Fetch with auth token + automatic refresh on 401.
+ * Drop-in replacement for raw fetch() in components.
+ */
+export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = localStorage.getItem('accessToken');
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  let response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401) {
+    const errorData = await response.clone().json().catch(() => ({}));
+    if (errorData.code === 'TOKEN_EXPIRED') {
+      const newToken = await tryRefreshToken();
+      if (newToken) {
+        headers.Authorization = `Bearer ${newToken}`;
+        response = await fetch(url, { ...options, headers });
+      }
+    }
+  }
+
+  return response;
 }
 
 /**

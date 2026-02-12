@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Package, Lock, Key, FileText, ShieldCheck, Zap, AlertCircle } from 'lucide-react';
+import { fetchWithAuth } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface InventoryItem {
   id: string;
@@ -68,10 +69,7 @@ export const InventoryPanel = () => {
 
   const fetchInventory = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/gameplay/inventory`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/gameplay/inventory`);
 
       if (!response.ok) throw new Error('Failed to fetch inventory');
       

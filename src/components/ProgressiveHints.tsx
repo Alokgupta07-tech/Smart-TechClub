@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/lib/api';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,22 +38,17 @@ interface HintsData {
   lastHintNumber: number;
 }
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const fetchHints = async (puzzleId: string): Promise<HintsData> => {
-  const accessToken = localStorage.getItem('accessToken');
-  const response = await fetch(`${API_BASE}/gameplay/puzzle/${puzzleId}/hints`, {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
+  const response = await fetchWithAuth(`${API_BASE}/gameplay/puzzle/${puzzleId}/hints`);
   if (!response.ok) throw new Error('Failed to fetch hints');
   return response.json();
 };
 
 const useHintMutation = async ({ puzzleId, hintId }: { puzzleId: string; hintId: string }) => {
-  const accessToken = localStorage.getItem('accessToken');
-  const response = await fetch(`${API_BASE}/gameplay/puzzle/${puzzleId}/hint/${hintId}`, {
+  const response = await fetchWithAuth(`${API_BASE}/gameplay/puzzle/${puzzleId}/hint/${hintId}`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${accessToken}` }
   });
   if (!response.ok) {
     const error = await response.json();

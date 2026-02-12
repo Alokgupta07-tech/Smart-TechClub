@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { fetchWithAuth } from '@/lib/api';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 import { 
   Users, 
   Clock, 
@@ -12,8 +16,10 @@ import {
   HelpCircle,
   LogOut,
   MessageSquare,
-  Timer,
-  Loader2
+  Loader2,
+  ArrowRight,
+  Star,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TerminalCard } from "@/components/TerminalCard";
@@ -24,6 +30,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import * as authAPI from "@/lib/authApi";
 import { InventoryPanel } from "@/components/InventoryPanel";
 import { BackButton } from "@/components/BackButton";
+import { QualificationMessageModal, QualificationBanner } from "@/components/QualificationMessageModal";
 
 interface TeamData {
   id: string;
@@ -36,13 +43,22 @@ interface TeamData {
   hintsUsed: number;
   timeElapsed: string;
   createdAt: string;
+  // Qualification status
+  qualifiedForLevel2?: boolean;
+  level1Completed?: boolean;
+  level2Unlocked?: boolean;
+  canStartLevel2?: boolean;
+  gameState?: {
+    level1Unlocked: boolean;
+    level2Unlocked: boolean;
+    level1StartTime: string | null;
+    level2StartTime: string | null;
+  };
 }
 
 const puzzles = [
   { id: 1, title: "DECRYPT THE MESSAGE", status: "current", points: 100 },
-  { id: 2, title: "BINARY SEQUENCE", status: "locked", points: 150 },
-  { id: 3, title: "NETWORK TRACE", status: "locked", points: 200 },
-  { id: 4, title: "FIREWALL BYPASS", status: "locked", points: 250 }
+  { id: 2, title: "BINARY SEQUENCE", status: "locked", points: 150 }
 ];
 
 const Dashboard = () => {
@@ -51,7 +67,6 @@ const Dashboard = () => {
   const [team, setTeam] = useState<TeamData | null>(null);
   const [broadcasts, setBroadcasts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [timer, setTimer] = useState(0);
 
   // Fetch team data
   useEffect(() => {
@@ -76,10 +91,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchBroadcasts = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        const response = await fetch('http://localhost:5000/api/game/broadcast', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await fetchWithAuth(`${API_BASE}/game/broadcast`);
         if (response.ok) {
           const data = await response.json();
           setBroadcasts(data.messages || []);
@@ -93,23 +105,6 @@ const Dashboard = () => {
     const interval = setInterval(fetchBroadcasts, 5000); // Refresh every 5s
     return () => clearInterval(interval);
   }, []);
-
-  // Timer effect
-  useEffect(() => {
-    if (team?.status === "active") {
-      const interval = setInterval(() => {
-        setTimer(prev => prev + 1);
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [team?.status]);
-
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  };
 
   const handleRequestHint = () => {
     toast.info("Hint system", {
@@ -158,16 +153,6 @@ const Dashboard = () => {
                 <span className="block text-[10px] font-terminal text-primary">{team.teamName}</span>
               </div>
             </div>
-
-            {/* Timer */}
-            {team.status === "active" && (
-              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/30">
-                <Timer className="w-4 h-4 text-primary" />
-                <span className="font-terminal text-lg text-primary text-glow-toxic">
-                  {formatTime(timer)}
-                </span>
-              </div>
-            )}
 
             <div className="flex items-center gap-3">
               <Link to="/leaderboard">
@@ -289,24 +274,34 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-2xl font-display font-bold text-primary mb-1">
-                        LEVEL 1: FIREWALL BREACH
+                        {team.level === 1 ? 'LEVEL 1: QUALIFICATION ROUND' : 'LEVEL 2: FINALS'}
                       </h2>
                       <p className="text-sm text-muted-foreground">
-                        Break through the initial security layer
+                        {team.level === 1 
+                          ? 'Break through the initial security layer' 
+                          : 'The final challenge awaits - Good luck!'}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground font-terminal">PROGRESS</p>
-                      <p className="text-2xl font-display font-bold text-warning">1/4</p>
+                      <p className="text-2xl font-display font-bold text-warning">{team.progress}%</p>
                     </div>
                   </div>
                   
                   {/* Progress Bar */}
                   <div className="mt-4">
                     <div className="infected-progress">
-                      <div className="infected-progress-bar" style={{ width: "25%" }} />
+                      <div className="infected-progress-bar" style={{ width: `${team.progress}%` }} />
                     </div>
                   </div>
+
+                  {/* Qualification Badge */}
+                  {team.qualifiedForLevel2 && team.level === 2 && (
+                    <div className="mt-4 flex items-center gap-2 text-green-400">
+                      <Star className="w-4 h-4" />
+                      <span className="text-sm font-terminal">QUALIFIED FINALIST</span>
+                    </div>
+                  )}
                 </TerminalCard>
 
                 {/* Puzzle Cards */}
@@ -347,7 +342,12 @@ const Dashboard = () => {
                           </div>
                           <h3 className="font-display text-sm">{puzzle.title}</h3>
                           {puzzle.status === "current" && (
-                            <Button variant="toxic" size="sm" className="mt-3 w-full">
+                            <Button 
+                              variant="toxic" 
+                              size="sm" 
+                              className="mt-3 w-full"
+                              onClick={() => navigate('/gameplay')}
+                            >
                               ENTER PUZZLE
                             </Button>
                           )}
@@ -360,40 +360,6 @@ const Dashboard = () => {
 
               {/* Sidebar */}
               <div className="space-y-6">
-                {/* Hints */}
-                <TerminalCard title="HINT SYSTEM" status="warning">
-                  <div className="text-center mb-4">
-                    <p className="text-xs text-muted-foreground font-terminal mb-2">HINTS REMAINING</p>
-                    <div className="flex justify-center gap-2">
-                      {[1, 2, 3].map((i) => (
-                        <div 
-                          key={i}
-                          className={cn(
-                            "w-10 h-10 rounded-lg border flex items-center justify-center",
-                            i <= team.hintsUsed 
-                              ? "border-muted-foreground/20 bg-muted/10 text-muted-foreground"
-                              : "border-warning/50 bg-warning/10 text-warning"
-                          )}
-                        >
-                          <HelpCircle className="w-5 h-5" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <Button 
-                    variant="terminal" 
-                    onClick={handleRequestHint}
-                    disabled={team.hintsUsed >= 3}
-                    className="w-full gap-2"
-                  >
-                    <HelpCircle className="w-4 h-4" />
-                    REQUEST HINT (-5 MIN)
-                  </Button>
-                  <p className="text-xs text-muted-foreground text-center mt-3 font-terminal">
-                    ⚠ Each hint adds 5 minutes to your time
-                  </p>
-                </TerminalCard>
-
                 {/* Team */}
                 <TerminalCard title="TEAM INFO" status="active">
                   <div className="space-y-2">
@@ -409,11 +375,56 @@ const Dashboard = () => {
                       <span className="text-muted-foreground">Hints Used:</span>
                       <span className="ml-2">{team.hintsUsed}/3</span>
                     </div>
+                    {/* Qualification Status */}
+                    {team.qualifiedForLevel2 && (
+                      <div className="mt-3 p-2 rounded-lg bg-green-500/10 border border-green-500/30">
+                        <div className="flex items-center gap-2 text-green-400">
+                          <Trophy className="w-4 h-4" />
+                          <span className="text-sm font-terminal">QUALIFIED FOR LEVEL 2</span>
+                        </div>
+                      </div>
+                    )}
+                    {team.level1Completed && !team.qualifiedForLevel2 && (
+                      <div className="mt-3 p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                        <div className="flex items-center gap-2 text-yellow-400">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-sm font-terminal">LEVEL 1 COMPLETED</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Awaiting qualification results...
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </TerminalCard>
 
-                {/* Inventory Panel */}
-                <InventoryPanel />
+                {/* Level 2 Transition Card */}
+                {team.canStartLevel2 && team.level === 1 && (
+                  <TerminalCard title="LEVEL 2 UNLOCKED" status="warning" className="animate-pulse-glow">
+                    <div className="text-center py-4">
+                      <div className="flex justify-center mb-3">
+                        <div className="relative">
+                          <Sparkles className="w-12 h-12 text-yellow-400" />
+                          <div className="absolute -inset-2 bg-yellow-500/20 rounded-full animate-ping" />
+                        </div>
+                      </div>
+                      <h3 className="text-lg font-display text-yellow-400 mb-2">
+                        FINALS AWAITS
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        You've qualified for Level 2! The finals are now unlocked.
+                      </p>
+                      <Button 
+                        variant="toxic" 
+                        className="w-full gap-2"
+                        onClick={() => navigate('/gameplay')}
+                      >
+                        <ArrowRight className="w-4 h-4" />
+                        START LEVEL 2
+                      </Button>
+                    </div>
+                  </TerminalCard>
+                )}
 
                 {/* Rules Reminder */}
                 <TerminalCard title="REMINDER" status="danger">
@@ -437,11 +448,106 @@ const Dashboard = () => {
             </div>
             </div>
           )}
+
+          {/* Completed State */}
+          {team.status === "completed" && (
+            <div className="max-w-2xl mx-auto text-center animate-fade-in">
+              <div className="relative">
+                <Trophy className="w-24 h-24 text-yellow-400 mx-auto mb-8" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-32 h-32 rounded-full bg-yellow-400/20 animate-ping" />
+                </div>
+              </div>
+              
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-green-500/30 bg-green-500/10 mb-6">
+                <CheckCircle className="w-4 h-4 text-green-400" />
+                <span className="text-xs font-terminal uppercase tracking-widest text-green-400">
+                  GAME COMPLETED
+                </span>
+              </div>
+
+              <h1 className="text-3xl md:text-4xl font-display font-bold mb-4">
+                CONGRATULATIONS, <span className="text-primary text-glow-toxic">{team.teamName}!</span>
+              </h1>
+              
+              <p className="text-muted-foreground font-terminal mb-8">
+                You have successfully completed the Lockdown challenge!
+              </p>
+
+              <TerminalCard title="FINAL STATS" status="active" className="mb-8 text-left">
+                <div className="grid grid-cols-2 gap-4 py-4">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground font-terminal">LEVEL</p>
+                    <p className="text-2xl font-display text-primary">{team.level}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground font-terminal">PROGRESS</p>
+                    <p className="text-2xl font-display text-green-400">{team.progress}%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground font-terminal">HINTS USED</p>
+                    <p className="text-2xl font-display text-yellow-400">{team.hintsUsed}</p>
+                  </div>
+                </div>
+              </TerminalCard>
+
+              <Link to="/leaderboard">
+                <Button variant="toxic" size="lg" className="gap-2">
+                  <Trophy className="w-5 h-5" />
+                  View Leaderboard
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          {/* Disqualified State */}
+          {team.status === "disqualified" && (
+            <div className="max-w-2xl mx-auto text-center animate-fade-in">
+              <AlertTriangle className="w-24 h-24 text-red-500 mx-auto mb-8" />
+              
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-red-500/30 bg-red-500/10 mb-6">
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+                <span className="text-xs font-terminal uppercase tracking-widest text-red-400">
+                  DISQUALIFIED
+                </span>
+              </div>
+
+              <h1 className="text-3xl md:text-4xl font-display font-bold mb-4">
+                TEAM <span className="text-red-500">{team.teamName}</span>
+              </h1>
+              
+              <p className="text-muted-foreground font-terminal mb-8">
+                Your team has been disqualified from the competition.
+              </p>
+
+              <TerminalCard title="STATUS" status="danger" className="mb-8 text-left">
+                <div className="py-4 text-center">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    If you believe this is an error, please contact the event administrators.
+                  </p>
+                  <p className="text-xs text-red-400 font-terminal">
+                    Disqualification may occur due to rule violations, suspicious activity, or admin decision.
+                  </p>
+                </div>
+              </TerminalCard>
+
+              <Link to="/leaderboard">
+                <Button variant="terminal" size="lg" className="gap-2">
+                  <Trophy className="w-5 h-5" />
+                  View Leaderboard
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </main>
+      
+      {/* Qualification Message Modal - Shows notifications from admin */}
+      <QualificationMessageModal autoShow={true} />
     </div>
   );
 };
 
 export default Dashboard;
+
 

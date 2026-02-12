@@ -1,5 +1,6 @@
 // server/controllers/leaderboardController.js
 const leaderboardService = require('../services/leaderboardService');
+const db = require('../config/db');
 
 /**
  * GET /api/game/leaderboard
@@ -8,7 +9,11 @@ const leaderboardService = require('../services/leaderboardService');
 exports.getLiveLeaderboard = async (req, res) => {
   try {
     const leaderboard = await leaderboardService.getLiveLeaderboard();
-    res.json(leaderboard);
+    
+    res.json({
+      results_published: true,
+      teams: leaderboard
+    });
   } catch (error) {
     console.error('Leaderboard error:', error);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });
@@ -22,13 +27,14 @@ exports.getLiveLeaderboard = async (req, res) => {
 exports.getTeamRank = async (req, res) => {
   try {
     const { teamId } = req.params;
+    
     const rank = await leaderboardService.getTeamRank(teamId);
     
     if (rank === null) {
       return res.status(404).json({ error: 'Team not found in leaderboard' });
     }
     
-    res.json({ teamId, rank });
+    res.json({ teamId, rank, results_published: true });
   } catch (error) {
     console.error('Get team rank error:', error);
     res.status(500).json({ error: 'Failed to get team rank' });

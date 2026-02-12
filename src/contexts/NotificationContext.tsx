@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Bell, Trophy, AlertTriangle, Radio, TrendingUp, Lightbulb } from 'lucide-react';
+import { fetchWithAuth } from '@/lib/api';
 
 interface Notification {
   id: string;
@@ -27,15 +28,13 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const fetchUnreadNotifications = async (): Promise<{ count: number; notifications: Notification[] }> => {
   const accessToken = localStorage.getItem('accessToken');
   if (!accessToken) return { count: 0, notifications: [] };
   
-  const response = await fetch(`${API_BASE}/notifications/unread`, {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
+  const response = await fetchWithAuth(`${API_BASE}/notifications/unread`);
   
   if (!response.ok) {
     if (response.status === 401) return { count: 0, notifications: [] };
@@ -65,6 +64,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     queryFn: fetchUnreadNotifications,
     refetchInterval: 5000, // Check every 5 seconds
     staleTime: 2000,
+    enabled: !!localStorage.getItem('accessToken'), // Don't poll when not logged in
   });
 
   // Show toast for new notifications
@@ -91,10 +91,8 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
-      const accessToken = localStorage.getItem('accessToken');
-      await fetch(`${API_BASE}/notifications/${notificationId}/read`, {
+      await fetchWithAuth(`${API_BASE}/notifications/${notificationId}/read`, {
         method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${accessToken}` }
       });
     },
     onSuccess: () => {
@@ -104,10 +102,8 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      const accessToken = localStorage.getItem('accessToken');
-      await fetch(`${API_BASE}/notifications/read-all`, {
+      await fetchWithAuth(`${API_BASE}/notifications/read-all`, {
         method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${accessToken}` }
       });
     },
     onSuccess: () => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,6 +29,15 @@ const Login = () => {
   const [userId, setUserId] = useState("");
   const [otp2FA, setOtp2FA] = useState("");
 
+  // Clear stale tokens when landing on login page
+  useEffect(() => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userId');
+  }, []);
+
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema)
   });
@@ -37,9 +46,7 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      console.log('Attempting team login with:', data.email);
       const response = await login(data.email, data.password);
-      console.log('Login response:', response);
       
       // Check if user is admin - they shouldn't use team login
       if (response.role === 'admin') {
@@ -138,6 +145,7 @@ const Login = () => {
                     {...register("password")}
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
+                    autoComplete="current-password"
                     className="pl-11 pr-11 h-12 bg-background/50 border-primary/20 focus:border-primary/50 font-terminal"
                   />
                   <button
@@ -175,6 +183,12 @@ const Login = () => {
                   </>
                 )}
               </Button>
+
+              <div className="text-center">
+                <Link to="/forgot-password" className="text-xs font-terminal text-muted-foreground hover:text-primary transition-colors underline">
+                  FORGOT PASSWORD?
+                </Link>
+              </div>
             </form>
           </TerminalCard>
 

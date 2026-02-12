@@ -6,6 +6,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/lib/api';
 import {
   Achievement,
   Notification,
@@ -16,15 +17,7 @@ import {
   PuzzleTimerStatus
 } from '@/types/api';
 
-const API_BASE = 'http://localhost:5000/api';
-
-const getAuthHeaders = () => {
-  const accessToken = localStorage.getItem('accessToken');
-  return {
-    'Content-Type': 'application/json',
-    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
-  };
-};
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 // ============================================
 // LEADERBOARD HOOKS
@@ -47,9 +40,7 @@ export function useLeaderboard() {
   return useQuery<LeaderboardEntry[]>({
     queryKey: ['leaderboard'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/leaderboard`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/leaderboard`);
       if (!response.ok) throw new Error('Failed to fetch leaderboard');
       return response.json();
     },
@@ -62,9 +53,7 @@ export function useTeamRank(teamId: string | undefined) {
   return useQuery({
     queryKey: ['team-rank', teamId],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/leaderboard/rank/${teamId}`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/leaderboard/rank/${teamId}`);
       if (!response.ok) throw new Error('Failed to fetch rank');
       return response.json();
     },
@@ -81,9 +70,7 @@ export function useTeamAchievements(teamId: string | undefined) {
   return useQuery<Achievement[]>({
     queryKey: ['achievements', teamId],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/teams/${teamId}/achievements`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/teams/${teamId}/achievements`);
       if (!response.ok) throw new Error('Failed to fetch achievements');
       return response.json();
     },
@@ -96,9 +83,7 @@ export function useAllAchievements() {
   return useQuery<Achievement[]>({
     queryKey: ['all-achievements'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/achievements`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/achievements`);
       if (!response.ok) throw new Error('Failed to fetch achievements');
       return response.json();
     },
@@ -114,9 +99,7 @@ export function useNotifications() {
   return useQuery<{ count: number; notifications: Notification[] }>({
     queryKey: ['notifications-unread'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/notifications/unread`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/notifications/unread`);
       if (!response.ok) {
         if (response.status === 401) return { count: 0, notifications: [] };
         throw new Error('Failed to fetch notifications');
@@ -133,9 +116,8 @@ export function useMarkNotificationRead() {
 
   return useMutation({
     mutationFn: async (notificationId: string) => {
-      const response = await fetch(`${API_BASE}/notifications/${notificationId}/read`, {
+      const response = await fetchWithAuth(`${API_BASE}/notifications/${notificationId}/read`, {
         method: 'PATCH',
-        headers: getAuthHeaders()
       });
       if (!response.ok) throw new Error('Failed to mark as read');
     },
@@ -150,9 +132,8 @@ export function useMarkAllNotificationsRead() {
 
   return useMutation({
     mutationFn: async () => {
-      const response = await fetch(`${API_BASE}/notifications/read-all`, {
+      const response = await fetchWithAuth(`${API_BASE}/notifications/read-all`, {
         method: 'PATCH',
-        headers: getAuthHeaders()
       });
       if (!response.ok) throw new Error('Failed to mark all as read');
     },
@@ -171,9 +152,7 @@ export function usePuzzleAnalytics(puzzleId: string | undefined) {
   return useQuery<PuzzleAnalytics>({
     queryKey: ['puzzle-analytics', puzzleId],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/admin/puzzle/${puzzleId}/stats`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/puzzle/${puzzleId}/stats`);
       if (!response.ok) throw new Error('Failed to fetch analytics');
       return response.json();
     },
@@ -186,9 +165,7 @@ export function useAllPuzzleAnalytics() {
   return useQuery<PuzzleAnalytics[]>({
     queryKey: ['all-puzzle-analytics'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/admin/analytics/puzzles`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/analytics/puzzles`);
       if (!response.ok) throw new Error('Failed to fetch analytics');
       return response.json();
     },
@@ -204,9 +181,8 @@ export function useSuspiciousAlerts(unreviewedOnly = true) {
   return useQuery<SuspiciousAlert[]>({
     queryKey: ['suspicious-alerts', unreviewedOnly],
     queryFn: async () => {
-      const response = await fetch(
-        `${API_BASE}/admin/suspicious?unreviewedOnly=${unreviewedOnly}`,
-        { headers: getAuthHeaders() }
+      const response = await fetchWithAuth(
+        `${API_BASE}/admin/suspicious?unreviewedOnly=${unreviewedOnly}`
       );
       if (!response.ok) throw new Error('Failed to fetch alerts');
       return response.json();
@@ -220,9 +196,8 @@ export function useReviewAlert() {
 
   return useMutation({
     mutationFn: async (alertId: string) => {
-      const response = await fetch(`${API_BASE}/admin/suspicious/${alertId}/review`, {
+      const response = await fetchWithAuth(`${API_BASE}/admin/suspicious/${alertId}/review`, {
         method: 'PATCH',
-        headers: getAuthHeaders()
       });
       if (!response.ok) throw new Error('Failed to review alert');
     },
@@ -244,9 +219,7 @@ export function useTeamTimeline(teamId: string | undefined) {
   return useQuery<TimelineActivity[]>({
     queryKey: ['team-timeline', teamId],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/admin/team/${teamId}/timeline`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/team/${teamId}/timeline`);
       if (!response.ok) throw new Error('Failed to fetch timeline');
       return response.json();
     },
@@ -270,9 +243,7 @@ export function usePuzzleHints(puzzleId: string | undefined) {
   return useQuery<HintsData>({
     queryKey: ['hints', puzzleId],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/gameplay/puzzle/${puzzleId}/hints`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/gameplay/puzzle/${puzzleId}/hints`);
       if (!response.ok) throw new Error('Failed to fetch hints');
       return response.json();
     },
@@ -286,9 +257,8 @@ export function useHint() {
 
   return useMutation({
     mutationFn: async ({ puzzleId, hintId }: { puzzleId: string; hintId: string }) => {
-      const response = await fetch(`${API_BASE}/gameplay/puzzle/${puzzleId}/hint/${hintId}`, {
+      const response = await fetchWithAuth(`${API_BASE}/gameplay/puzzle/${puzzleId}/hint/${hintId}`, {
         method: 'POST',
-        headers: getAuthHeaders()
       });
       if (!response.ok) {
         const error = await response.json();
@@ -314,9 +284,7 @@ export function usePuzzleTimer(puzzleId: string | undefined) {
   return useQuery<PuzzleTimerStatus>({
     queryKey: ['puzzle-timer', puzzleId],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/gameplay/puzzle/${puzzleId}/timer`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithAuth(`${API_BASE}/gameplay/puzzle/${puzzleId}/timer`);
       if (!response.ok) throw new Error('Failed to fetch timer');
       return response.json();
     },
@@ -334,9 +302,11 @@ export function useBroadcastNotification() {
 
   return useMutation({
     mutationFn: async ({ title, message, priority }: { title: string; message: string; priority?: string }) => {
-      const response = await fetch(`${API_BASE}/admin/notifications/broadcast`, {
+      const response = await fetchWithAuth(`${API_BASE}/admin/notifications/broadcast`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ title, message, priority })
       });
       if (!response.ok) throw new Error('Failed to send broadcast');

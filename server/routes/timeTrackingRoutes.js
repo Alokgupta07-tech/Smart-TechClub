@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const timeTrackingController = require('../controllers/timeTrackingController');
+const teamGameController = require('../controllers/teamGameController');
 const { authenticateToken } = require('../middleware/auth');
 const { adminOnly } = require('../middleware/roleGuard');
 
@@ -23,6 +24,7 @@ router.post('/complete-question', authenticateToken, timeTrackingController.comp
 // Skip operations
 router.post('/skip-question', authenticateToken, timeTrackingController.skipQuestion);
 router.post('/unskip-question', authenticateToken, timeTrackingController.unskipQuestion);
+router.post('/go-to-question', authenticateToken, timeTrackingController.goToQuestion);
 router.get('/skipped-questions', authenticateToken, timeTrackingController.getSkippedQuestions);
 
 // Session operations
@@ -32,5 +34,8 @@ router.get('/session', authenticateToken, timeTrackingController.getSessionState
 // Timer state
 router.get('/timer/:puzzleId', authenticateToken, timeTrackingController.getTimerState);
 router.post('/sync-timer', authenticateToken, timeTrackingController.syncTimer);
+
+// Game summary (show before end game)
+router.get('/game-summary', authenticateToken, teamGameController.getGameSummary);
 
 module.exports = router;

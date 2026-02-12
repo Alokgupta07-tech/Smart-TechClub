@@ -9,6 +9,10 @@ import {
   MessageSquare,
   RefreshCw,
   Puzzle,
+  Lock,
+  ClipboardCheck,
+  Eye,
+  FileCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BackButton } from '@/components/BackButton';
@@ -38,8 +42,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { fetchWithAuth } from '@/lib/api';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface GameState {
   id: string;
@@ -55,25 +60,50 @@ interface GameState {
   completed_teams: number;
 }
 
+// NEW: Interface for evaluation status
+interface EvaluationStatus {
+  level_id: number;
+  evaluation_state: 'IN_PROGRESS' | 'SUBMISSIONS_CLOSED' | 'EVALUATING' | 'RESULTS_PUBLISHED';
+  submissions: {
+    total_submissions: number;
+    pending: number;
+    evaluated: number;
+    teams_with_submissions: number;
+  };
+  teams: {
+    total: number;
+    qualified: number;
+    disqualified: number;
+    pending: number;
+  };
+  actions: {
+    can_close_submissions: boolean;
+    can_evaluate: boolean;
+    can_publish: boolean;
+  };
+  timestamps: {
+    submissions_closed_at: string | null;
+    evaluation_started_at: string | null;
+    evaluated_at: string | null;
+    results_published_at: string | null;
+  };
+}
+
 export default function GameControl() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
+  const [selectedLevel, setSelectedLevel] = useState<number>(1); // NEW: Track selected level for evaluation
 
   // Fetch game state
   const { data: gameStateData, isLoading } = useQuery({
     queryKey: ['gameState'],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      console.log('GameControl: Fetching game state, token exists:', !!token, 'token:', token?.substring(0, 20) + '...');
-      const response = await fetch(`${API_BASE}/game/state`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/game/state`);
       
       if (!response.ok) {
-        console.error('GameControl: Failed to fetch game state, status:', response.status);
         throw new Error('Failed to fetch game state');
       }
       return response.json();
@@ -81,13 +111,146 @@ export default function GameControl() {
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 
+  // ======= NEW: Fetch evaluation status for selected level =======
+  const { data: evaluationData } = useQuery({
+    queryKey: ['evaluationStatus', selectedLevel],
+    queryFn: async () => {
+      const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${selectedLevel}/status`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch evaluation status');
+      }
+      return response.json();
+    },
+    refetchInterval: 5000,
+  });
+
+  const evaluationStatus: EvaluationStatus | undefined = evaluationData;
+
+  // Close Submissions mutation
+  const closeSubmissions = useMutation({
+    mutationFn: async (levelId: number) => {
+      const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/close-submissions`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to close submissions');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      toast({
+        title: 'Submissions Closed',
+        description: `Level ${selectedLevel} submissions are now closed. ${data.teams_affected} teams affected.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Evaluate Answers mutation
+  const evaluateAnswers = useMutation({
+    mutationFn: async (levelId: number) => {
+      const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/evaluate`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to evaluate answers');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      toast({
+        title: 'Evaluation Complete',
+        description: `${data.stats.submissions_evaluated} submissions evaluated. ${data.stats.correct_answers || 0} correct.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Publish Results mutation
+  const publishResults = useMutation({
+    mutationFn: async (levelId: number) => {
+      const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/publish-results`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to publish results');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      toast({
+        title: 'Results Published!',
+        description: `Level ${selectedLevel} results are now visible. ${data.stats.qualified} qualified, ${data.stats.disqualified} disqualified.`,
+        className: 'bg-green-500 text-white',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Reopen Submissions mutation
+  const reopenSubmissions = useMutation({
+    mutationFn: async (levelId: number) => {
+      const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/reopen-submissions`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to reopen submissions');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      toast({
+        title: 'Submissions Reopened',
+        description: `Level ${selectedLevel} submissions are now open again.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  // ======= END NEW CODE =======
+
   // Start game mutation
   const startGame = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/start`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/start`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       });
       
       if (!response.ok) throw new Error('Failed to start game');
@@ -112,10 +275,8 @@ export default function GameControl() {
   // Unlock Level 2 mutation
   const unlockLevel2 = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/level2/unlock`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/level2/unlock`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       });
       
       if (!response.ok) throw new Error('Failed to unlock Level 2');
@@ -140,10 +301,8 @@ export default function GameControl() {
   // Pause game mutation
   const pauseGame = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/pause`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/pause`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       });
       
       if (!response.ok) throw new Error('Failed to pause game');
@@ -161,10 +320,8 @@ export default function GameControl() {
   // Resume game mutation
   const resumeGame = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/resume`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/resume`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       });
       
       if (!response.ok) throw new Error('Failed to resume game');
@@ -182,10 +339,8 @@ export default function GameControl() {
   // End game mutation
   const endGame = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/end`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/end`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       });
       
       if (!response.ok) throw new Error('Failed to end game');
@@ -203,10 +358,8 @@ export default function GameControl() {
   // Restart game mutation
   const restartGame = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/restart`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/restart`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       });
       
       if (!response.ok) throw new Error('Failed to restart game');
@@ -231,12 +384,10 @@ export default function GameControl() {
   // Broadcast message mutation
   const broadcastMsg = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/broadcast`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/broadcast`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           message: broadcastMessage,
@@ -260,7 +411,8 @@ export default function GameControl() {
 
   const gameState: GameState | undefined = gameStateData?.gameState;
 
-  const getPhaseDisplay = (phase: string) => {
+  const getPhaseDisplay = (phase: string | undefined | null) => {
+    if (!phase) return 'Not Started';
     const phases: Record<string, string> = {
       not_started: 'Not Started',
       level_1: 'Level 1 Active',
@@ -270,7 +422,8 @@ export default function GameControl() {
     return phases[phase] || phase;
   };
 
-  const getPhaseColor = (phase: string) => {
+  const getPhaseColor = (phase: string | undefined | null) => {
+    if (!phase) return 'text-zinc-400';
     const colors: Record<string, string> = {
       not_started: 'text-zinc-400',
       level_1: 'text-yellow-500',
@@ -379,11 +532,11 @@ export default function GameControl() {
             <CardTitle className="text-sm">Game Status</CardTitle>
           </CardHeader>
           <CardContent>
-            {gameState?.current_phase === 'not_started' ? (
+            {(!gameState?.current_phase || gameState.current_phase === 'not_started') ? (
               <span className="text-zinc-500 font-semibold">⏹ Not Started</span>
-            ) : gameState?.current_phase === 'completed' ? (
+            ) : gameState.current_phase === 'completed' ? (
               <span className="text-blue-500 font-semibold">✓ Completed</span>
-            ) : gameState?.is_paused ? (
+            ) : gameState.is_paused ? (
               <span className="text-yellow-500 font-semibold">⏸ Paused</span>
             ) : (
               <span className="text-green-500 font-semibold">▶ Running</span>
@@ -552,6 +705,220 @@ export default function GameControl() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ======= NEW: Level Evaluation Controls ======= */}
+      <Card className="bg-black/40 border-cyan-500/30">
+        <CardHeader>
+          <CardTitle className="text-cyan-500 flex items-center gap-2">
+            <FileCheck className="w-5 h-5" />
+            Evaluation Controls
+          </CardTitle>
+          <CardDescription>
+            Control answer evaluation and result publication per level
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Level Selector */}
+          <div className="flex items-center gap-4 p-4 border border-zinc-700 rounded-lg">
+            <Label className="text-zinc-400">Select Level:</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={selectedLevel === 1 ? 'default' : 'outline'}
+                onClick={() => setSelectedLevel(1)}
+                className={selectedLevel === 1 ? 'bg-cyan-500 text-black' : ''}
+              >
+                Level 1
+              </Button>
+              <Button
+                variant={selectedLevel === 2 ? 'default' : 'outline'}
+                onClick={() => setSelectedLevel(2)}
+                className={selectedLevel === 2 ? 'bg-cyan-500 text-black' : ''}
+              >
+                Level 2
+              </Button>
+            </div>
+          </div>
+
+          {/* Evaluation Status Display */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="bg-zinc-900 border-zinc-700">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400">Current State</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className={`text-lg font-bold ${
+                  evaluationStatus?.evaluation_state === 'RESULTS_PUBLISHED' ? 'text-green-500' :
+                  evaluationStatus?.evaluation_state === 'EVALUATING' ? 'text-yellow-500' :
+                  evaluationStatus?.evaluation_state === 'SUBMISSIONS_CLOSED' ? 'text-orange-500' :
+                  'text-cyan-500'
+                }`}>
+                  {evaluationStatus?.evaluation_state?.replace(/_/g, ' ') || 'IN PROGRESS'}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-zinc-900 border-zinc-700">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400">Submissions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-bold text-cyan-500">
+                  {evaluationStatus?.submissions?.total_submissions || 0}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  {evaluationStatus?.submissions?.pending || 0} pending
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-zinc-900 border-zinc-700">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400">Teams</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-bold text-cyan-500">
+                  {evaluationStatus?.submissions?.teams_with_submissions || 0}
+                </p>
+                <p className="text-xs text-zinc-500">with submissions</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-zinc-900 border-zinc-700">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400">Qualified</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-bold text-green-500">
+                  {evaluationStatus?.teams?.qualified || 0}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  {evaluationStatus?.teams?.disqualified || 0} disqualified
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sequential Action Buttons */}
+          <div className="space-y-4">
+            {/* Step 1: Close Submissions */}
+            <div className={`flex items-center justify-between p-4 border rounded-lg ${
+              evaluationStatus?.actions?.can_close_submissions ? 'border-orange-500/30' : 'border-zinc-700 opacity-50'
+            }`}>
+              <div>
+                <h3 className="font-semibold text-orange-500 flex items-center gap-2">
+                  <Lock className="w-4 h-4" />
+                  Step 1: Close Submissions
+                </h3>
+                <p className="text-sm text-zinc-400">
+                  Lock further answer submissions for Level {selectedLevel}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => closeSubmissions.mutate(selectedLevel)}
+                  disabled={!evaluationStatus?.actions?.can_close_submissions || closeSubmissions.isPending}
+                  className="bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
+                >
+                  <Lock className="w-4 h-4 mr-2" />
+                  {closeSubmissions.isPending ? 'Closing...' : 'Close Submissions'}
+                </Button>
+                {evaluationStatus?.evaluation_state === 'SUBMISSIONS_CLOSED' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => reopenSubmissions.mutate(selectedLevel)}
+                    disabled={reopenSubmissions.isPending}
+                    className="border-zinc-500"
+                  >
+                    {reopenSubmissions.isPending ? 'Reopening...' : 'Reopen'}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Step 2: Evaluate Answers */}
+            <div className={`flex items-center justify-between p-4 border rounded-lg ${
+              evaluationStatus?.actions?.can_evaluate ? 'border-yellow-500/30' : 'border-zinc-700 opacity-50'
+            }`}>
+              <div>
+                <h3 className="font-semibold text-yellow-500 flex items-center gap-2">
+                  <ClipboardCheck className="w-4 h-4" />
+                  Step 2: Evaluate Answers
+                </h3>
+                <p className="text-sm text-zinc-400">
+                  Run evaluation logic on all submitted answers
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  if (confirm(`Evaluate all answers for Level ${selectedLevel}? This will calculate scores and qualification.`)) {
+                    evaluateAnswers.mutate(selectedLevel);
+                  }
+                }}
+                disabled={!evaluationStatus?.actions?.can_evaluate || evaluateAnswers.isPending}
+                className="bg-yellow-500 text-black hover:bg-yellow-600 disabled:opacity-50"
+              >
+                <ClipboardCheck className="w-4 h-4 mr-2" />
+                {evaluateAnswers.isPending ? 'Evaluating...' : 'Evaluate Answers'}
+              </Button>
+            </div>
+
+            {/* Step 3: Publish Results */}
+            <div className={`flex items-center justify-between p-4 border rounded-lg ${
+              evaluationStatus?.actions?.can_publish ? 'border-green-500/30' : 'border-zinc-700 opacity-50'
+            }`}>
+              <div>
+                <h3 className="font-semibold text-green-500 flex items-center gap-2">
+                  <Eye className="w-4 h-4" />
+                  Step 3: Publish Results
+                </h3>
+                <p className="text-sm text-zinc-400">
+                  Make results visible to teams (cannot be undone)
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  if (confirm(`Publish Level ${selectedLevel} results? Teams will see their scores and qualification status.`)) {
+                    publishResults.mutate(selectedLevel);
+                  }
+                }}
+                disabled={!evaluationStatus?.actions?.can_publish || publishResults.isPending}
+                className="bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                {publishResults.isPending ? 'Publishing...' : 'Publish Results'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Status Timeline */}
+          {evaluationStatus && (
+            <div className="mt-4 p-4 bg-zinc-900 rounded-lg border border-zinc-700">
+              <h4 className="text-sm font-semibold text-zinc-400 mb-2">Timeline</h4>
+              <div className="space-y-1 text-sm">
+                {evaluationStatus.timestamps?.submissions_closed_at && (
+                  <p className="text-orange-400">
+                    ● Submissions closed: {new Date(evaluationStatus.timestamps.submissions_closed_at).toLocaleString()}
+                  </p>
+                )}
+                {evaluationStatus.timestamps?.evaluated_at && (
+                  <p className="text-yellow-400">
+                    ● Evaluation completed: {new Date(evaluationStatus.timestamps.evaluated_at).toLocaleString()}
+                  </p>
+                )}
+                {evaluationStatus.timestamps?.results_published_at && (
+                  <p className="text-green-400">
+                    ● Results published: {new Date(evaluationStatus.timestamps.results_published_at).toLocaleString()}
+                  </p>
+                )}
+                {!evaluationStatus.timestamps?.submissions_closed_at && (
+                  <p className="text-zinc-500">● Submissions open - waiting for close</p>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      {/* ======= END NEW: Level Evaluation Controls ======= */}
 
       {/* Broadcast Dialog */}
       <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>

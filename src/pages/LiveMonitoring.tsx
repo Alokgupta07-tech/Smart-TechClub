@@ -32,7 +32,7 @@ import { Progress } from '@/components/ui/progress';
 import { GlitchText } from '@/components/GlitchText';
 import { BackButton } from '@/components/BackButton';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface TeamStatus {
   id: string;

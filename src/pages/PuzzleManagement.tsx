@@ -30,8 +30,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { fetchWithAuth } from '@/lib/api';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface Puzzle {
   id: string;
@@ -85,14 +86,11 @@ export default function PuzzleManagement() {
   const { data: puzzlesData, isLoading } = useQuery({
     queryKey: ['puzzles', selectedLevel],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
       const url = selectedLevel === 'all' 
         ? `${API_BASE}/puzzles`
         : `${API_BASE}/puzzles?level=${selectedLevel}`;
       
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(url);
       
       if (!response.ok) throw new Error('Failed to fetch puzzles');
       return response.json();
@@ -102,13 +100,9 @@ export default function PuzzleManagement() {
   // Create puzzle mutation
   const createPuzzle = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/puzzles`, {
+      const response = await fetchWithAuth(`${API_BASE}/puzzles`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
       
@@ -136,13 +130,9 @@ export default function PuzzleManagement() {
   // Update puzzle mutation
   const updatePuzzle = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/puzzles/${id}`, {
+      const response = await fetchWithAuth(`${API_BASE}/puzzles/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
       
@@ -169,10 +159,8 @@ export default function PuzzleManagement() {
   // Delete puzzle mutation
   const deletePuzzle = useMutation({
     mutationFn: async (id: string) => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/puzzles/${id}`, {
+      const response = await fetchWithAuth(`${API_BASE}/puzzles/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
       });
       
       if (!response.ok) throw new Error('Failed to delete puzzle');

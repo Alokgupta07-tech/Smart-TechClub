@@ -16,8 +16,9 @@ import {
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { fetchWithAuth } from '@/lib/api';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface SessionState {
   session_id: string;
@@ -68,10 +69,7 @@ export function TeamSessionProgress({
   const { data, isLoading } = useQuery({
     queryKey: ['teamSession'],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/session`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/game/time/session`);
       
       if (!response.ok) throw new Error('Failed to fetch session');
       return response.json();

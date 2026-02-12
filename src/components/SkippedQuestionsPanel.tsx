@@ -15,6 +15,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { fetchWithAuth } from '@/lib/api';
 import {
   Collapsible,
   CollapsibleContent,
@@ -23,7 +24,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface SkippedQuestion {
   puzzle_id: string;
@@ -60,10 +61,7 @@ export function SkippedQuestionsPanel({
   const { data, isLoading } = useQuery({
     queryKey: ['skippedQuestions'],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/skipped-questions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/game/time/skipped-questions`);
       
       if (!response.ok) throw new Error('Failed to fetch skipped questions');
       return response.json();
@@ -74,12 +72,10 @@ export function SkippedQuestionsPanel({
   // Return to question mutation
   const returnMutation = useMutation({
     mutationFn: async (puzzleId: string) => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/unskip-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/time/unskip-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });

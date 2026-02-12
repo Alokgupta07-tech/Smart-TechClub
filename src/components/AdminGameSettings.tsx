@@ -41,8 +41,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { fetchWithAuth } from '@/lib/api';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface GameSetting {
   key: string;
@@ -110,10 +111,7 @@ export function AdminGameSettings() {
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['gameSettings'],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/admin/game-settings`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/game-settings`);
       
       if (!response.ok) throw new Error('Failed to fetch settings');
       const data: SettingsResponse = await response.json();
@@ -124,12 +122,10 @@ export function AdminGameSettings() {
   // Update setting mutation
   const updateSettingMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string | number | boolean }) => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/admin/game-settings/${key}`, {
+      const response = await fetchWithAuth(`${API_BASE}/admin/game-settings/${key}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ value }),
       });

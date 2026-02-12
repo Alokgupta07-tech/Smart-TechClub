@@ -52,12 +52,10 @@ export function AdminRoute({ children }: AdminRouteProps) {
   }
 
   if (!isAuthenticated) {
-    console.log('AdminRoute: Not authenticated, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
   if (role !== 'admin') {
-    console.log('AdminRoute: Not admin, redirecting to dashboard. Role:', role);
     return <Navigate to="/dashboard" replace />;
   }
 

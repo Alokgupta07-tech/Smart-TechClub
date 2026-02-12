@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -12,6 +13,8 @@ const gameRoutes = require('./routes/gameRoutes');
 const gameplayRoutes = require('./routes/gameplayRoutes');
 const featureRoutes = require('./routes/featureRoutes');
 const timeTrackingRoutes = require('./routes/timeTrackingRoutes');
+const qualificationRoutes = require('./routes/qualificationRoutes'); // NEW: Level qualification system
+const evaluationRoutes = require('./routes/evaluationRoutes'); // NEW: Admin-controlled evaluation system
 
 // Import database (this tests connection)
 require('./config/db');
@@ -88,12 +91,14 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/evaluation', evaluationRoutes);  // NEW: Admin evaluation routes
 app.use('/api/team', teamRoutes);
 app.use('/api/puzzles', puzzleRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/game/time', timeTrackingRoutes);  // Time tracking routes
 app.use('/api/gameplay', gameplayRoutes);
 app.use('/api', featureRoutes);
+app.use('/api', qualificationRoutes);  // NEW: Level qualification routes
 
 // 404 handler
 app.use((req, res) => {

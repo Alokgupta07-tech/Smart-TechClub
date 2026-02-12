@@ -1,3 +1,4 @@
+
 /**
  * Admin Team Timings Component
  * ============================
@@ -64,7 +65,6 @@ export const AdminTimeDashboard = () => {
         <TeamTimingsTable />
         <QuestionAnalyticsPanel />
       </div>
-      <AdminGameSettings />
     </div>
   );
 };
@@ -74,7 +74,6 @@ export const AdminTimeDashboard = () => {
  */
 const AdminStatsOverview = () => {
   const { data: teamsData, isLoading } = useAdminTeamTimings();
-  const { data: analyticsData } = useQuestionAnalytics();
 
   if (isLoading) {
     return (
@@ -92,16 +91,29 @@ const AdminStatsOverview = () => {
 
   const teams = teamsData?.teams || [];
   const activeTeams = teams.filter((t: any) => t.currentStatus === 'active').length;
-  const completedTeams = teams.filter((t: any) => t.questionsCompleted >= (t.totalQuestions || 10)).length;
   
-  const avgTotalTime = teams.length > 0 
-    ? Math.round(teams.reduce((acc: number, t: any) => acc + (t.totalTime || 0), 0) / teams.length)
+  // Only count teams that have completed all questions OR have status 'completed'
+  const completedTeams = teams.filter((t: any) => 
+    t.currentStatus === 'completed' || t.questionsCompleted >= (t.totalQuestions || 10)
+  ).length;
+  
+  // Calculate average time only for teams that have started (totalTime > 0)
+  const teamsWithTime = teams.filter((t: any) => t.totalTime > 0 && t.totalTime < 86400); // Max 24 hours
+  const avgTotalTime = teamsWithTime.length > 0 
+    ? Math.round(teamsWithTime.reduce((acc: number, t: any) => acc + t.totalTime, 0) / teamsWithTime.length)
     : 0;
   
-  const fastestTeam = teams.reduce((fastest: any, t: any) => {
-    if (!fastest || (t.totalTime > 0 && t.totalTime < fastest.totalTime)) return t;
-    return fastest;
-  }, null);
+  // Find fastest completed team (must have completed and have valid time)
+  const completedTeamsWithTime = teams.filter((t: any) => 
+    (t.currentStatus === 'completed' || t.questionsCompleted >= (t.totalQuestions || 10)) &&
+    t.totalTime > 0 && t.totalTime < 86400
+  );
+  const fastestTeam = completedTeamsWithTime.length > 0
+    ? completedTeamsWithTime.reduce((fastest: any, t: any) => {
+        if (!fastest || t.totalTime < fastest.totalTime) return t;
+        return fastest;
+      }, null)
+    : null;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -134,7 +146,9 @@ const AdminStatsOverview = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground font-terminal">Avg Time</p>
-              <p className="text-2xl font-bold text-yellow-400 font-terminal">{formatTime(avgTotalTime)}</p>
+              <p className="text-2xl font-bold text-yellow-400 font-terminal">
+                {teamsWithTime.length > 0 ? formatTime(avgTotalTime) : '--:--:--'}
+              </p>
             </div>
             <Timer className="w-8 h-8 text-yellow-400" />
           </div>
@@ -149,6 +163,11 @@ const AdminStatsOverview = () => {
               <p className="text-lg font-bold text-purple-400 font-terminal truncate max-w-24">
                 {fastestTeam?.teamName || 'N/A'}
               </p>
+              {fastestTeam && (
+                <p className="text-xs text-muted-foreground font-terminal">
+                  {formatTime(fastestTeam.totalTime)}
+                </p>
+              )}
             </div>
             <Trophy className="w-8 h-8 text-purple-400" />
           </div>
@@ -501,7 +520,7 @@ const AdminGameSettings = () => {
           <Button 
             onClick={handleSave}
             disabled={isUpdating || isLoading}
-            className="font-terminal bg-toxic-green text-black hover:bg-toxic-green/80"
+            className="font-terminal bg-green-500 text-black hover:bg-green-400 font-bold px-6 py-2 shadow-lg shadow-green-500/50"
           >
             {isUpdating ? 'Saving...' : 'Save Settings'}
           </Button>

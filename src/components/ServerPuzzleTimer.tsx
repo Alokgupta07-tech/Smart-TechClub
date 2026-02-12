@@ -167,7 +167,7 @@ export const ServerPuzzleTimer = ({
             onClick={handleToggleTimer}
             variant="outline"
             size="sm"
-            disabled={isStarting || isPausing || isResuming || status === 'completed'}
+            disabled={isStarting || isPausing || isResuming}
             className={cn(
               "font-terminal",
               isRunning && "border-yellow-500 text-yellow-500 hover:bg-yellow-500/10",
@@ -193,7 +193,7 @@ export const ServerPuzzleTimer = ({
               onClick={() => setShowSkipModal(true)}
               variant="outline"
               size="sm"
-              disabled={isSkipping || status === 'completed'}
+              disabled={isSkipping}
               className="font-terminal border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
             >
               <SkipForward className="w-4 h-4 mr-1" />

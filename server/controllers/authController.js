@@ -39,10 +39,10 @@ async function register(req, res) {
     const userId = uuidv4();
     const teamId = uuidv4();
 
-    // Create user
+    // Create user (auto-verified since email verification is disabled)
     await db.query(
       'INSERT INTO users (id, name, email, password_hash, role, is_verified) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, name, email, passwordHash, 'team', false]
+      [userId, name, email, passwordHash, 'team', true]
     );
 
     // Create team
@@ -207,11 +207,12 @@ async function login(req, res) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Check if email verified (team only)
-    if (user.role === 'team' && !user.is_verified) {
-      await logAudit(user.id, 'LOGIN_FAILED', req, 'Email not verified');
-      return res.status(403).json({ error: 'Please verify your email first', code: 'EMAIL_NOT_VERIFIED' });
-    }
+    // Email verification check removed - users can login without verification
+    // To re-enable, uncomment the following:
+    // if (user.role === 'team' && !user.is_verified) {
+    //   await logAudit(user.id, 'LOGIN_FAILED', req, 'Email not verified');
+    //   return res.status(403).json({ error: 'Please verify your email first', code: 'EMAIL_NOT_VERIFIED' });
+    // }
 
     // Check 2FA
     if (user.two_fa_enabled) {
@@ -298,11 +299,21 @@ async function verify2FA(req, res) {
 
     const user = users[0];
 
+    // Get team_id if user is a team member
+    let teamId = null;
+    if (user.role === 'team') {
+      const [teams] = await db.query('SELECT id FROM teams WHERE user_id = ?', [user.id]);
+      if (teams.length > 0) {
+        teamId = teams[0].id;
+      }
+    }
+
     // Generate tokens
     const accessToken = generateAccessToken({
       userId: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
+      teamId: teamId
     });
 
     const refreshToken = generateRefreshToken({ userId: user.id });
@@ -374,11 +385,21 @@ async function refresh(req, res) {
 
     const user = users[0];
 
+    // Get team_id if user is a team member
+    let teamId = null;
+    if (user.role === 'team') {
+      const [teams] = await db.query('SELECT id FROM teams WHERE user_id = ?', [user.id]);
+      if (teams.length > 0) {
+        teamId = teams[0].id;
+      }
+    }
+
     // Generate new access token
     const accessToken = generateAccessToken({
       userId: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
+      teamId: teamId
     });
 
     // Log audit

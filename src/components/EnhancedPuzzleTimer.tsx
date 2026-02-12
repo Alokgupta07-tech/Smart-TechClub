@@ -38,8 +38,9 @@ import {
 } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { fetchWithAuth } from '@/lib/api';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface TimerState {
   puzzle_id: string;
@@ -109,12 +110,10 @@ export function EnhancedPuzzleTimer({
   // Sync with server
   const syncWithServer = useCallback(async () => {
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/sync-timer`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/time/sync-timer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });
@@ -181,12 +180,10 @@ export function EnhancedPuzzleTimer({
   // Start question mutation
   const startMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/start-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/time/start-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });
@@ -210,12 +207,10 @@ export function EnhancedPuzzleTimer({
   // Pause question mutation
   const pauseMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/pause-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/time/pause-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });
@@ -244,12 +239,10 @@ export function EnhancedPuzzleTimer({
   // Resume question mutation
   const resumeMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/resume-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/time/resume-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });
@@ -276,12 +269,10 @@ export function EnhancedPuzzleTimer({
   // Skip question mutation
   const skipMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/skip-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/time/skip-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ puzzle_id: puzzleId }),
       });

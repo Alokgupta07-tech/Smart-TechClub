@@ -28,6 +28,7 @@ import {
   Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { fetchWithAuth } from '@/lib/api';
 import {
   Table,
   TableBody,
@@ -43,7 +44,7 @@ import {
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface TeamTiming {
   id: string;
@@ -111,10 +112,7 @@ export function AdminTimeAnalytics() {
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['adminTeamTimings'],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/admin/team-timings`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/team-timings`);
       
       if (!response.ok) throw new Error('Failed to fetch team timings');
       return response.json();

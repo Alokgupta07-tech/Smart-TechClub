@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { fetchWithAuth } from '@/lib/api';
 
 interface PuzzleAnalytics {
   puzzleId: string;
@@ -26,13 +27,10 @@ interface PuzzleAnalytics {
   teamsUsedHints: number;
 }
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const fetchPuzzleStats = async (puzzleId: string): Promise<PuzzleAnalytics> => {
-  const accessToken = localStorage.getItem('accessToken');
-  const response = await fetch(`${API_BASE}/admin/puzzle/${puzzleId}/stats`, {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
+  const response = await fetchWithAuth(`${API_BASE}/admin/puzzle/${puzzleId}/stats`);
   if (!response.ok) throw new Error('Failed to fetch stats');
   return response.json();
 };
