@@ -32,10 +32,6 @@ npm run dev
 - **Frontend:** http://localhost:5173 (or 5174 if 5173 is busy)
 - **Backend:** http://localhost:5000
 
-### 🔐 Admin Login
-**Email:** `agupta88094@gmail.com`  
-**Password:** `tech@2026`
-
 ---
 
 ## 📖 About The Project
