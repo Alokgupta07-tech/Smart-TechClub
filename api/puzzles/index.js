@@ -7,11 +7,14 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { getSupabase } = require('../_lib/supabase');
-    const { verifyAuth, requireAdmin } = require('../_lib/auth');
-    const crypto = require('crypto');
+    var supabaseMod = require('../_lib/supabase');
+    var authMod = require('../_lib/auth');
+    var crypto = require('crypto');
+    var getSupabase = supabaseMod.getSupabase;
+    var verifyAuth = authMod.verifyAuth;
+    var requireAdmin = authMod.requireAdmin;
 
-    const supabase = getSupabase();
+    var supabase = getSupabase();
     
     // Parse level from query string
     var level = null;
