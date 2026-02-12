@@ -59,7 +59,8 @@ const AdminLogin = () => {
       }
     } catch (error: any) {
       console.error('Admin login error:', error);
-      const errorMsg = error.response?.data?.error || error.message || "Authentication failed";
+      const rawErr = error.response?.data?.error;
+      const errorMsg = typeof rawErr === 'string' ? rawErr : rawErr?.message || error.message || "Authentication failed";
       toast.error("Access Denied", {
         description: errorMsg
       });

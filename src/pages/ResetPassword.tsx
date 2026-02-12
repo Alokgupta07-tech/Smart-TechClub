@@ -64,10 +64,8 @@ const ResetPassword = () => {
         description: "Your password has been updated. You can now login.",
       });
     } catch (error: any) {
-      const errorMsg =
-        error.response?.data?.error ||
-        error.message ||
-        "Failed to reset password. Please try again.";
+      const rawErr = error.response?.data?.error;
+      const errorMsg = typeof rawErr === 'string' ? rawErr : rawErr?.message || error.message || "Failed to reset password. Please try again.";
       toast.error("Reset Failed", { description: errorMsg });
     } finally {
       setIsLoading(false);

@@ -119,7 +119,8 @@ const Register = () => {
       navigate("/dashboard");
     } catch (error: any) {
       console.error('Verification error:', error);
-      const errorMsg = error.response?.data?.error || error.message || "Invalid or expired OTP";
+      const rawErr = error.response?.data?.error;
+      const errorMsg = typeof rawErr === 'string' ? rawErr : rawErr?.message || error.message || "Invalid or expired OTP";
       const errorCode = error.response?.data?.code;
       
       if (errorCode === 'RATE_LIMIT_EXCEEDED') {
@@ -151,7 +152,7 @@ const Register = () => {
     } catch (error: any) {
       console.error('Resend OTP error:', error);
       toast.error("Failed to resend code", {
-        description: error.response?.data?.error || "Please try again"
+        description: typeof error.response?.data?.error === 'string' ? error.response.data.error : error.response?.data?.error?.message || "Please try again"
       });
     } finally {
       setIsResending(false);
@@ -185,7 +186,7 @@ const Register = () => {
     } catch (error: any) {
       console.error('Registration error:', error);
       toast.error("Registration failed", {
-        description: error.response?.data?.error || "Please try again"
+        description: typeof error.response?.data?.error === 'string' ? error.response.data.error : error.response?.data?.error?.message || "Please try again"
       });
     } finally {
       setIsSubmitting(false);

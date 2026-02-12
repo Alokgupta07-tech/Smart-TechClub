@@ -44,10 +44,8 @@ const ForgotPassword = () => {
         description: "Check your email for the password reset code.",
       });
     } catch (error: any) {
-      const errorMsg =
-        error.response?.data?.error ||
-        error.message ||
-        "Failed to send reset code. Please try again.";
+      const rawErr = error.response?.data?.error;
+      const errorMsg = typeof rawErr === 'string' ? rawErr : rawErr?.message || error.message || "Failed to send reset code. Please try again.";
       toast.error("Request Failed", { description: errorMsg });
     } finally {
       setIsLoading(false);

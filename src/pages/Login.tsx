@@ -74,7 +74,8 @@ const Login = () => {
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      const errorMsg = error.response?.data?.error || error.message || "Failed to connect to backend API. Please ensure the server is running.";
+      const rawErr = error.response?.data?.error;
+      const errorMsg = typeof rawErr === 'string' ? rawErr : rawErr?.message || error.message || "Failed to connect to backend API. Please ensure the server is running.";
       toast.error("Authentication Failed", {
         description: errorMsg
       });
