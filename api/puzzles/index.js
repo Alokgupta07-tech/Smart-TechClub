@@ -41,11 +41,11 @@ module.exports = async function handler(req, res) {
         query = query.eq('level', level);
       }
       query = query.order('level', { ascending: true }).order('sequence', { ascending: true });
-      
-      // DEBUG: Test query
-      return res.status(200).json({ debug: 'before-query', hasQuery: !!query });
-      
       var result = await query;
+      
+      // DEBUG: After query
+      return res.status(200).json({ debug: 'after-query', hasData: !!result.data, count: (result.data || []).length, error: result.error });
+      
       if (result.error) throw result.error;
       return res.json(result.data || []);
     }
