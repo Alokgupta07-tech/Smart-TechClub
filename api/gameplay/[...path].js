@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { getSupabase } = require('../_lib/supabase');
 const { verifyAuth, setCorsHeaders } = require('../_lib/auth');
 
@@ -32,8 +32,8 @@ module.exports = async function handler(req, res) {
       const { data: puzzles } = await supabase
         .from('puzzles')
         .select('id, title, description, type, level, points')
-        .eq('level', team.current_level)
-        .order('sequence', { ascending: true })
+        .eq('level', team.level)
+        .order('puzzle_number', { ascending: true })
         .limit(1);
 
       if (!puzzles || puzzles.length === 0) {
@@ -68,19 +68,10 @@ module.exports = async function handler(req, res) {
       const isCorrect = puzzle.answer.toLowerCase().trim() === answer.toLowerCase().trim();
 
       if (isCorrect) {
-        // Update team score — read current, add, write back
-        const newScore = (team.total_score || 0) + puzzle.points;
-        const newSolved = (team.puzzles_solved || 0) + 1;
-
-        const { error: upErr } = await supabase
-          .from('teams')
-          .update({ total_score: newScore, puzzles_solved: newSolved })
-          .eq('id', team.id);
-        if (upErr) throw upErr;
 
         // Record submission
         const { error: subErr } = await supabase.from('submissions').insert({
-          id: uuidv4(),
+          id: crypto.randomUUID(),
           team_id: team.id,
           puzzle_id: puzzleId,
           answer,
@@ -93,7 +84,7 @@ module.exports = async function handler(req, res) {
       } else {
         // Record wrong submission
         await supabase.from('submissions').insert({
-          id: uuidv4(),
+          id: crypto.randomUUID(),
           team_id: team.id,
           puzzle_id: puzzleId,
           answer,
@@ -130,12 +121,11 @@ module.exports = async function handler(req, res) {
       const hint = hintNumber === 1 ? puzzle.hint1 : puzzle.hint2;
       if (!hint) return res.status(400).json({ error: 'Hint not available' });
 
-      // Update hints used and score penalty
+      // Update hints used
       const { error: upErr } = await supabase
         .from('teams')
         .update({
-          hints_used: (team.hints_used || 0) + 1,
-          total_score: Math.max(0, (team.total_score || 0) - 10)
+          hints_used: (team.hints_used || 0) + 1
         })
         .eq('id', team.id);
       if (upErr) throw upErr;

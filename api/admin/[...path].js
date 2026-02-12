@@ -268,9 +268,9 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET' && path === '/monitor/live') {
       const { data: teams, error: tErr } = await supabase
         .from('teams')
-        .select('id, team_name, current_level, total_score, status, user_id')
+        .select('id, team_name, level, status, user_id')
         .in('status', ['active', 'paused'])
-        .order('total_score', { ascending: false });
+        .order('level', { ascending: false });
       if (tErr) throw tErr;
 
       var liveUserIds = [];
@@ -286,16 +286,29 @@ module.exports = async function handler(req, res) {
         (users || []).forEach(function(u) { liveUsersMap[u.id] = u; });
       }
 
+      // Calculate scores from submissions
+      const teamIds = (teams || []).map(t => t.id);
+      const { data: submissions } = teamIds.length > 0 ? await supabase
+        .from('submissions')
+        .select('team_id, points_earned')
+        .in('team_id', teamIds) : { data: [] };
+      
+      var scoreMap = {};
+      (submissions || []).forEach(function(s) {
+        if (!scoreMap[s.team_id]) scoreMap[s.team_id] = 0;
+        scoreMap[s.team_id] += s.points_earned || 0;
+      });
+
       var liveResult = (teams || []).map(function(t) {
         return {
           id: t.id,
           team_name: t.team_name,
-          current_level: t.current_level,
-          total_score: t.total_score,
+          current_level: t.level,
+          total_score: scoreMap[t.id] || 0,
           status: t.status,
           leader_name: liveUsersMap[t.user_id] ? liveUsersMap[t.user_id].name : null
         };
-      });
+      }).sort((a, b) => b.total_score - a.total_score);
 
       return res.json(liveResult);
     }

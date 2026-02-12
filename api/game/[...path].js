@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { getSupabase } = require('../_lib/supabase');
 const { verifyAuth, requireAdmin, setCorsHeaders } = require('../_lib/auth');
 
@@ -24,7 +24,7 @@ module.exports = async function handler(req, res) {
         const { error: insertErr } = await supabase.from('game_state').insert({
           id: 1,
           phase: 'waiting',
-          current_level: 1,
+          level: 1,
           max_level: 5,
           start_time: null,
           end_time: null
@@ -32,7 +32,7 @@ module.exports = async function handler(req, res) {
         if (insertErr) throw insertErr;
 
         return res.json({
-          id: 1, phase: 'waiting', current_level: 1,
+          id: 1, phase: 'waiting', level: 1,
           max_level: 5, start_time: null, end_time: null
         });
       }
@@ -94,14 +94,14 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && path === '/reset') {
       const { error: gsErr } = await supabase
         .from('game_state')
-        .update({ phase: 'waiting', current_level: 1, start_time: null, end_time: null })
+        .update({ phase: 'waiting', level: 1, start_time: null, end_time: null })
         .eq('id', 1);
       if (gsErr) throw gsErr;
 
       // Reset all teams
       const { error: tErr } = await supabase
         .from('teams')
-        .update({ current_level: 1, total_score: 0, status: 'waiting' })
+        .update({ level: 1, status: 'waiting' })
         .neq('id', '00000000-0000-0000-0000-000000000000'); // update all rows
       if (tErr) throw tErr;
 
@@ -113,7 +113,7 @@ module.exports = async function handler(req, res) {
       const { level } = req.body;
       const { error } = await supabase
         .from('game_state')
-        .update({ current_level: level })
+        .update({ level: level })
         .eq('id', 1);
       if (error) throw error;
       return res.json({ message: `Level ${level} unlocked` });
@@ -123,7 +123,7 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && path === '/broadcast') {
       const { message, type } = req.body;
       const { error } = await supabase.from('broadcasts').insert({
-        id: uuidv4(),
+        id: crypto.randomUUID(),
         message,
         type: type || 'info',
         created_at: new Date().toISOString()

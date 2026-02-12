@@ -7,7 +7,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { v4: uuidv4 } = require('uuid');
+    const crypto = require('crypto');
     const bcrypt = require('bcryptjs');
     const { getSupabase } = require('../_lib/supabase');
     const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../_lib/auth');
@@ -38,8 +38,8 @@ module.exports = async function handler(req, res) {
       }
 
       const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-      const userId = uuidv4();
-      const teamId = uuidv4();
+      const userId = crypto.randomUUID();
+      const teamId = crypto.randomUUID();
 
       const { error: userErr } = await supabase.from('users').insert({
         id: userId,
@@ -61,7 +61,7 @@ module.exports = async function handler(req, res) {
       if (members && Array.isArray(members) && members.length > 0) {
         const memberRows = members.map(function(m) {
           return {
-            id: uuidv4(),
+            id: crypto.randomUUID(),
             team_id: teamId,
             name: m.name,
             email: m.email,
