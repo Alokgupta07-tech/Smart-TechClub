@@ -1,20 +1,11 @@
-let uuidv4, bcrypt, getSupabase, generateAccessToken, generateRefreshToken, verifyRefreshToken, setCorsHeaders;
-try {
-  uuidv4 = require('uuid').v4;
-  bcrypt = require('bcryptjs');
-  ({ getSupabase } = require('../_lib/supabase'));
-  ({ generateAccessToken, generateRefreshToken, verifyRefreshToken, setCorsHeaders } = require('../_lib/auth'));
-} catch (loadErr) {
-  module.exports = (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    return res.status(500).json({ error: 'Module load failed', details: loadErr.message, stack: loadErr.stack });
-  };
-  return;
-}
-
-const SALT_ROUNDS = 10;
-
 module.exports = async function handler(req, res) {
+  const { v4: uuidv4 } = require('uuid');
+  const bcrypt = require('bcryptjs');
+  const { getSupabase } = require('../_lib/supabase');
+  const { generateAccessToken, generateRefreshToken, verifyRefreshToken, setCorsHeaders } = require('../_lib/auth');
+
+  const SALT_ROUNDS = 10;
+
   setCorsHeaders(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
