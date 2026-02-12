@@ -1,6 +1,17 @@
 const { getSupabase } = require('../_lib/supabase');
 const { verifyAuth, setCorsHeaders } = require('../_lib/auth');
 
+// Map team DB fields to API response (for backward compatibility)
+function mapTeam(team) {
+  if (!team) return null;
+  return {
+    ...team,
+    current_level: team.level,
+    total_score: 0,
+    puzzles_solved: 0
+  };
+}
+
 module.exports = async function handler(req, res) {
   setCorsHeaders(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -43,7 +54,7 @@ module.exports = async function handler(req, res) {
         .eq('team_id', team.id);
 
       return res.json({
-        ...team,
+        ...mapTeam(team),
         leader_name: leader?.name || null,
         leader_email: leader?.email || null,
         members: members || []

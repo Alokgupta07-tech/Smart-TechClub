@@ -2,6 +2,17 @@ const crypto = require('crypto');
 const { getSupabase } = require('../_lib/supabase');
 const { verifyAuth, setCorsHeaders } = require('../_lib/auth');
 
+// Map team DB fields to API response (for backward compatibility)
+function mapTeam(team) {
+  if (!team) return null;
+  return {
+    ...team,
+    current_level: team.level,
+    total_score: 0, // Calculated from submissions if needed
+    puzzles_solved: 0 // Calculated from submissions if needed
+  };
+}
+
 module.exports = async function handler(req, res) {
   setCorsHeaders(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -40,7 +51,7 @@ module.exports = async function handler(req, res) {
         return res.json({ message: 'No puzzles available for this level', puzzle: null });
       }
 
-      return res.json({ puzzle: puzzles[0], team });
+      return res.json({ puzzle: puzzles[0], team: mapTeam(team) });
     }
 
     // ─── POST /api/gameplay/puzzle/submit ───
@@ -156,7 +167,7 @@ module.exports = async function handler(req, res) {
       const correct = subs ? subs.filter(s => s.is_correct).length : 0;
 
       return res.json({
-        team,
+        team: mapTeam(team),
         submissions: { total, correct }
       });
     }
