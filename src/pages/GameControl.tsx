@@ -275,8 +275,10 @@ export default function GameControl() {
   // Unlock Level 2 mutation
   const unlockLevel2 = useMutation({
     mutationFn: async () => {
-      const response = await fetchWithAuth(`${API_BASE}/game/level2/unlock`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/level/unlock`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: 2 }),
       });
       
       if (!response.ok) throw new Error('Failed to unlock Level 2');
