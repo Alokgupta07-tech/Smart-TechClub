@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
-const { getSupabase } = require('../../lib/supabase');
-const { verifyAuth, setCorsHeaders } = require('../../lib/auth');
+const { getSupabase } = require('../_lib/supabase');
+const { verifyAuth, setCorsHeaders } = require('../_lib/auth');
 
 module.exports = async function handler(req, res) {
   setCorsHeaders(res);

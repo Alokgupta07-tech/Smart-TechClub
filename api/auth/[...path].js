@@ -1,7 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
-const { getSupabase } = require('../../lib/supabase');
-const { generateAccessToken, generateRefreshToken, verifyRefreshToken, setCorsHeaders } = require('../../lib/auth');
+const { getSupabase } = require('../_lib/supabase');
+const { generateAccessToken, generateRefreshToken, verifyRefreshToken, setCorsHeaders } = require('../_lib/auth');
 
 const SALT_ROUNDS = 10;
 
