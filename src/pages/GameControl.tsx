@@ -103,7 +103,9 @@ export default function GameControl() {
       }
       return response.json();
     },
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: 10000, // Refresh every 10 seconds (reduced from 5)
+    staleTime: 8000, // Consider data fresh for 8 seconds
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
   });
 
   // ======= NEW: Fetch evaluation status for selected level =======
@@ -118,7 +120,8 @@ export default function GameControl() {
       }
       return response.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: 15000, // Slower polling when re-enabled
+    staleTime: 10000,
     retry: false, // Don't retry on 404
     enabled: false, // Disable until evaluation feature is implemented
   });
@@ -257,6 +260,7 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate asynchronously without blocking
       queryClient.invalidateQueries({ queryKey: ['gameState'] });
       toast({
         title: 'Success',
@@ -285,6 +289,7 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate asynchronously without blocking
       queryClient.invalidateQueries({ queryKey: ['gameState'] });
       toast({
         title: 'Success',
@@ -311,6 +316,7 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate asynchronously without blocking
       queryClient.invalidateQueries({ queryKey: ['gameState'] });
       toast({
         title: 'Game Paused',
@@ -330,6 +336,7 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate asynchronously without blocking
       queryClient.invalidateQueries({ queryKey: ['gameState'] });
       toast({
         title: 'Game Resumed',
@@ -349,6 +356,7 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate asynchronously without blocking
       queryClient.invalidateQueries({ queryKey: ['gameState'] });
       toast({
         title: 'Game Ended',
@@ -368,6 +376,7 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate asynchronously without blocking
       queryClient.invalidateQueries({ queryKey: ['gameState'] });
       toast({
         title: 'Game Restarted',
