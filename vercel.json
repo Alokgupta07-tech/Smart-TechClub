@@ -15,7 +15,7 @@
     { "source": "/api/notifications/unread", "destination": "/api/notifications/unread" },
     { "source": "/api/notifications/:path*", "destination": "/api/notifications/[...path]" },
     { "source": "/api/leaderboard", "destination": "/api/leaderboard" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/((?!api|assets).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
