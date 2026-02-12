@@ -1,16 +1,9 @@
-const { getPool } = require('../_lib/db');
-const { verifyAuth, requireTeam, setCorsHeaders } = require('../_lib/auth');
-
-/**
- * Team API - Serverless Handler
- * Handles: /api/team/*
- */
+const { getSupabase } = require('../../lib/supabase');
+const { verifyAuth, setCorsHeaders } = require('../../lib/auth');
 
 module.exports = async function handler(req, res) {
   setCorsHeaders(res);
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   // Verify authentication
   const authResult = verifyAuth(req);
@@ -18,50 +11,72 @@ module.exports = async function handler(req, res) {
     return res.status(authResult.status).json({ error: authResult.error, code: authResult.code });
   }
 
-  const db = getPool();
+  const supabase = getSupabase();
   const path = req.url.replace('/api/team', '').split('?')[0];
   const user = authResult.user;
 
   try {
-    // GET /api/team/me
+    // ─── GET /api/team/me ───
     if (req.method === 'GET' && path === '/me') {
-      const [teams] = await db.query(`
-        SELECT t.*, u.name as leader_name, u.email as leader_email
-        FROM teams t
-        JOIN users u ON t.user_id = u.id
-        WHERE t.user_id = ?
-      `, [user.userId]);
+      // Get team
+      const { data: team, error: tErr } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('user_id', user.userId)
+        .single();
 
-      if (teams.length === 0) {
+      if (tErr || !team) {
         return res.status(404).json({ error: 'Team not found' });
       }
 
-      const [members] = await db.query('SELECT * FROM team_members WHERE team_id = ?', [teams[0].id]);
+      // Get leader info
+      const { data: leader } = await supabase
+        .from('users')
+        .select('name, email')
+        .eq('id', user.userId)
+        .single();
+
+      // Get members
+      const { data: members } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('team_id', team.id);
 
       return res.json({
-        ...teams[0],
-        members
+        ...team,
+        leader_name: leader?.name || null,
+        leader_email: leader?.email || null,
+        members: members || []
       });
     }
 
-    // GET /api/team/profile
+    // ─── GET /api/team/profile ───
     if (req.method === 'GET' && path === '/profile') {
-      const [users] = await db.query('SELECT id, name, email, role, created_at FROM users WHERE id = ?', [user.userId]);
-      if (users.length === 0) {
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('id, name, email, role, created_at')
+        .eq('id', user.userId)
+        .single();
+
+      if (error || !profile) {
         return res.status(404).json({ error: 'User not found' });
       }
-      return res.json(users[0]);
+      return res.json(profile);
     }
 
-    // PUT /api/team/name
+    // ─── PUT /api/team/name ───
     if (req.method === 'PUT' && path === '/name') {
       const { teamName } = req.body;
-
       if (!teamName) {
         return res.status(400).json({ error: 'Team name is required' });
       }
 
-      await db.query('UPDATE teams SET team_name = ? WHERE user_id = ?', [teamName, user.userId]);
+      const { error } = await supabase
+        .from('teams')
+        .update({ team_name: teamName })
+        .eq('user_id', user.userId);
+      if (error) throw error;
+
       return res.json({ message: 'Team name updated' });
     }
 

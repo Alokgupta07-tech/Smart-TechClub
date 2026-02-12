@@ -1,32 +1,27 @@
-const { getPool } = require('../_lib/db');
-const { verifyAuth, requireAdmin, setCorsHeaders } = require('../_lib/auth');
-
-/**
- * Game API - Serverless Handler
- * Handles: /api/game/*
- */
+const { v4: uuidv4 } = require('uuid');
+const { getSupabase } = require('../../lib/supabase');
+const { verifyAuth, requireAdmin, setCorsHeaders } = require('../../lib/auth');
 
 module.exports = async function handler(req, res) {
   setCorsHeaders(res);
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const db = getPool();
+  const supabase = getSupabase();
   const path = req.url.replace('/api/game', '').split('?')[0];
 
   try {
-    // GET /api/game/state - Public
+    // ─── GET /api/game/state — Public ───
     if (req.method === 'GET' && path === '/state') {
-      const [states] = await db.query('SELECT * FROM game_state LIMIT 1');
+      const { data: states, error } = await supabase
+        .from('game_state')
+        .select('*')
+        .limit(1);
 
-      if (states.length === 0) {
+      if (error) throw error;
+
+      if (!states || states.length === 0) {
         // Create default game state
-        await db.query(`
-          INSERT INTO game_state (id, phase, current_level, max_level, start_time, end_time)
-          VALUES (1, 'waiting', 1, 5, NULL, NULL)
-        `);
-        return res.json({
+        const { error: insertErr } = await supabase.from('game_state').insert({
           id: 1,
           phase: 'waiting',
           current_level: 1,
@@ -34,71 +29,106 @@ module.exports = async function handler(req, res) {
           start_time: null,
           end_time: null
         });
+        if (insertErr) throw insertErr;
+
+        return res.json({
+          id: 1, phase: 'waiting', current_level: 1,
+          max_level: 5, start_time: null, end_time: null
+        });
       }
 
       return res.json(states[0]);
     }
 
-    // Protected routes below
+    // ─── Protected admin routes below ───
     const authResult = verifyAuth(req);
     if (authResult.error) {
       return res.status(authResult.status).json({ error: authResult.error, code: authResult.code });
     }
-
     const adminCheck = requireAdmin(authResult.user);
     if (adminCheck) {
       return res.status(adminCheck.status).json({ error: adminCheck.error });
     }
 
-    // POST /api/game/start
+    // ─── POST /api/game/start ───
     if (req.method === 'POST' && path === '/start') {
-      await db.query(`
-        UPDATE game_state SET phase = 'active', start_time = NOW() WHERE id = 1
-      `);
+      const { error } = await supabase
+        .from('game_state')
+        .update({ phase: 'active', start_time: new Date().toISOString() })
+        .eq('id', 1);
+      if (error) throw error;
       return res.json({ message: 'Game started' });
     }
 
-    // POST /api/game/pause
+    // ─── POST /api/game/pause ───
     if (req.method === 'POST' && path === '/pause') {
-      await db.query(`UPDATE game_state SET phase = 'paused' WHERE id = 1`);
+      const { error } = await supabase
+        .from('game_state')
+        .update({ phase: 'paused' })
+        .eq('id', 1);
+      if (error) throw error;
       return res.json({ message: 'Game paused' });
     }
 
-    // POST /api/game/resume
+    // ─── POST /api/game/resume ───
     if (req.method === 'POST' && path === '/resume') {
-      await db.query(`UPDATE game_state SET phase = 'active' WHERE id = 1`);
+      const { error } = await supabase
+        .from('game_state')
+        .update({ phase: 'active' })
+        .eq('id', 1);
+      if (error) throw error;
       return res.json({ message: 'Game resumed' });
     }
 
-    // POST /api/game/end
+    // ─── POST /api/game/end ───
     if (req.method === 'POST' && path === '/end') {
-      await db.query(`UPDATE game_state SET phase = 'ended', end_time = NOW() WHERE id = 1`);
+      const { error } = await supabase
+        .from('game_state')
+        .update({ phase: 'ended', end_time: new Date().toISOString() })
+        .eq('id', 1);
+      if (error) throw error;
       return res.json({ message: 'Game ended' });
     }
 
-    // POST /api/game/reset
+    // ─── POST /api/game/reset ───
     if (req.method === 'POST' && path === '/reset') {
-      await db.query(`
-        UPDATE game_state SET phase = 'waiting', current_level = 1, start_time = NULL, end_time = NULL WHERE id = 1
-      `);
-      await db.query(`UPDATE teams SET current_level = 1, total_score = 0, status = 'waiting'`);
+      const { error: gsErr } = await supabase
+        .from('game_state')
+        .update({ phase: 'waiting', current_level: 1, start_time: null, end_time: null })
+        .eq('id', 1);
+      if (gsErr) throw gsErr;
+
+      // Reset all teams
+      const { error: tErr } = await supabase
+        .from('teams')
+        .update({ current_level: 1, total_score: 0, status: 'waiting' })
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // update all rows
+      if (tErr) throw tErr;
+
       return res.json({ message: 'Game reset' });
     }
 
-    // POST /api/game/level/unlock
+    // ─── POST /api/game/level/unlock ───
     if (req.method === 'POST' && path === '/level/unlock') {
       const { level } = req.body;
-      await db.query(`UPDATE game_state SET current_level = ? WHERE id = 1`, [level]);
+      const { error } = await supabase
+        .from('game_state')
+        .update({ current_level: level })
+        .eq('id', 1);
+      if (error) throw error;
       return res.json({ message: `Level ${level} unlocked` });
     }
 
-    // POST /api/game/broadcast
+    // ─── POST /api/game/broadcast ───
     if (req.method === 'POST' && path === '/broadcast') {
       const { message, type } = req.body;
-      await db.query(
-        'INSERT INTO broadcasts (id, message, type, created_at) VALUES (UUID(), ?, ?, NOW())',
-        [message, type || 'info']
-      );
+      const { error } = await supabase.from('broadcasts').insert({
+        id: uuidv4(),
+        message,
+        type: type || 'info',
+        created_at: new Date().toISOString()
+      });
+      if (error) throw error;
       return res.json({ message: 'Broadcast sent' });
     }
 

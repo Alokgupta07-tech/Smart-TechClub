@@ -1,41 +1,50 @@
-const { getPool } = require('./_lib/db');
-const { setCorsHeaders } = require('./_lib/auth');
-
-/**
- * Leaderboard API - Serverless Handler
- * Handles: /api/leaderboard
- */
+const { getSupabase } = require('../lib/supabase');
+const { setCorsHeaders } = require('../lib/auth');
 
 module.exports = async function handler(req, res) {
   setCorsHeaders(res);
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const db = getPool();
+  const supabase = getSupabase();
 
   try {
-    const [teams] = await db.query(`
-      SELECT 
-        t.id,
-        t.team_name,
-        t.total_score,
-        t.current_level,
-        t.puzzles_solved,
-        t.status,
-        u.name as leader_name
-      FROM teams t
-      JOIN users u ON t.user_id = u.id
-      WHERE t.status != 'disqualified'
-      ORDER BY t.total_score DESC, t.puzzles_solved DESC
-      LIMIT 100
-    `);
+    // Get teams (excluding disqualified)
+    const { data: teams, error: tErr } = await supabase
+      .from('teams')
+      .select('id, team_name, total_score, current_level, puzzles_solved, status, user_id')
+      .neq('status', 'disqualified')
+      .order('total_score', { ascending: false })
+      .order('puzzles_solved', { ascending: false })
+      .limit(100);
 
-    return res.json(teams);
+    if (tErr) throw tErr;
+
+    // Get leader names
+    const userIds = [...new Set((teams || []).map(t => t.user_id).filter(Boolean))];
+    let usersMap = {};
+    if (userIds.length > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, name')
+        .in('id', userIds);
+      for (const u of (users || [])) usersMap[u.id] = u;
+    }
+
+    const result = (teams || []).map(t => ({
+      id: t.id,
+      team_name: t.team_name,
+      total_score: t.total_score,
+      current_level: t.current_level,
+      puzzles_solved: t.puzzles_solved,
+      status: t.status,
+      leader_name: usersMap[t.user_id]?.name || null
+    }));
+
+    return res.json(result);
 
   } catch (error) {
     console.error('Leaderboard API error:', error);

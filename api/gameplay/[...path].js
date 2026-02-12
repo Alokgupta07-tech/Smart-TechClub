@@ -1,16 +1,10 @@
-const { getPool } = require('../_lib/db');
-const { verifyAuth, requireTeam, setCorsHeaders } = require('../_lib/auth');
-
-/**
- * Gameplay API - Serverless Handler
- * Handles: /api/gameplay/*
- */
+const { v4: uuidv4 } = require('uuid');
+const { getSupabase } = require('../../lib/supabase');
+const { verifyAuth, setCorsHeaders } = require('../../lib/auth');
 
 module.exports = async function handler(req, res) {
   setCorsHeaders(res);
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   // Verify authentication
   const authResult = verifyAuth(req);
@@ -18,147 +12,162 @@ module.exports = async function handler(req, res) {
     return res.status(authResult.status).json({ error: authResult.error, code: authResult.code });
   }
 
-  const db = getPool();
+  const supabase = getSupabase();
   const path = req.url.replace('/api/gameplay', '').split('?')[0];
   const user = authResult.user;
 
   try {
-    // GET /api/gameplay/current - Get current puzzle for team
+    // ─── GET /api/gameplay/current ───
     if (req.method === 'GET' && path === '/current') {
-      const [teams] = await db.query('SELECT * FROM teams WHERE user_id = ?', [user.userId]);
+      const { data: team, error: tErr } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('user_id', user.userId)
+        .single();
 
-      if (teams.length === 0) {
+      if (tErr || !team) {
         return res.status(404).json({ error: 'Team not found' });
       }
 
-      const team = teams[0];
+      const { data: puzzles } = await supabase
+        .from('puzzles')
+        .select('id, title, description, type, level, points')
+        .eq('level', team.current_level)
+        .order('sequence', { ascending: true })
+        .limit(1);
 
-      const [puzzles] = await db.query(
-        'SELECT id, title, description, type, level, points FROM puzzles WHERE level = ? ORDER BY sequence LIMIT 1',
-        [team.current_level]
-      );
-
-      if (puzzles.length === 0) {
+      if (!puzzles || puzzles.length === 0) {
         return res.json({ message: 'No puzzles available for this level', puzzle: null });
       }
 
       return res.json({ puzzle: puzzles[0], team });
     }
 
-    // POST /api/gameplay/puzzle/submit - Submit answer
+    // ─── POST /api/gameplay/puzzle/submit ───
     if (req.method === 'POST' && path === '/puzzle/submit') {
       const { puzzleId, answer } = req.body;
 
-      const [teams] = await db.query('SELECT * FROM teams WHERE user_id = ?', [user.userId]);
-      if (teams.length === 0) {
+      const { data: team, error: tErr } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('user_id', user.userId)
+        .single();
+      if (tErr || !team) {
         return res.status(404).json({ error: 'Team not found' });
       }
 
-      const team = teams[0];
-
-      const [puzzles] = await db.query('SELECT * FROM puzzles WHERE id = ?', [puzzleId]);
-      if (puzzles.length === 0) {
+      const { data: puzzle, error: pErr } = await supabase
+        .from('puzzles')
+        .select('*')
+        .eq('id', puzzleId)
+        .single();
+      if (pErr || !puzzle) {
         return res.status(404).json({ error: 'Puzzle not found' });
       }
 
-      const puzzle = puzzles[0];
-
-      // Check answer (case-insensitive)
       const isCorrect = puzzle.answer.toLowerCase().trim() === answer.toLowerCase().trim();
 
       if (isCorrect) {
-        // Update team progress
-        await db.query(
-          'UPDATE teams SET total_score = total_score + ?, puzzles_solved = puzzles_solved + 1 WHERE id = ?',
-          [puzzle.points, team.id]
-        );
+        // Update team score — read current, add, write back
+        const newScore = (team.total_score || 0) + puzzle.points;
+        const newSolved = (team.puzzles_solved || 0) + 1;
+
+        const { error: upErr } = await supabase
+          .from('teams')
+          .update({ total_score: newScore, puzzles_solved: newSolved })
+          .eq('id', team.id);
+        if (upErr) throw upErr;
 
         // Record submission
-        await db.query(
-          'INSERT INTO submissions (id, team_id, puzzle_id, answer, is_correct, points_earned) VALUES (UUID(), ?, ?, ?, ?, ?)',
-          [team.id, puzzleId, answer, true, puzzle.points]
-        );
-
-        return res.json({
-          correct: true,
-          message: 'Correct answer!',
-          pointsEarned: puzzle.points
+        const { error: subErr } = await supabase.from('submissions').insert({
+          id: uuidv4(),
+          team_id: team.id,
+          puzzle_id: puzzleId,
+          answer,
+          is_correct: true,
+          points_earned: puzzle.points
         });
+        if (subErr) throw subErr;
+
+        return res.json({ correct: true, message: 'Correct answer!', pointsEarned: puzzle.points });
       } else {
         // Record wrong submission
-        await db.query(
-          'INSERT INTO submissions (id, team_id, puzzle_id, answer, is_correct, points_earned) VALUES (UUID(), ?, ?, ?, ?, ?)',
-          [team.id, puzzleId, answer, false, 0]
-        );
-
-        return res.json({
-          correct: false,
-          message: 'Incorrect answer. Try again!'
+        await supabase.from('submissions').insert({
+          id: uuidv4(),
+          team_id: team.id,
+          puzzle_id: puzzleId,
+          answer,
+          is_correct: false,
+          points_earned: 0
         });
+
+        return res.json({ correct: false, message: 'Incorrect answer. Try again!' });
       }
     }
 
-    // POST /api/gameplay/puzzle/hint - Request hint
+    // ─── POST /api/gameplay/puzzle/hint ───
     if (req.method === 'POST' && path === '/puzzle/hint') {
       const { puzzleId, hintNumber } = req.body;
 
-      const [teams] = await db.query('SELECT * FROM teams WHERE user_id = ?', [user.userId]);
-      if (teams.length === 0) {
-        return res.status(404).json({ error: 'Team not found' });
-      }
-
-      const team = teams[0];
+      const { data: team } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('user_id', user.userId)
+        .single();
+      if (!team) return res.status(404).json({ error: 'Team not found' });
 
       if (team.hints_used >= 3) {
         return res.status(400).json({ error: 'No hints remaining' });
       }
 
-      const [puzzles] = await db.query('SELECT * FROM puzzles WHERE id = ?', [puzzleId]);
-      if (puzzles.length === 0) {
-        return res.status(404).json({ error: 'Puzzle not found' });
-      }
+      const { data: puzzle } = await supabase
+        .from('puzzles')
+        .select('*')
+        .eq('id', puzzleId)
+        .single();
+      if (!puzzle) return res.status(404).json({ error: 'Puzzle not found' });
 
-      const puzzle = puzzles[0];
       const hint = hintNumber === 1 ? puzzle.hint1 : puzzle.hint2;
+      if (!hint) return res.status(400).json({ error: 'Hint not available' });
 
-      if (!hint) {
-        return res.status(400).json({ error: 'Hint not available' });
-      }
-
-      // Deduct hint and apply penalty
-      await db.query(
-        'UPDATE teams SET hints_used = hints_used + 1, total_score = total_score - 10 WHERE id = ?',
-        [team.id]
-      );
+      // Update hints used and score penalty
+      const { error: upErr } = await supabase
+        .from('teams')
+        .update({
+          hints_used: (team.hints_used || 0) + 1,
+          total_score: Math.max(0, (team.total_score || 0) - 10)
+        })
+        .eq('id', team.id);
+      if (upErr) throw upErr;
 
       return res.json({
         hint,
-        hintsRemaining: 2 - team.hints_used,
+        hintsRemaining: 2 - (team.hints_used || 0),
         penaltyApplied: 10
       });
     }
 
-    // GET /api/gameplay/progress - Get team progress
+    // ─── GET /api/gameplay/progress ───
     if (req.method === 'GET' && path === '/progress') {
-      const [teams] = await db.query('SELECT * FROM teams WHERE user_id = ?', [user.userId]);
+      const { data: team } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('user_id', user.userId)
+        .single();
+      if (!team) return res.status(404).json({ error: 'Team not found' });
 
-      if (teams.length === 0) {
-        return res.status(404).json({ error: 'Team not found' });
-      }
+      // Get submission stats
+      const { data: subs } = await supabase
+        .from('submissions')
+        .select('is_correct')
+        .eq('team_id', team.id);
 
-      const team = teams[0];
-
-      const [submissions] = await db.query(
-        'SELECT COUNT(*) as total, SUM(is_correct) as correct FROM submissions WHERE team_id = ?',
-        [team.id]
-      );
+      const total = subs ? subs.length : 0;
+      const correct = subs ? subs.filter(s => s.is_correct).length : 0;
 
       return res.json({
         team,
-        submissions: {
-          total: submissions[0].total || 0,
-          correct: submissions[0].correct || 0
-        }
+        submissions: { total, correct }
       });
     }
 
