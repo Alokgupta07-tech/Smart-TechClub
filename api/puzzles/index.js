@@ -34,6 +34,9 @@ module.exports = async function handler(req, res) {
       return res.status(adminCheck.status).json({ error: adminCheck.error });
     }
 
+    // DEBUG: After auth
+    return res.status(200).json({ debug: 'after-admin-check', user: authResult.user.email });
+
     // ─── GET /api/puzzles — List all puzzles (admin) ───
     if (req.method === 'GET') {
       var query = supabase.from('puzzles').select('*');
