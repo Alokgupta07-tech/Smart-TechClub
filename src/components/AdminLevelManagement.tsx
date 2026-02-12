@@ -452,7 +452,7 @@ const AdminLevelManagement = () => {
     );
   };
 
-  const isLevel2Unlocked = gameState?.level_2_unlocked;
+  const isLevel2Unlocked = gameState?.level2_open;
 
   return (
     <div className="space-y-6">
