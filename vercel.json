@@ -11,6 +11,7 @@
     { "source": "/api/game/:path*", "destination": "/api/game/[...path]" },
     { "source": "/api/puzzles/:path*", "destination": "/api/puzzles/[...path]" },
     { "source": "/api/gameplay/:path*", "destination": "/api/gameplay/[...path]" },
+    { "source": "/api/notifications/:path*", "destination": "/api/notifications/[...path]" },
     { "source": "/api/leaderboard", "destination": "/api/leaderboard" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],

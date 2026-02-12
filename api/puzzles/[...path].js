@@ -1,14 +1,14 @@
-const { v4: uuidv4 } = require('uuid');
-const { getSupabase } = require('../_lib/supabase');
-const { verifyAuth, requireAdmin, setCorsHeaders } = require('../_lib/auth');
-
 module.exports = async function handler(req, res) {
+  const { getSupabase } = require('../_lib/supabase');
+  const { verifyAuth, requireAdmin, setCorsHeaders } = require('../_lib/auth');
+  const crypto = require('crypto');
+
   setCorsHeaders(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const supabase = getSupabase();
   const path = req.url.replace('/api/puzzles', '').split('?')[0];
-  const url = new URL(req.url, `http://${req.headers.host}`);
+  const level = req.query && req.query.level ? req.query.level : null;
 
   try {
     // ─── GET /api/puzzles — List all puzzles (admin) ───
@@ -22,7 +22,6 @@ module.exports = async function handler(req, res) {
         return res.status(adminCheck.status).json({ error: adminCheck.error });
       }
 
-      const level = url.searchParams.get('level');
       let query = supabase.from('puzzles').select('*');
 
       if (level) {
@@ -66,7 +65,7 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && (path === '' || path === '/')) {
       const { title, description, type, level, points, answer, hint1, hint2, sequence } = req.body;
 
-      const newId = uuidv4();
+      const newId = crypto.randomUUID();
       const { error } = await supabase.from('puzzles').insert({
         id: newId,
         title,
