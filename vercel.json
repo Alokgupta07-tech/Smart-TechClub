@@ -9,7 +9,6 @@
     { "source": "/api/admin/:path*", "destination": "/api/admin/[...path]" },
     { "source": "/api/team/:path*", "destination": "/api/team/[...path]" },
     { "source": "/api/game/:path*", "destination": "/api/game/[...path]" },
-    { "source": "/api/puzzles/:path*", "destination": "/api/puzzles/[...path]" },
     { "source": "/api/gameplay/:path*", "destination": "/api/gameplay/[...path]" },
     { "source": "/api/notifications/:path*", "destination": "/api/notifications/[...path]" },
     { "source": "/api/leaderboard", "destination": "/api/leaderboard" },
