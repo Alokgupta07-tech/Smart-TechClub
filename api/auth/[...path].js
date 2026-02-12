@@ -1,7 +1,16 @@
-const { v4: uuidv4 } = require('uuid');
-const bcrypt = require('bcryptjs');
-const { getSupabase } = require('../_lib/supabase');
-const { generateAccessToken, generateRefreshToken, verifyRefreshToken, setCorsHeaders } = require('../_lib/auth');
+let uuidv4, bcrypt, getSupabase, generateAccessToken, generateRefreshToken, verifyRefreshToken, setCorsHeaders;
+try {
+  uuidv4 = require('uuid').v4;
+  bcrypt = require('bcryptjs');
+  ({ getSupabase } = require('../_lib/supabase'));
+  ({ generateAccessToken, generateRefreshToken, verifyRefreshToken, setCorsHeaders } = require('../_lib/auth'));
+} catch (loadErr) {
+  module.exports = (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    return res.status(500).json({ error: 'Module load failed', details: loadErr.message, stack: loadErr.stack });
+  };
+  return;
+}
 
 const SALT_ROUNDS = 10;
 
@@ -213,7 +222,8 @@ module.exports = async function handler(req, res) {
     console.error('Auth API error:', error);
     return res.status(500).json({
       error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: error.message,
+      stack: error.stack
     });
   }
 };
