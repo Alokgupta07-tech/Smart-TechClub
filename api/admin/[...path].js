@@ -339,6 +339,85 @@ module.exports = async function handler(req, res) {
       return res.json(logs || []);
     }
 
+    // ─── GET /api/admin/team-timings ───
+    if (req.method === 'GET' && path === '/team-timings') {
+      const { data: teams, error: teamsError } = await supabase
+        .from('teams')
+        .select('id, team_name, status, start_time, end_time, hints_used')
+        .order('created_at', { ascending: false });
+      
+      if (teamsError) {
+        return res.json({ success: true, teams: [] });
+      }
+      
+      // Get puzzle count
+      const { data: puzzles } = await supabase
+        .from('puzzles')
+        .select('id')
+        .eq('is_active', true)
+        .eq('level', 1);
+      const totalQuestions = puzzles?.length || 10;
+      
+      // Build team info with JS calculations
+      const teamsWithDetails = (teams || []).map(team => {
+        let totalTimeSeconds = 0;
+        if (team.start_time && team.end_time) {
+          totalTimeSeconds = Math.floor((new Date(team.end_time) - new Date(team.start_time)) / 1000);
+        } else if (team.start_time && team.status === 'active') {
+          totalTimeSeconds = Math.floor((new Date() - new Date(team.start_time)) / 1000);
+        }
+        
+        return {
+          teamId: team.id,
+          teamName: team.team_name,
+          currentStatus: team.status || 'waiting',
+          totalTime: totalTimeSeconds,
+          penaltyTime: 0,
+          questionsCompleted: 0,
+          totalQuestions: totalQuestions,
+          currentQuestion: 1,
+          skipsUsed: 0,
+          hintsUsed: team.hints_used || 0,
+          correctAnswers: 0,
+          wrongAnswers: 0,
+          questionTimes: []
+        };
+      });
+      
+      return res.json({ success: true, teams: teamsWithDetails });
+    }
+
+    // ─── GET /api/admin/question-analytics ───
+    if (req.method === 'GET' && path === '/question-analytics') {
+      const { data: puzzles, error: puzzlesError } = await supabase
+        .from('puzzles')
+        .select('id, title, level, puzzle_number')
+        .order('level')
+        .order('puzzle_number');
+      
+      if (puzzlesError) {
+        return res.json({ success: true, questions: [], overallAvgTime: 600 });
+      }
+      
+      return res.json({
+        success: true,
+        questions: (puzzles || []).map(p => ({
+          id: p.id,
+          title: p.title,
+          level: p.level,
+          puzzleNumber: p.puzzle_number,
+          totalAttempts: 0,
+          completedCount: 0,
+          skippedCount: 0,
+          avgTime: 0,
+          minTime: 0,
+          maxTime: 0,
+          totalHintsUsed: 0
+        })),
+        overallAvgTime: 600
+      });
+    }
+
     return res.status(404).json({ error: 'Endpoint not found' });
 
   } catch (error) {
