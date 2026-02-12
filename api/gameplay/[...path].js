@@ -6,10 +6,19 @@ const { verifyAuth, setCorsHeaders } = require('../_lib/auth');
 function mapTeam(team) {
   if (!team) return null;
   return {
-    ...team,
+    id: team.id,
+    team_name: team.team_name,
+    level: team.level,
+    status: team.status,
+    progress: team.progress,
+    start_time: team.start_time,
+    end_time: team.end_time,
+    hints_used: team.hints_used,
+    user_id: team.user_id,
+    created_at: team.created_at,
     current_level: team.level,
-    total_score: 0, // Calculated from submissions if needed
-    puzzles_solved: 0 // Calculated from submissions if needed
+    total_score: 0,
+    puzzles_solved: 0
   };
 }
 
@@ -164,12 +173,17 @@ module.exports = async function handler(req, res) {
         .select('is_correct')
         .eq('team_id', team.id);
 
-      const total = subs ? subs.length : 0;
-      const correct = subs ? subs.filter(s => s.is_correct).length : 0;
+      var total = subs ? subs.length : 0;
+      var correct = 0;
+      if (subs) {
+        for (var i = 0; i < subs.length; i++) {
+          if (subs[i].is_correct) correct++;
+        }
+      }
 
       return res.json({
         team: mapTeam(team),
-        submissions: { total, correct }
+        submissions: { total: total, correct: correct }
       });
     }
 

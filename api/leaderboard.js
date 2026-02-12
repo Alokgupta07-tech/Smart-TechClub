@@ -23,41 +23,51 @@ module.exports = async function handler(req, res) {
     if (tErr) throw tErr;
 
     // Get leader names
-    const userIds = [...new Set((teams || []).map(t => t.user_id).filter(Boolean))];
-    let usersMap = {};
+    var userIds = [];
+    (teams || []).forEach(function(t) {
+      if (t.user_id && userIds.indexOf(t.user_id) === -1) {
+        userIds.push(t.user_id);
+      }
+    });
+    var usersMap = {};
     if (userIds.length > 0) {
       const { data: users } = await supabase
         .from('users')
         .select('id, name')
         .in('id', userIds);
-      for (const u of (users || [])) usersMap[u.id] = u;
+      (users || []).forEach(function(u) { usersMap[u.id] = u; });
     }
 
     // Calculate scores from submissions
-    const teamIds = (teams || []).map(t => t.id);
+    var teamIds = (teams || []).map(function(t) { return t.id; });
     const { data: submissions } = teamIds.length > 0 ? await supabase
       .from('submissions')
       .select('team_id, score_awarded, is_correct')
       .in('team_id', teamIds) : { data: [] };
 
-    const teamScores = {};
-    const teamSolved = {};
-    for (const sub of (submissions || [])) {
+    var teamScores = {};
+    var teamSolved = {};
+    (submissions || []).forEach(function(sub) {
       if (!teamScores[sub.team_id]) teamScores[sub.team_id] = 0;
       if (!teamSolved[sub.team_id]) teamSolved[sub.team_id] = 0;
       teamScores[sub.team_id] += sub.score_awarded || 0;
       if (sub.is_correct) teamSolved[sub.team_id]++;
-    }
+    });
 
-    const result = (teams || []).map(t => ({
-      id: t.id,
-      team_name: t.team_name,
-      total_score: teamScores[t.id] || 0,
-      current_level: t.level,
-      puzzles_solved: teamSolved[t.id] || 0,
-      status: t.status,
-      leader_name: usersMap[t.user_id]?.name || null
-    })).sort((a, b) => b.total_score - a.total_score || b.puzzles_solved - a.puzzles_solved);
+    var result = (teams || []).map(function(t) {
+      var leaderUser = usersMap[t.user_id];
+      return {
+        id: t.id,
+        team_name: t.team_name,
+        total_score: teamScores[t.id] || 0,
+        current_level: t.level,
+        puzzles_solved: teamSolved[t.id] || 0,
+        status: t.status,
+        leader_name: (leaderUser && leaderUser.name) ? leaderUser.name : null
+      };
+    }).sort(function(a, b) {
+      return (b.total_score - a.total_score) || (b.puzzles_solved - a.puzzles_solved);
+    });
 
     return res.json(result);
 

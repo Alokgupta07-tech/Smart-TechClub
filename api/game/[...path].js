@@ -9,7 +9,7 @@ async function getGameStateId(supabase) {
   if (cachedGameStateId) return cachedGameStateId;
   
   const { data } = await supabase.from('game_state').select('id').limit(1).single();
-  if (data?.id) {
+  if (data && data.id) {
     cachedGameStateId = data.id;
     return cachedGameStateId;
   }

@@ -95,14 +95,16 @@ module.exports = async function handler(req, res) {
         // Get all teams to broadcast to
         const { data: teams } = await supabase.from('teams').select('id');
         if (teams && teams.length > 0) {
-          const notifications = teams.map(t => ({
-            team_id: t.id,
-            notification_type: 'broadcast',
-            title,
-            message,
-            priority: priority || 'normal',
-            is_read: false,
-          }));
+          var notifications = teams.map(function(t) {
+            return {
+              team_id: t.id,
+              notification_type: 'broadcast',
+              title: title,
+              message: message,
+              priority: priority || 'normal',
+              is_read: false
+            };
+          });
 
           const { error } = await supabase.from('notifications').insert(notifications);
           if (error && error.code !== '42P01') throw error;

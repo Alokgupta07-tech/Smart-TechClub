@@ -63,10 +63,10 @@ module.exports = async function handler(req, res) {
           return {
             id: crypto.randomUUID(),
             team_id: teamId,
-            name: m.name,
-            email: m.email,
-            phone: m.phone || null,
-            role: m.role || 'member'
+            member_name: m.name,
+            member_email: m.email || null,
+            member_role: m.role || 'member',
+            is_leader: false
           };
         });
         const { error: memErr } = await supabase.from('team_members').insert(memberRows);

@@ -5,7 +5,16 @@ const { verifyAuth, setCorsHeaders } = require('../_lib/auth');
 function mapTeam(team) {
   if (!team) return null;
   return {
-    ...team,
+    id: team.id,
+    team_name: team.team_name,
+    level: team.level,
+    status: team.status,
+    progress: team.progress,
+    start_time: team.start_time,
+    end_time: team.end_time,
+    hints_used: team.hints_used,
+    user_id: team.user_id,
+    created_at: team.created_at,
     current_level: team.level,
     total_score: 0,
     puzzles_solved: 0
@@ -53,12 +62,11 @@ module.exports = async function handler(req, res) {
         .select('*')
         .eq('team_id', team.id);
 
-      return res.json({
-        ...mapTeam(team),
-        leader_name: leader?.name || null,
-        leader_email: leader?.email || null,
-        members: members || []
-      });
+      var mapped = mapTeam(team);
+      mapped.leader_name = (leader && leader.name) ? leader.name : null;
+      mapped.leader_email = (leader && leader.email) ? leader.email : null;
+      mapped.members = members || [];
+      return res.json(mapped);
     }
 
     // ─── GET /api/team/profile ───
