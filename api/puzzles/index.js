@@ -10,8 +10,8 @@ module.exports = async function handler(req, res) {
   // return res.status(200).json({ debug: 'handler reached', method: req.method });
 
   try {
-    const { getSupabase } = require('./_lib/supabase');
-    const { verifyAuth, requireAdmin } = require('./_lib/auth');
+    const { getSupabase } = require('../_lib/supabase');
+    const { verifyAuth, requireAdmin } = require('../_lib/auth');
     const crypto = require('crypto');
 
     const supabase = getSupabase();
