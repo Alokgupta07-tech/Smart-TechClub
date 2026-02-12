@@ -132,7 +132,18 @@ module.exports = async function handler(req, res) {
     return res.status(404).json({ error: 'Endpoint not found' });
 
   } catch (error) {
-    console.error('Puzzles API error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Puzzles path API error:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      details: error.details,
+      path: req.url
+    });
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message,
+      code: error.code,
+      details: String(error.details || error.message || error)
+    });
   }
 };

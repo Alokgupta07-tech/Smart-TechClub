@@ -69,7 +69,17 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
 
   } catch (error) {
-    console.error('Puzzles API error:', error);
-    return res.status(500).json({ error: 'Internal server error', details: String(error.message || error) });
+    console.error('Puzzles index API error:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      details: error.details
+    });
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      message: error.message,
+      code: error.code,
+      details: String(error.details || error.message || error) 
+    });
   }
 };
