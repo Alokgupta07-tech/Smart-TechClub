@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, startTransition } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -105,6 +105,7 @@ export default function GameControl() {
     },
     refetchInterval: 10000, // Refresh every 10 seconds (reduced from 5)
     staleTime: 8000, // Consider data fresh for 8 seconds
+    gcTime: 20000, // Cache for 20 seconds (reduced memory)
     refetchOnWindowFocus: false, // Prevent refetch on window focus
   });
 
@@ -588,7 +589,14 @@ export default function GameControl() {
                 </p>
               </div>
               <Button
-                onClick={() => startGame.mutate()}
+                onClick={() => {
+                  // Use requestAnimationFrame to defer to next frame
+                  requestAnimationFrame(() => {
+                    startTransition(() => {
+                      startGame.mutate();
+                    });
+                  });
+                }}
                 disabled={startGame.isPending}
                 className="bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
               >
@@ -608,7 +616,14 @@ export default function GameControl() {
                 </p>
               </div>
               <Button
-                onClick={() => unlockLevel2.mutate()}
+                onClick={() => {
+                  // Use requestAnimationFrame to defer to next frame
+                  requestAnimationFrame(() => {
+                    startTransition(() => {
+                      unlockLevel2.mutate();
+                    });
+                  });
+                }}
                 disabled={unlockLevel2.isPending}
                 className="bg-orange-500 text-white hover:bg-orange-600"
               >
@@ -633,7 +648,13 @@ export default function GameControl() {
               </div>
               {currentPhase === 'paused' ? (
                 <Button
-                  onClick={() => resumeGame.mutate()}
+                  onClick={() => {
+                    requestAnimationFrame(() => {
+                      startTransition(() => {
+                        resumeGame.mutate();
+                      });
+                    });
+                  }}
                   disabled={resumeGame.isPending}
                   className="bg-green-500 text-white hover:bg-green-600"
                 >
@@ -642,7 +663,13 @@ export default function GameControl() {
                 </Button>
               ) : (
                 <Button
-                  onClick={() => pauseGame.mutate()}
+                  onClick={() => {
+                    requestAnimationFrame(() => {
+                      startTransition(() => {
+                        pauseGame.mutate();
+                      });
+                    });
+                  }}
                   disabled={pauseGame.isPending}
                   className="bg-yellow-500 text-black hover:bg-yellow-600"
                 >
@@ -663,7 +690,13 @@ export default function GameControl() {
                 </p>
               </div>
               <Button
-                onClick={() => endGame.mutate()}
+                onClick={() => {
+                  requestAnimationFrame(() => {
+                    startTransition(() => {
+                      endGame.mutate();
+                    });
+                  });
+                }}
                 disabled={endGame.isPending}
                 className="bg-red-500 text-white hover:bg-red-600"
               >
@@ -717,7 +750,11 @@ export default function GameControl() {
             <Button
               onClick={() => {
                 if (confirm('Are you sure you want to restart the game? All team progress will be lost!')) {
-                  restartGame.mutate();
+                  requestAnimationFrame(() => {
+                    startTransition(() => {
+                      restartGame.mutate();
+                    });
+                  });
                 }
               }}
               disabled={restartGame.isPending}
@@ -989,7 +1026,11 @@ export default function GameControl() {
               Cancel
             </Button>
             <Button
-              onClick={() => broadcastMsg.mutate()}
+              onClick={() => {
+                startTransition(() => {
+                  broadcastMsg.mutate();
+                });
+              }}
               disabled={broadcastMsg.isPending || !broadcastMessage}
               className="bg-blue-500 text-white hover:bg-blue-600"
             >
