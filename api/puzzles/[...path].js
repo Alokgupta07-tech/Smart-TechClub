@@ -41,7 +41,7 @@ module.exports = async function handler(req, res) {
 
       const { data: puzzles, error } = await query;
       if (error) throw error;
-      return res.json(puzzles || []);
+      return res.json({ puzzles: puzzles || [] });
     }
 
     // ─── GET /api/puzzles/:id ───

@@ -43,7 +43,7 @@ module.exports = async function handler(req, res) {
       query = query.order('level', { ascending: true }).order('puzzle_number', { ascending: true });
       var result = await query;
       if (result.error) throw result.error;
-      return res.json(result.data || []);
+      return res.json({ puzzles: result.data || [] });
     }
 
     // ─── POST /api/puzzles — Create puzzle ───
