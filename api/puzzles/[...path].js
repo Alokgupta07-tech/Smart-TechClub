@@ -72,20 +72,20 @@ module.exports = async function handler(req, res) {
 
     // ─── POST /api/puzzles — Create puzzle ───
     if (req.method === 'POST' && (path === '' || path === '/')) {
-      const { title, description, type, level, points, answer, hint1, hint2, sequence } = req.body;
+      const { title, description, type, level, puzzle_number, points, answer, correct_answer, puzzle_content, puzzle_file_url } = req.body;
 
       const newId = crypto.randomUUID();
       const { error } = await supabase.from('puzzles').insert({
         id: newId,
         title,
         description,
-        type: type || 'text',
+        puzzle_type: type || 'text',
         level,
+        puzzle_number: puzzle_number || 1,
         points: points || 100,
-        answer,
-        hint1: hint1 || null,
-        hint2: hint2 || null,
-        sequence: sequence || 1
+        correct_answer: answer || correct_answer,
+        puzzle_content: puzzle_content || null,
+        puzzle_file_url: puzzle_file_url || null
       });
       if (error) throw error;
 
@@ -95,11 +95,21 @@ module.exports = async function handler(req, res) {
     // ─── PUT /api/puzzles/:id — Update puzzle ───
     if (req.method === 'PUT' && path.match(/^\/[^\/]+$/)) {
       const puzzleId = path.slice(1);
-      const { title, description, type, level, points, answer, hint1, hint2, sequence } = req.body;
+      const { title, description, type, level, puzzle_number, points, answer, correct_answer, puzzle_content, puzzle_file_url } = req.body;
 
       const { error } = await supabase
         .from('puzzles')
-        .update({ title, description, type, level, points, answer, hint1, hint2, sequence })
+        .update({ 
+          title, 
+          description, 
+          puzzle_type: type, 
+          level, 
+          puzzle_number, 
+          points, 
+          correct_answer: answer || correct_answer,
+          puzzle_content,
+          puzzle_file_url
+        })
         .eq('id', puzzleId);
       if (error) throw error;
 

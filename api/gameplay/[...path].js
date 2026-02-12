@@ -76,7 +76,7 @@ module.exports = async function handler(req, res) {
         return res.status(404).json({ error: 'Puzzle not found' });
       }
 
-      const isCorrect = puzzle.answer.toLowerCase().trim() === answer.toLowerCase().trim();
+      const isCorrect = puzzle.correct_answer.toLowerCase().trim() === answer.toLowerCase().trim();
 
       if (isCorrect) {
 
@@ -122,15 +122,16 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'No hints remaining' });
       }
 
-      const { data: puzzle } = await supabase
-        .from('puzzles')
+      // Get hint from hints table
+      const { data: hints } = await supabase
+        .from('hints')
         .select('*')
-        .eq('id', puzzleId)
+        .eq('puzzle_id', puzzleId)
+        .eq('hint_number', hintNumber)
+        .eq('is_active', true)
         .single();
-      if (!puzzle) return res.status(404).json({ error: 'Puzzle not found' });
-
-      const hint = hintNumber === 1 ? puzzle.hint1 : puzzle.hint2;
-      if (!hint) return res.status(400).json({ error: 'Hint not available' });
+      
+      if (!hints) return res.status(404).json({ error: 'Hint not available' });
 
       // Update hints used
       const { error: upErr } = await supabase
@@ -142,7 +143,7 @@ module.exports = async function handler(req, res) {
       if (upErr) throw upErr;
 
       return res.json({
-        hint,
+        hint: hints.hint_text,
         hintsRemaining: 2 - (team.hints_used || 0),
         penaltyApplied: 10
       });

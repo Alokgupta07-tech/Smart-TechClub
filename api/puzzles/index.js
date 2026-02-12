@@ -54,13 +54,13 @@ module.exports = async function handler(req, res) {
         id: newId,
         title: body.title,
         description: body.description,
-        type: body.type || 'text',
+        puzzle_type: body.type || 'text',
         level: body.level,
+        puzzle_number: body.puzzle_number || 1,
         points: body.points || 100,
-        answer: body.answer,
-        hint1: body.hint1 || null,
-        hint2: body.hint2 || null,
-        sequence: body.sequence || 1
+        correct_answer: body.answer || body.correct_answer,
+        puzzle_content: body.puzzle_content || null,
+        puzzle_file_url: body.puzzle_file_url || null
       });
       if (insertResult.error) throw insertResult.error;
       return res.status(201).json({ message: 'Puzzle created', id: newId });
