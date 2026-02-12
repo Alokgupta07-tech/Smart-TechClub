@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, startTransition } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from '@/lib/api';
@@ -421,7 +421,7 @@ const Admin = () => {
           {/* Quick Navigation */}
           <div className="mb-6 flex gap-3 flex-wrap">
             <Button 
-              onClick={() => setActivePanel('teams')} 
+              onClick={() => startTransition(() => setActivePanel('teams'))} 
               variant={activePanel === 'teams' ? 'default' : 'outline'}
               className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
             >
@@ -429,7 +429,7 @@ const Admin = () => {
               Teams Overview
             </Button>
             <Button 
-              onClick={() => setActivePanel('timeTracking')} 
+              onClick={() => startTransition(() => setActivePanel('timeTracking'))} 
               variant={activePanel === 'timeTracking' ? 'default' : 'outline'}
               className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
             >
@@ -437,7 +437,7 @@ const Admin = () => {
               Time Tracking
             </Button>
             <Button 
-              onClick={() => setActivePanel('qualification')} 
+              onClick={() => startTransition(() => setActivePanel('qualification'))} 
               variant={activePanel === 'qualification' ? 'default' : 'outline'}
               className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
             >
@@ -445,7 +445,7 @@ const Admin = () => {
               Qualification
             </Button>
             <Button 
-              onClick={() => setActivePanel('levels')} 
+              onClick={() => startTransition(() => setActivePanel('levels'))} 
               variant={activePanel === 'levels' ? 'default' : 'outline'}
               className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
             >
