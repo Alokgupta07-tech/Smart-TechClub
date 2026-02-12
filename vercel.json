@@ -5,6 +5,7 @@
   "installCommand": "npm install && cd api && npm install",
   "framework": "vite",
   "rewrites": [
+    { "source": "/api/puzzles", "destination": "/api/puzzles/[...path]" },
     { "source": "/api/auth/:path*", "destination": "/api/auth/[...path]" },
     { "source": "/api/admin/:path*", "destination": "/api/admin/[...path]" },
     { "source": "/api/team/:path*", "destination": "/api/team/[...path]" },
