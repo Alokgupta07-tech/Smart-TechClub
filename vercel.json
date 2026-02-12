@@ -12,6 +12,7 @@
     { "source": "/api/team/:path*", "destination": "/api/team/[...path]" },
     { "source": "/api/game/:path*", "destination": "/api/game/[...path]" },
     { "source": "/api/gameplay/:path*", "destination": "/api/gameplay/[...path]" },
+    { "source": "/api/notifications/unread", "destination": "/api/notifications/unread" },
     { "source": "/api/notifications/:path*", "destination": "/api/notifications/[...path]" },
     { "source": "/api/leaderboard", "destination": "/api/leaderboard" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
