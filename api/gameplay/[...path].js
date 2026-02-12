@@ -42,7 +42,7 @@ module.exports = async function handler(req, res) {
 
       const { data: puzzles } = await supabase
         .from('puzzles')
-        .select('id, title, description, type, level, points')
+        .select('id, title, description, puzzle_type, level, points')
         .eq('level', team.level)
         .order('puzzle_number', { ascending: true })
         .limit(1);
@@ -85,9 +85,9 @@ module.exports = async function handler(req, res) {
           id: crypto.randomUUID(),
           team_id: team.id,
           puzzle_id: puzzleId,
-          answer,
+          submitted_answer: answer,
           is_correct: true,
-          points_earned: puzzle.points
+          score_awarded: puzzle.points
         });
         if (subErr) throw subErr;
 
@@ -98,9 +98,9 @@ module.exports = async function handler(req, res) {
           id: crypto.randomUUID(),
           team_id: team.id,
           puzzle_id: puzzleId,
-          answer,
+          submitted_answer: answer,
           is_correct: false,
-          points_earned: 0
+          score_awarded: 0
         });
 
         return res.json({ correct: false, message: 'Incorrect answer. Try again!' });

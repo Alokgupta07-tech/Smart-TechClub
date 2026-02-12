@@ -290,13 +290,13 @@ module.exports = async function handler(req, res) {
       const teamIds = (teams || []).map(t => t.id);
       const { data: submissions } = teamIds.length > 0 ? await supabase
         .from('submissions')
-        .select('team_id, points_earned')
+        .select('team_id, score_awarded')
         .in('team_id', teamIds) : { data: [] };
       
       var scoreMap = {};
       (submissions || []).forEach(function(s) {
         if (!scoreMap[s.team_id]) scoreMap[s.team_id] = 0;
-        scoreMap[s.team_id] += s.points_earned || 0;
+        scoreMap[s.team_id] += s.score_awarded || 0;
       });
 
       var liveResult = (teams || []).map(function(t) {

@@ -20,20 +20,14 @@ module.exports = async function handler(req, res) {
       if (error) throw error;
 
       if (!states || states.length === 0) {
-        // Create default game state
-        const { error: insertErr } = await supabase.from('game_state').insert({
-          id: 1,
-          phase: 'waiting',
-          level: 1,
-          max_level: 5,
-          start_time: null,
-          end_time: null
-        });
-        if (insertErr) throw insertErr;
-
+        // Return default game state (will be created by seed data)
         return res.json({
-          id: 1, phase: 'waiting', level: 1,
-          max_level: 5, start_time: null, end_time: null
+          game_active: false,
+          current_level: 1,
+          level1_open: true,
+          level2_open: false,
+          game_started_at: null,
+          game_ended_at: null
         });
       }
 
@@ -54,8 +48,8 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && path === '/start') {
       const { error } = await supabase
         .from('game_state')
-        .update({ phase: 'active', start_time: new Date().toISOString() })
-        .eq('id', 1);
+        .update({ game_active: true, game_started_at: new Date().toISOString() })
+        .limit(1);
       if (error) throw error;
       return res.json({ message: 'Game started' });
     }
@@ -64,8 +58,8 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && path === '/pause') {
       const { error } = await supabase
         .from('game_state')
-        .update({ phase: 'paused' })
-        .eq('id', 1);
+        .update({ game_active: false })
+        .limit(1);
       if (error) throw error;
       return res.json({ message: 'Game paused' });
     }
@@ -74,8 +68,8 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && path === '/resume') {
       const { error } = await supabase
         .from('game_state')
-        .update({ phase: 'active' })
-        .eq('id', 1);
+        .update({ game_active: true })
+        .limit(1);
       if (error) throw error;
       return res.json({ message: 'Game resumed' });
     }
@@ -84,8 +78,8 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && path === '/end') {
       const { error } = await supabase
         .from('game_state')
-        .update({ phase: 'ended', end_time: new Date().toISOString() })
-        .eq('id', 1);
+        .update({ game_active: false, game_ended_at: new Date().toISOString() })
+        .limit(1);
       if (error) throw error;
       return res.json({ message: 'Game ended' });
     }
@@ -94,8 +88,15 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && path === '/reset') {
       const { error: gsErr } = await supabase
         .from('game_state')
-        .update({ phase: 'waiting', level: 1, start_time: null, end_time: null })
-        .eq('id', 1);
+        .update({ 
+          game_active: false, 
+          current_level: 1, 
+          level1_open: true, 
+          level2_open: false,
+          game_started_at: null, 
+          game_ended_at: null 
+        })
+        .limit(1);
       if (gsErr) throw gsErr;
 
       // Reset all teams
@@ -111,10 +112,14 @@ module.exports = async function handler(req, res) {
     // ─── POST /api/game/level/unlock ───
     if (req.method === 'POST' && path === '/level/unlock') {
       const { level } = req.body;
+      const updates = { current_level: level };
+      if (level === 1) updates.level1_open = true;
+      if (level === 2) updates.level2_open = true;
+      
       const { error } = await supabase
         .from('game_state')
-        .update({ level: level })
-        .eq('id', 1);
+        .update(updates)
+        .limit(1);
       if (error) throw error;
       return res.json({ message: `Level ${level} unlocked` });
     }

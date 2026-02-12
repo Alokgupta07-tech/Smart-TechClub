@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
     const teamIds = (teams || []).map(t => t.id);
     const { data: submissions } = teamIds.length > 0 ? await supabase
       .from('submissions')
-      .select('team_id, points_earned, is_correct')
+      .select('team_id, score_awarded, is_correct')
       .in('team_id', teamIds) : { data: [] };
 
     const teamScores = {};
@@ -45,7 +45,7 @@ module.exports = async function handler(req, res) {
     for (const sub of (submissions || [])) {
       if (!teamScores[sub.team_id]) teamScores[sub.team_id] = 0;
       if (!teamSolved[sub.team_id]) teamSolved[sub.team_id] = 0;
-      teamScores[sub.team_id] += sub.points_earned || 0;
+      teamScores[sub.team_id] += sub.score_awarded || 0;
       if (sub.is_correct) teamSolved[sub.team_id]++;
     }
 
