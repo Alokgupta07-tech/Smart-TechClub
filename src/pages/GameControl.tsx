@@ -47,17 +47,12 @@ import { fetchWithAuth } from '@/lib/api';
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface GameState {
-  id: string;
-  game_name: string;
-  current_phase: string;
-  level_1_unlocked: boolean;
-  level_2_unlocked: boolean;
+  game_active: boolean;
+  current_level: number;
+  level1_open: boolean;
+  level2_open: boolean;
   game_started_at: string | null;
   game_ended_at: string | null;
-  is_paused: boolean;
-  total_teams: number;
-  active_teams: number;
-  completed_teams: number;
 }
 
 // NEW: Interface for evaluation status
@@ -409,12 +404,24 @@ export default function GameControl() {
     },
   });
 
-  const gameState: GameState | undefined = gameStateData?.gameState;
+  const gameState: GameState | undefined = gameStateData;
+  
+  // Derive phase from game_active and game_ended_at for display
+  const getCurrentPhase = (): string => {
+    if (!gameState) return 'not_started';
+    if (gameState.game_ended_at) return 'completed';
+    if (!gameState.game_active && !gameState.game_started_at) return 'not_started';
+    if (!gameState.game_active) return 'paused';
+    return `level_${gameState.current_level}`;
+  };
+  
+  const currentPhase = getCurrentPhase();
 
   const getPhaseDisplay = (phase: string | undefined | null) => {
     if (!phase) return 'Not Started';
     const phases: Record<string, string> = {
       not_started: 'Not Started',
+      paused: 'Paused',
       level_1: 'Level 1 Active',
       level_2: 'Level 2 Active',
       completed: 'Game Completed',
@@ -426,6 +433,7 @@ export default function GameControl() {
     if (!phase) return 'text-zinc-400';
     const colors: Record<string, string> = {
       not_started: 'text-zinc-400',
+      paused: 'text-orange-400',
       level_1: 'text-yellow-500',
       level_2: 'text-orange-500',
       completed: 'text-green-500',
@@ -459,8 +467,8 @@ export default function GameControl() {
             <CardTitle className="text-sm text-zinc-400">Game Phase</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${gameState ? getPhaseColor(gameState.current_phase) : ''}`}>
-              {gameState ? getPhaseDisplay(gameState.current_phase) : 'Unknown'}
+            <p className={`text-2xl font-bold ${gameState ? getPhaseColor(currentPhase) : ''}`}>
+              {gameState ? getPhaseDisplay(currentPhase) : 'Unknown'}
             </p>
           </CardContent>
         </Card>
@@ -471,7 +479,7 @@ export default function GameControl() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-toxic-green">
-              {gameState?.total_teams || 0}
+              -
             </p>
           </CardContent>
         </Card>
@@ -482,7 +490,7 @@ export default function GameControl() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-yellow-500">
-              {gameState?.active_teams || 0}
+              -
             </p>
           </CardContent>
         </Card>
@@ -493,7 +501,7 @@ export default function GameControl() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-500">
-              {gameState?.completed_teams || 0}
+              -
             </p>
           </CardContent>
         </Card>
@@ -506,7 +514,7 @@ export default function GameControl() {
             <CardTitle className="text-sm">Level 1</CardTitle>
           </CardHeader>
           <CardContent>
-            {gameState?.level_1_unlocked ? (
+            {gameState?.level1_open ? (
               <span className="text-green-500 font-semibold">✓ Unlocked</span>
             ) : (
               <span className="text-zinc-500">Locked</span>
@@ -519,7 +527,7 @@ export default function GameControl() {
             <CardTitle className="text-sm">Level 2</CardTitle>
           </CardHeader>
           <CardContent>
-            {gameState?.level_2_unlocked ? (
+            {gameState?.level2_open ? (
               <span className="text-green-500 font-semibold">✓ Unlocked</span>
             ) : (
               <span className="text-zinc-500">Locked</span>
@@ -532,11 +540,11 @@ export default function GameControl() {
             <CardTitle className="text-sm">Game Status</CardTitle>
           </CardHeader>
           <CardContent>
-            {(!gameState?.current_phase || gameState.current_phase === 'not_started') ? (
+            {currentPhase === 'not_started' ? (
               <span className="text-zinc-500 font-semibold">⏹ Not Started</span>
-            ) : gameState.current_phase === 'completed' ? (
+            ) : currentPhase === 'completed' ? (
               <span className="text-blue-500 font-semibold">✓ Completed</span>
-            ) : gameState.is_paused ? (
+            ) : currentPhase === 'paused' ? (
               <span className="text-yellow-500 font-semibold">⏸ Paused</span>
             ) : (
               <span className="text-green-500 font-semibold">▶ Running</span>
@@ -555,7 +563,7 @@ export default function GameControl() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Start Game */}
-          {gameState?.current_phase === 'not_started' && (
+          {currentPhase === 'not_started' && (
             <div className="flex items-center justify-between p-4 border border-toxic-green/20 rounded-lg">
               <div>
                 <h3 className="font-semibold text-toxic-green">Start Game</h3>
@@ -575,7 +583,7 @@ export default function GameControl() {
           )}
 
           {/* Unlock Level 2 */}
-          {!!gameState?.level_1_unlocked && !gameState?.level_2_unlocked && (
+          {!!gameState?.level1_open && !gameState?.level2_open && (
             <div className="flex items-center justify-between p-4 border border-orange-500/20 rounded-lg">
               <div>
                 <h3 className="font-semibold text-orange-500">Unlock Level 2</h3>
@@ -595,19 +603,19 @@ export default function GameControl() {
           )}
 
           {/* Pause/Resume */}
-          {gameState?.current_phase !== 'not_started' && gameState?.current_phase !== 'completed' && (
+          {currentPhase !== 'not_started' && currentPhase !== 'completed' && (
             <div className="flex items-center justify-between p-4 border border-yellow-500/20 rounded-lg">
               <div>
                 <h3 className="font-semibold text-yellow-500">
-                  {gameState?.is_paused ? 'Resume Game' : 'Pause Game'}
+                  {currentPhase === 'paused' ? 'Resume Game' : 'Pause Game'}
                 </h3>
                 <p className="text-sm text-zinc-400">
-                  {gameState?.is_paused
+                  {currentPhase === 'paused'
                     ? 'Resume the game for all teams'
                     : 'Temporarily pause the game for all teams'}
                 </p>
               </div>
-              {gameState?.is_paused ? (
+              {currentPhase === 'paused' ? (
                 <Button
                   onClick={() => resumeGame.mutate()}
                   disabled={resumeGame.isPending}
@@ -630,7 +638,7 @@ export default function GameControl() {
           )}
 
           {/* End Game */}
-          {gameState?.current_phase !== 'not_started' && gameState?.current_phase !== 'completed' && (
+          {currentPhase !== 'not_started' && currentPhase !== 'completed' && (
             <div className="flex items-center justify-between p-4 border border-red-500/20 rounded-lg">
               <div>
                 <h3 className="font-semibold text-red-500">End Game</h3>
