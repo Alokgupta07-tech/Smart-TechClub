@@ -7,7 +7,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   
   // Debug checkpoint - return immediately to test
-  // return res.status(200).json({ debug: 'handler reached', method: req.method });
+  return res.status(200).json({ debug: 'handler reached', method: req.method, url: req.url });
 
   try {
     const { getSupabase } = require('../_lib/supabase');
