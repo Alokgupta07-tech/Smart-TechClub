@@ -341,25 +341,34 @@ module.exports = async function handler(req, res) {
 
     // ─── GET /api/admin/team-timings ───
     if (req.method === 'GET' && path === '/team-timings') {
-      const { data: teams, error: teamsError } = await supabase
+      var teamsResult = await supabase
         .from('teams')
         .select('id, team_name, status, start_time, end_time, hints_used')
         .order('created_at', { ascending: false });
       
-      if (teamsError) {
+      if (teamsResult.error) {
         return res.json({ success: true, teams: [] });
       }
+      var teams = teamsResult.data || [];
       
       // Get puzzle count
-      const { data: puzzles } = await supabase
+      var puzzlesResult = await supabase
         .from('puzzles')
-        .select('id')
+        .select('id, title, puzzle_number')
         .eq('is_active', true)
-        .eq('level', 1);
-      var totalQuestions = (puzzles && puzzles.length) ? puzzles.length : 10;
+        .eq('level', 1)
+        .order('puzzle_number');
+      var puzzles = puzzlesResult.data || [];
+      var totalQuestions = puzzles.length > 0 ? puzzles.length : 10;
       
-      // Build team info with JS calculations
-      var teamsWithDetails = (teams || []).map(function(team) {
+      // Get all progress records
+      var progressResult = await supabase
+        .from('team_question_progress')
+        .select('team_id, puzzle_id, status, attempts, correct, time_spent_seconds, started_at, completed_at');
+      var allProgress = progressResult.data || [];
+      
+      // Build team info with actual progress data
+      var teamsWithDetails = teams.map(function(team) {
         var totalTimeSeconds = 0;
         if (team.start_time && team.end_time) {
           totalTimeSeconds = Math.floor((new Date(team.end_time) - new Date(team.start_time)) / 1000);
@@ -367,20 +376,51 @@ module.exports = async function handler(req, res) {
           totalTimeSeconds = Math.floor((new Date() - new Date(team.start_time)) / 1000);
         }
         
+        // Filter progress for this team
+        var teamProgress = allProgress.filter(function(p) { return p.team_id === team.id; });
+        var completedCount = teamProgress.filter(function(p) { return p.status === 'COMPLETED'; }).length;
+        var skippedCount = teamProgress.filter(function(p) { return p.status === 'SKIPPED'; }).length;
+        var correctCount = teamProgress.filter(function(p) { return p.correct === true; }).length;
+        var wrongCount = teamProgress.filter(function(p) { return p.attempts > 0 && p.correct !== true; }).length;
+        var currentQ = completedCount + skippedCount + 1;
+        
+        // Get current status
+        var currentStatus = team.status || 'waiting';
+        var inProgressQ = teamProgress.find(function(p) { return p.status === 'IN_PROGRESS'; });
+        if (inProgressQ) {
+          currentStatus = 'playing';
+        } else if (completedCount >= totalQuestions) {
+          currentStatus = 'completed';
+        }
+        
+        // Build question times array
+        var questionTimes = puzzles.map(function(puzzle, idx) {
+          var progress = teamProgress.find(function(p) { return p.puzzle_id === puzzle.id; });
+          return {
+            questionNumber: idx + 1,
+            questionId: puzzle.id,
+            title: puzzle.title,
+            status: progress ? progress.status : 'NOT_STARTED',
+            timeSpent: progress ? (progress.time_spent_seconds || 0) : 0,
+            attempts: progress ? (progress.attempts || 0) : 0,
+            correct: progress ? progress.correct : null
+          };
+        });
+        
         return {
           teamId: team.id,
           teamName: team.team_name,
-          currentStatus: team.status || 'waiting',
+          currentStatus: currentStatus,
           totalTime: totalTimeSeconds,
           penaltyTime: 0,
-          questionsCompleted: 0,
+          questionsCompleted: completedCount,
           totalQuestions: totalQuestions,
-          currentQuestion: 1,
-          skipsUsed: 0,
+          currentQuestion: currentQ > totalQuestions ? totalQuestions : currentQ,
+          skipsUsed: skippedCount,
           hintsUsed: team.hints_used || 0,
-          correctAnswers: 0,
-          wrongAnswers: 0,
-          questionTimes: []
+          correctAnswers: correctCount,
+          wrongAnswers: wrongCount,
+          questionTimes: questionTimes
         };
       });
       
@@ -389,34 +429,54 @@ module.exports = async function handler(req, res) {
 
     // ─── GET /api/admin/question-analytics ───
     if (req.method === 'GET' && path === '/question-analytics') {
-      const { data: puzzles, error: puzzlesError } = await supabase
+      var puzzlesResult = await supabase
         .from('puzzles')
         .select('id, title, level, puzzle_number')
         .order('level')
         .order('puzzle_number');
       
-      if (puzzlesError) {
+      if (puzzlesResult.error) {
         return res.json({ success: true, questions: [], overallAvgTime: 600 });
       }
+      var puzzles = puzzlesResult.data || [];
+      
+      // Get all progress data
+      var progressResult = await supabase
+        .from('team_question_progress')
+        .select('puzzle_id, status, attempts, time_spent_seconds, correct');
+      var allProgress = progressResult.data || [];
+      
+      // Calculate overall average time
+      var allTimes = allProgress.filter(function(p) { return p.time_spent_seconds > 0; }).map(function(p) { return p.time_spent_seconds; });
+      var overallAvgTime = allTimes.length > 0 ? Math.floor(allTimes.reduce(function(a, b) { return a + b; }, 0) / allTimes.length) : 600;
       
       return res.json({
         success: true,
-        questions: (puzzles || []).map(function(p) {
+        questions: puzzles.map(function(p) {
+          var puzzleProgress = allProgress.filter(function(pr) { return pr.puzzle_id === p.id; });
+          var completedCount = puzzleProgress.filter(function(pr) { return pr.status === 'COMPLETED'; }).length;
+          var skippedCount = puzzleProgress.filter(function(pr) { return pr.status === 'SKIPPED'; }).length;
+          var totalAttempts = puzzleProgress.reduce(function(sum, pr) { return sum + (pr.attempts || 0); }, 0);
+          var times = puzzleProgress.filter(function(pr) { return pr.time_spent_seconds > 0; }).map(function(pr) { return pr.time_spent_seconds; });
+          var avgTime = times.length > 0 ? Math.floor(times.reduce(function(a, b) { return a + b; }, 0) / times.length) : 0;
+          var minTime = times.length > 0 ? Math.min.apply(null, times) : 0;
+          var maxTime = times.length > 0 ? Math.max.apply(null, times) : 0;
+          
           return {
             id: p.id,
             title: p.title,
             level: p.level,
             puzzleNumber: p.puzzle_number,
-            totalAttempts: 0,
-            completedCount: 0,
-            skippedCount: 0,
-            avgTime: 0,
-            minTime: 0,
-            maxTime: 0,
+            totalAttempts: totalAttempts,
+            completedCount: completedCount,
+            skippedCount: skippedCount,
+            avgTime: avgTime,
+            minTime: minTime,
+            maxTime: maxTime,
             totalHintsUsed: 0
           };
         }),
-        overallAvgTime: 600
+        overallAvgTime: overallAvgTime
       });
     }
 
