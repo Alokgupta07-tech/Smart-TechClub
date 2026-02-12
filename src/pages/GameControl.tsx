@@ -260,15 +260,36 @@ export default function GameControl() {
       if (!response.ok) throw new Error('Failed to start game');
       return response.json();
     },
+    onMutate: async () => {
+      // Optimistic update
+      await queryClient.cancelQueries({ queryKey: ['gameState'] });
+      const previousState = queryClient.getQueryData(['gameState']);
+      
+      queryClient.setQueryData(['gameState'], (old: any) => ({
+        ...old,
+        game_active: true,
+        level1_open: true,
+        game_started_at: new Date().toISOString(),
+      }));
+      
+      return { previousState };
+    },
     onSuccess: () => {
-      // Invalidate asynchronously without blocking
-      queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      // Defer invalidation to prevent blocking
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      }, 100);
+      
       toast({
         title: 'Success',
         description: 'Game started! Level 1 unlocked.',
       });
     },
-    onError: () => {
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousState) {
+        queryClient.setQueryData(['gameState'], context.previousState);
+      }
       toast({
         title: 'Error',
         description: 'Failed to start game',
@@ -289,15 +310,36 @@ export default function GameControl() {
       if (!response.ok) throw new Error('Failed to unlock Level 2');
       return response.json();
     },
+    onMutate: async () => {
+      // Optimistic update - show immediate feedback
+      await queryClient.cancelQueries({ queryKey: ['gameState'] });
+      const previousState = queryClient.getQueryData(['gameState']);
+      
+      // Optimistically update the cache
+      queryClient.setQueryData(['gameState'], (old: any) => ({
+        ...old,
+        level2_open: true,
+        current_level: 2,
+      }));
+      
+      return { previousState };
+    },
     onSuccess: () => {
-      // Invalidate asynchronously without blocking
-      queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      // Defer invalidation to prevent blocking
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      }, 100);
+      
       toast({
         title: 'Success',
         description: 'Level 2 unlocked!',
       });
     },
-    onError: () => {
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousState) {
+        queryClient.setQueryData(['gameState'], context.previousState);
+      }
       toast({
         title: 'Error',
         description: 'Failed to unlock Level 2',
@@ -317,8 +359,11 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate asynchronously without blocking
-      queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      // Defer invalidation to prevent blocking
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      }, 100);
+      
       toast({
         title: 'Game Paused',
         description: 'All teams have been paused',
@@ -337,8 +382,11 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate asynchronously without blocking
-      queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      // Defer invalidation to prevent blocking
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      }, 100);
+      
       toast({
         title: 'Game Resumed',
         description: 'All teams have been resumed',
@@ -357,8 +405,11 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate asynchronously without blocking
-      queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      // Defer invalidation to prevent blocking
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      }, 100);
+      
       toast({
         title: 'Game Ended',
         description: 'All teams have been marked as completed',
@@ -377,8 +428,11 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate asynchronously without blocking
-      queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      // Defer invalidation to prevent blocking
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      }, 100);
+      
       toast({
         title: 'Game Restarted',
         description: 'Game has been reset to initial state',
@@ -590,12 +644,12 @@ export default function GameControl() {
               </div>
               <Button
                 onClick={() => {
-                  // Use requestAnimationFrame to defer to next frame
-                  requestAnimationFrame(() => {
+                  // Use setTimeout to push to next task and show immediate feedback
+                  setTimeout(() => {
                     startTransition(() => {
                       startGame.mutate();
                     });
-                  });
+                  }, 0);
                 }}
                 disabled={startGame.isPending}
                 className="bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
@@ -617,12 +671,12 @@ export default function GameControl() {
               </div>
               <Button
                 onClick={() => {
-                  // Use requestAnimationFrame to defer to next frame
-                  requestAnimationFrame(() => {
+                  // Use setTimeout to push to next task and show immediate feedback
+                  setTimeout(() => {
                     startTransition(() => {
                       unlockLevel2.mutate();
                     });
-                  });
+                  }, 0);
                 }}
                 disabled={unlockLevel2.isPending}
                 className="bg-orange-500 text-white hover:bg-orange-600"
@@ -649,11 +703,11 @@ export default function GameControl() {
               {currentPhase === 'paused' ? (
                 <Button
                   onClick={() => {
-                    requestAnimationFrame(() => {
+                    setTimeout(() => {
                       startTransition(() => {
                         resumeGame.mutate();
                       });
-                    });
+                    }, 0);
                   }}
                   disabled={resumeGame.isPending}
                   className="bg-green-500 text-white hover:bg-green-600"
@@ -664,11 +718,11 @@ export default function GameControl() {
               ) : (
                 <Button
                   onClick={() => {
-                    requestAnimationFrame(() => {
+                    setTimeout(() => {
                       startTransition(() => {
                         pauseGame.mutate();
                       });
-                    });
+                    }, 0);
                   }}
                   disabled={pauseGame.isPending}
                   className="bg-yellow-500 text-black hover:bg-yellow-600"
@@ -691,11 +745,11 @@ export default function GameControl() {
               </div>
               <Button
                 onClick={() => {
-                  requestAnimationFrame(() => {
+                  setTimeout(() => {
                     startTransition(() => {
                       endGame.mutate();
                     });
-                  });
+                  }, 0);
                 }}
                 disabled={endGame.isPending}
                 className="bg-red-500 text-white hover:bg-red-600"
@@ -750,11 +804,11 @@ export default function GameControl() {
             <Button
               onClick={() => {
                 if (confirm('Are you sure you want to restart the game? All team progress will be lost!')) {
-                  requestAnimationFrame(() => {
+                  setTimeout(() => {
                     startTransition(() => {
                       restartGame.mutate();
                     });
-                  });
+                  }, 0);
                 }
               }}
               disabled={restartGame.isPending}
