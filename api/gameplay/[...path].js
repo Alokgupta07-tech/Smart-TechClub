@@ -35,6 +35,10 @@ module.exports = async function handler(req, res) {
   const supabase = getSupabase();
   const path = req.url.replace('/api/gameplay', '').split('?')[0];
   const user = authResult.user;
+  
+  // Parse query parameters
+  const urlParts = req.url.split('?');
+  const queryParams = new URLSearchParams(urlParts[1] || '');
 
   try {
     // ─── GET /api/gameplay/current OR /api/gameplay/puzzle/current ───
@@ -78,12 +82,31 @@ module.exports = async function handler(req, res) {
         });
       }
       
-      // Find first incomplete puzzle or first puzzle
-      let currentPuzzle = puzzles[0];
-      for (let i = 0; i < puzzles.length; i++) {
-        if (!completedPuzzleIds.has(puzzles[i].id)) {
-          currentPuzzle = puzzles[i];
-          break;
+      // Check if a specific puzzle_id is requested
+      const requestedPuzzleId = queryParams.get('puzzle_id');
+      let currentPuzzle = null;
+      
+      if (requestedPuzzleId) {
+        // Find the requested puzzle
+        currentPuzzle = puzzles.find(p => p.id === requestedPuzzleId);
+        if (!currentPuzzle) {
+          // Fallback to first incomplete puzzle
+          currentPuzzle = puzzles[0];
+          for (let i = 0; i < puzzles.length; i++) {
+            if (!completedPuzzleIds.has(puzzles[i].id)) {
+              currentPuzzle = puzzles[i];
+              break;
+            }
+          }
+        }
+      } else {
+        // Find first incomplete puzzle or first puzzle
+        currentPuzzle = puzzles[0];
+        for (let i = 0; i < puzzles.length; i++) {
+          if (!completedPuzzleIds.has(puzzles[i].id)) {
+            currentPuzzle = puzzles[i];
+            break;
+          }
         }
       }
 
@@ -149,33 +172,80 @@ module.exports = async function handler(req, res) {
 
       const isCorrect = puzzle.correct_answer.toLowerCase().trim() === answer.toLowerCase().trim();
 
+      // Record submission (both correct and incorrect)
+      await supabase.from('submissions').insert({
+        id: crypto.randomUUID(),
+        team_id: team.id,
+        puzzle_id: puzzle_id,
+        submitted_answer: answer,
+        is_correct: isCorrect,
+        score_awarded: isCorrect ? puzzle.points : 0
+      });
+
+      // Get all puzzles to find next one
+      const { data: allPuzzles } = await supabase
+        .from('puzzles')
+        .select('id, level, puzzle_number, title, points')
+        .eq('level', puzzle.level)
+        .order('puzzle_number', { ascending: true });
+
+      // Get all correct submissions for this team
+      const { data: correctSubs } = await supabase
+        .from('submissions')
+        .select('puzzle_id')
+        .eq('team_id', team.id)
+        .eq('is_correct', true);
+
+      const completedPuzzleIds = new Set((correctSubs || []).map(s => s.puzzle_id));
+      
+      // Add current puzzle if correct
       if (isCorrect) {
-
-        // Record submission
-        const { error: subErr } = await supabase.from('submissions').insert({
-          id: crypto.randomUUID(),
-          team_id: team.id,
-          puzzle_id: puzzle_id,
-          submitted_answer: answer,
-          is_correct: true,
-          score_awarded: puzzle.points
-        });
-        if (subErr) throw subErr;
-
-        return res.json({ correct: true, message: 'Correct answer!', pointsEarned: puzzle.points });
-      } else {
-        // Record wrong submission
-        await supabase.from('submissions').insert({
-          id: crypto.randomUUID(),
-          team_id: team.id,
-          puzzle_id: puzzle_id,
-          submitted_answer: answer,
-          is_correct: false,
-          score_awarded: 0
-        });
-
-        return res.json({ correct: false, message: 'Incorrect answer. Try again!' });
+        completedPuzzleIds.add(puzzle_id);
       }
+
+      // Find next incomplete puzzle
+      let nextPuzzle = null;
+      if (allPuzzles && allPuzzles.length > 0) {
+        // First try to find next puzzle after current one
+        const currentIndex = allPuzzles.findIndex(p => p.id === puzzle_id);
+        for (let i = currentIndex + 1; i < allPuzzles.length; i++) {
+          if (!completedPuzzleIds.has(allPuzzles[i].id)) {
+            nextPuzzle = allPuzzles[i];
+            break;
+          }
+        }
+        // If no next puzzle found, wrap around to find any incomplete puzzle
+        if (!nextPuzzle) {
+          for (let i = 0; i < allPuzzles.length; i++) {
+            if (!completedPuzzleIds.has(allPuzzles[i].id)) {
+              nextPuzzle = allPuzzles[i];
+              break;
+            }
+          }
+        }
+      }
+
+      // Check if game is completed (all puzzles done)
+      const totalPuzzles = allPuzzles ? allPuzzles.length : 0;
+      const gameCompleted = completedPuzzleIds.size >= totalPuzzles && totalPuzzles > 0;
+
+      if (gameCompleted) {
+        // Update team status to completed
+        await supabase
+          .from('teams')
+          .update({ status: 'completed', end_time: new Date().toISOString(), progress: 100 })
+          .eq('id', team.id);
+      }
+
+      // Always return response that allows moving to next question
+      return res.json({
+        success: true,
+        is_correct: isCorrect,
+        message: isCorrect ? 'Correct answer!' : 'Incorrect answer. Try again!',
+        points_earned: isCorrect ? puzzle.points : 0,
+        next_puzzle: nextPuzzle,
+        game_completed: gameCompleted
+      });
     }
 
     // ─── POST /api/gameplay/puzzle/hint ───

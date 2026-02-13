@@ -117,6 +117,9 @@ export default function TeamGameplay() {
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const [timeExpired, setTimeExpired] = useState(false);
   const navigate = useNavigate();
+  
+  // Track currently selected puzzle ID for navigation
+  const [selectedPuzzleId, setSelectedPuzzleId] = useState<string | null>(null);
 
   // Load saved answers and session state on mount
   useEffect(() => {
@@ -210,10 +213,14 @@ export default function TeamGameplay() {
 
   // Fetch current puzzle
   const { data: puzzleData, isLoading: puzzleLoading, error: puzzleError } = useQuery({
-    queryKey: ['currentPuzzle'],
+    queryKey: ['currentPuzzle', selectedPuzzleId],
     queryFn: async () => {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/gameplay/puzzle/current`, {
+      // If a specific puzzle is selected, fetch it; otherwise get current
+      const url = selectedPuzzleId 
+        ? `${API_BASE}/gameplay/puzzle/current?puzzle_id=${selectedPuzzleId}`
+        : `${API_BASE}/gameplay/puzzle/current`;
+      const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
@@ -515,29 +522,15 @@ export default function TeamGameplay() {
   // Navigate to any question mutation
   const goToQuestion = useMutation({
     mutationFn: async (puzzleId: string) => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/go-to-question`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          puzzle_id: puzzleId,
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to navigate to question');
-      }
-      return response.json();
+      // Store puzzle ID for navigation - this is the key fix
+      return { puzzleId };
     },
     onSuccess: (data) => {
-      // Silent navigation - no toast notification
+      // Silent navigation - update selected puzzle state
       setAnswer('');
       setCurrentHint('');
-      queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
+      setSelectedPuzzleId(data.puzzleId);
+      // Also invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
       queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
     },
@@ -553,29 +546,14 @@ export default function TeamGameplay() {
   // Return to skipped question mutation (keep for backward compatibility)
   const returnToQuestion = useMutation({
     mutationFn: async (puzzleId: string) => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/unskip-question`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          puzzle_id: puzzleId,
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to return to question');
-      }
-      return response.json();
+      // Simply navigate to the puzzle
+      return { puzzleId };
     },
     onSuccess: (data) => {
-      // Silent return - no toast notification
+      // Navigate to the puzzle
       setAnswer('');
       setCurrentHint('');
-      queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
+      setSelectedPuzzleId(data.puzzleId);
       queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
       queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
     },
