@@ -135,14 +135,14 @@ exports.startGame = async (req, res) => {
 
       if (updateErr) throw updateErr;
 
-      // Update all qualified teams to active status
+      // Update all waiting and qualified teams to active status
       await supabaseAdmin
         .from('teams')
         .update({
           status: 'active',
           start_time: now
         })
-        .eq('status', 'qualified');
+        .in('status', ['waiting', 'qualified']);
 
       return res.json({
         success: true,
@@ -176,12 +176,12 @@ exports.startGame = async (req, res) => {
       WHERE id = ?
     `, [gameState[0].id]);
     
-    // Update all qualified teams to active status
+    // Update all waiting and qualified teams to active status
     await db.query(`
       UPDATE teams 
       SET status = 'active',
           start_time = NOW()
-      WHERE status = 'qualified'
+      WHERE status IN ('waiting', 'qualified')
     `);
     
     res.json({

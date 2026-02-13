@@ -204,11 +204,22 @@ module.exports = async function handler(req, res) {
     // ─── POST /api/game/start ───
     if (req.method === 'POST' && path === '/start') {
       const gameStateId = await getGameStateId(supabase);
+      const now = new Date().toISOString();
+      
+      // Update game state
       const { error } = await supabase
         .from('game_state')
-        .update({ game_active: true, game_started_at: new Date().toISOString() })
+        .update({ game_active: true, game_started_at: now })
         .eq('id', gameStateId);
       if (error) throw error;
+      
+      // Update all waiting and qualified teams to active status
+      const { error: teamError } = await supabase
+        .from('teams')
+        .update({ status: 'active', start_time: now })
+        .in('status', ['waiting', 'qualified']);
+      if (teamError) throw teamError;
+      
       return res.json({ message: 'Game started' });
     }
 
