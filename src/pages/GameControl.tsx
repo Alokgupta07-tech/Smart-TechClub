@@ -112,6 +112,20 @@ export default function GameControl() {
 
   const gameState: GameState | undefined = gameStateData;
 
+  // Fetch admin stats
+  const { data: statsData } = useQuery({
+    queryKey: ['adminStats'],
+    queryFn: async () => {
+      const response = await fetchWithAuth(`${API_BASE}/admin/stats`);
+      if (!response.ok) {
+        return { totalTeams: 0, active: 0, completed: 0, waiting: 0, avgTime: '00:00:00', hintsUsed: 0 };
+      }
+      return response.json();
+    },
+    refetchInterval: 10000,
+    staleTime: 8000,
+  });
+
   // ======= NEW: Fetch evaluation status for selected level =======
   const { data: evaluationData } = useQuery({
     queryKey: ['evaluationStatus', selectedLevel],
@@ -549,7 +563,7 @@ export default function GameControl() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-toxic-green">
-              -
+              {statsData?.totalTeams ?? 0}
             </p>
           </CardContent>
         </Card>
@@ -560,7 +574,7 @@ export default function GameControl() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-yellow-500">
-              -
+              {statsData?.active ?? 0}
             </p>
           </CardContent>
         </Card>
@@ -571,7 +585,7 @@ export default function GameControl() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-500">
-              -
+              {statsData?.completed ?? 0}
             </p>
           </CardContent>
         </Card>

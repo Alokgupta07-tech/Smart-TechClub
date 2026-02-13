@@ -276,15 +276,32 @@ module.exports = async function handler(req, res) {
 
     // ─── GET /api/admin/monitor/live ───
     if (req.method === 'GET' && path === '/monitor/live') {
-      const { data: teams, error: tErr } = await supabase
+      // Get ALL teams for stats, but filter for live display
+      const { data: allTeams, error: allErr } = await supabase
         .from('teams')
-        .select('id, team_name, level, status, user_id')
-        .in('status', ['active', 'paused'])
+        .select('id, team_name, level, status, user_id, start_time, hints_used, progress')
         .order('level', { ascending: false });
-      if (tErr) throw tErr;
+      if (allErr) throw allErr;
+
+      // Calculate stats from all teams
+      var totalTeams = (allTeams || []).length;
+      var activeTeams = 0;
+      var completedTeams = 0;
+      var totalProgress = 0;
+      (allTeams || []).forEach(function(t) {
+        if (t.status === 'active' || t.status === 'paused') activeTeams++;
+        if (t.status === 'completed') completedTeams++;
+        totalProgress += t.progress || 0;
+      });
+      var avgProgress = totalTeams > 0 ? (totalProgress / totalTeams) : 0;
+
+      // Filter to active/paused teams for live display
+      var liveTeams = (allTeams || []).filter(function(t) {
+        return t.status === 'active' || t.status === 'paused';
+      });
 
       var liveUserIds = [];
-      (teams || []).forEach(function(t) {
+      liveTeams.forEach(function(t) {
         if (t.user_id && liveUserIds.indexOf(t.user_id) === -1) liveUserIds.push(t.user_id);
       });
       var liveUsersMap = {};
@@ -296,31 +313,79 @@ module.exports = async function handler(req, res) {
         (users || []).forEach(function(u) { liveUsersMap[u.id] = u; });
       }
 
-      // Calculate scores from submissions
-      const teamIds = (teams || []).map(t => t.id);
+      // Calculate scores and progress from submissions
+      const teamIds = liveTeams.map(t => t.id);
       const { data: submissions } = teamIds.length > 0 ? await supabase
         .from('submissions')
-        .select('team_id, score_awarded')
+        .select('team_id, puzzle_id, is_correct, score_awarded, submitted_at')
         .in('team_id', teamIds) : { data: [] };
       
+      // Get puzzles for progress calculation
+      const { data: puzzles } = await supabase
+        .from('puzzles')
+        .select('id')
+        .eq('is_active', true);
+      var totalPuzzles = (puzzles || []).length || 10;
+      
       var scoreMap = {};
+      var correctMap = {};
+      var attemptMap = {};
+      var lastActivityMap = {};
       (submissions || []).forEach(function(s) {
         if (!scoreMap[s.team_id]) scoreMap[s.team_id] = 0;
+        if (!correctMap[s.team_id]) correctMap[s.team_id] = 0;
+        if (!attemptMap[s.team_id]) attemptMap[s.team_id] = 0;
         scoreMap[s.team_id] += s.score_awarded || 0;
+        if (s.is_correct) correctMap[s.team_id]++;
+        attemptMap[s.team_id]++;
+        if (s.submitted_at) {
+          if (!lastActivityMap[s.team_id] || new Date(s.submitted_at) > new Date(lastActivityMap[s.team_id])) {
+            lastActivityMap[s.team_id] = s.submitted_at;
+          }
+        }
       });
 
-      var liveResult = (teams || []).map(function(t) {
+      var liveResult = liveTeams.map(function(t) {
+        // Calculate elapsed time
+        var elapsedSec = 0;
+        if (t.start_time) {
+          elapsedSec = Math.floor((Date.now() - new Date(t.start_time).getTime()) / 1000);
+        }
+        var hrs = Math.floor(elapsedSec / 3600);
+        var mins = Math.floor((elapsedSec % 3600) / 60);
+        var secs = elapsedSec % 60;
+        var elapsed = hrs.toString().padStart(2, '0') + ':' + mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
+        
+        var correctCount = correctMap[t.id] || 0;
+        var progressPct = totalPuzzles > 0 ? Math.round((correctCount / totalPuzzles) * 100) : 0;
+        
         return {
           id: t.id,
           team_name: t.team_name,
           current_level: t.level,
+          current_puzzle: correctCount + 1,
+          progress: progressPct,
+          completed_puzzles: correctCount,
+          total_attempts: attemptMap[t.id] || 0,
+          hints_used: t.hints_used || 0,
           total_score: scoreMap[t.id] || 0,
           status: t.status,
+          time_elapsed: elapsed,
+          elapsed_seconds: elapsedSec,
+          last_activity: lastActivityMap[t.id] || null,
           leader_name: liveUsersMap[t.user_id] ? liveUsersMap[t.user_id].name : null
         };
       }).sort((a, b) => b.total_score - a.total_score);
 
-      return res.json(liveResult);
+      return res.json({
+        teams: liveResult,
+        stats: {
+          total_teams: totalTeams,
+          active_teams: activeTeams,
+          completed_teams: completedTeams,
+          average_progress: avgProgress
+        }
+      });
     }
 
     // ─── GET /api/admin/activity ───
@@ -331,9 +396,15 @@ module.exports = async function handler(req, res) {
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) {
-        return res.json([]);
+        return res.json({ logs: [] });
       }
-      return res.json(logs || []);
+      return res.json({ logs: logs || [] });
+    }
+
+    // ─── GET /api/admin/suspicious ───
+    if (req.method === 'GET' && path === '/suspicious') {
+      // Return empty array for suspicious activity (can be enhanced later)
+      return res.json({ activities: [] });
     }
 
     // ─── GET /api/admin/audit-logs ───
