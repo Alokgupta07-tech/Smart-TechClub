@@ -504,33 +504,48 @@ module.exports = async function handler(req, res) {
           game_ended_at: null 
         })
         .eq('id', gameStateId);
-      if (gsErr) throw gsErr;
+      if (gsErr) {
+        console.error('Game state reset error:', gsErr);
+        throw gsErr;
+      }
 
       // Reset all teams - including start_time to clear timer
+      // Note: teams table has: level, status, progress, hints_used, start_time, end_time
       const { error: tErr } = await supabase
         .from('teams')
         .update({ 
           level: 1, 
           status: 'waiting',
+          progress: 0,
+          hints_used: 0,
           start_time: null,
-          score: 0
+          end_time: null
         })
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // update all rows
-      if (tErr) throw tErr;
+        .not('id', 'is', null); // update all rows
+      if (tErr) {
+        console.error('Team reset error:', tErr);
+        // Continue anyway - non-critical
+      }
 
-      // Clear all submissions
-      const { error: subErr } = await supabase
-        .from('submissions')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      // Ignore error if table is empty
+      // Clear all submissions - use try/catch to handle empty table
+      try {
+        await supabase
+          .from('submissions')
+          .delete()
+          .not('id', 'is', null);
+      } catch (e) {
+        console.log('Submissions clear (may be empty):', e);
+      }
 
       // Clear team_puzzles progress
-      const { error: tpErr } = await supabase
-        .from('team_puzzles')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      // Ignore error if table is empty
+      try {
+        await supabase
+          .from('team_puzzles')
+          .delete()
+          .not('id', 'is', null);
+      } catch (e) {
+        console.log('Team puzzles clear (may be empty):', e);
+      }
 
       return res.json({ message: 'Game reset - all progress cleared' });
     }
