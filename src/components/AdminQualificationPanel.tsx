@@ -335,7 +335,17 @@ function TeamQualificationTable() {
                             <ArrowRight className="w-4 h-4" />
                           </Button>
                         )}
-                        {team.status !== 'disqualified' && (
+                        {team.status === 'disqualified' ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-green-400 hover:bg-green-500/20"
+                            onClick={() => updateStatusMutation.mutate({ teamId: team.id, status: 'active' })}
+                            title="Qualify team (reverse disqualification)"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
+                        ) : (
                           <Button
                             size="sm"
                             variant="ghost"

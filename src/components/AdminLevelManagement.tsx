@@ -774,7 +774,7 @@ const AdminLevelManagement = () => {
                                 </Button>
                               ) : null}
                               
-                              {!team.qualifiedForLevel2 && team.progress >= 50 && (
+                              {!team.qualifiedForLevel2 && (
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -789,18 +789,30 @@ const AdminLevelManagement = () => {
                                 </Button>
                               )}
                               
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0 text-red-400 hover:bg-red-500/20"
-                                onClick={() => {
-                                  setSelectedTeam(team);
-                                  setShowDisqualifyDialog(true);
-                                }}
-                                title="Disqualify team"
-                              >
-                                <Ban className="w-4 h-4" />
-                              </Button>
+                              {team.status === "disqualified" ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-green-400 hover:bg-green-500/20"
+                                  onClick={() => updateTeamStatus(team.id, "active")}
+                                  title="Qualify team (reverse disqualification)"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-red-400 hover:bg-red-500/20"
+                                  onClick={() => {
+                                    setSelectedTeam(team);
+                                    setShowDisqualifyDialog(true);
+                                  }}
+                                  title="Disqualify team"
+                                >
+                                  <Ban className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1105,17 +1117,31 @@ const AdminLevelManagement = () => {
                                       <Pause className="w-4 h-4" />
                                     </Button>
                                   ) : null}
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-8 w-8 p-0 text-red-400 hover:bg-red-500/20"
-                                    onClick={() => {
-                                      setSelectedTeam(team);
-                                      setShowDisqualifyDialog(true);
-                                    }}
-                                  >
-                                    <Ban className="w-4 h-4" />
-                                  </Button>
+                                  
+                                  {team.status === "disqualified" ? (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-green-400 hover:bg-green-500/20"
+                                      onClick={() => updateTeamStatus(team.id, "active")}
+                                      title="Qualify team (reverse disqualification)"
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-red-400 hover:bg-red-500/20"
+                                      onClick={() => {
+                                        setSelectedTeam(team);
+                                        setShowDisqualifyDialog(true);
+                                      }}
+                                      title="Disqualify team"
+                                    >
+                                      <Ban className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
