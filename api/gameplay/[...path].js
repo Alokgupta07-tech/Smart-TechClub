@@ -49,6 +49,7 @@ module.exports = async function handler(req, res) {
         return res.status(404).json({ error: 'Team not found' });
       }
 
+      // Get all puzzles for team's level
       const { data: puzzles, error: pErr } = await supabase
         .from('puzzles')
         .select('*')
@@ -64,28 +65,47 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // Get the first puzzle for the team's level
-      const puzzle = puzzles[0];
+      // Get all successful submissions
+      const { data: submissions } = await supabase
+        .from('submissions')
+        .select('puzzle_id, is_correct')
+        .eq('team_id', team.id);
+      
+      const completedPuzzleIds = new Set();
+      if (submissions) {
+        submissions.forEach(function(sub) {
+          if (sub.is_correct) completedPuzzleIds.add(sub.puzzle_id);
+        });
+      }
+      
+      // Find first incomplete puzzle or first puzzle
+      let currentPuzzle = puzzles[0];
+      for (let i = 0; i < puzzles.length; i++) {
+        if (!completedPuzzleIds.has(puzzles[i].id)) {
+          currentPuzzle = puzzles[i];
+          break;
+        }
+      }
 
       // Get puzzle progress
       const { data: progress } = await supabase
         .from('team_progress')
         .select('*')
         .eq('team_id', team.id)
-        .eq('puzzle_id', puzzle.id);
+        .eq('puzzle_id', currentPuzzle.id);
 
-      // Get hints
+      // Get hints for current puzzle
       const { data: allHints } = await supabase
         .from('hints')
         .select('*')
-        .eq('puzzle_id', puzzle.id)
-        .order('hint_order', { ascending: true });
+        .eq('puzzle_id', currentPuzzle.id)
+        .order('hint_number', { ascending: true });
 
       const { data: usedHints } = await supabase
         .from('team_hints_used')
         .select('hint_id')
         .eq('team_id', team.id)
-        .eq('puzzle_id', puzzle.id);
+        .eq('puzzle_id', currentPuzzle.id);
 
       const usedHintIds = (usedHints || []).map(h => h.hint_id);
       const availableHints = (allHints || []).filter(h => !usedHintIds.includes(h.id));
@@ -93,12 +113,15 @@ module.exports = async function handler(req, res) {
       return res.json({
         success: true,
         puzzle: {
-          ...puzzle,
+          ...currentPuzzle,
           progress: (progress && progress[0]) || { attempts: 0, hints_used: 0 },
           available_hints: availableHints.length,
-          total_hints: (allHints || []).length
+          total_hints: (allHints || []).length,
+          is_completed: completedPuzzleIds.has(currentPuzzle.id)
         },
-        team: mapTeam(team)
+        team: mapTeam(team),
+        total_puzzles: puzzles.length,
+        completed_puzzles: completedPuzzleIds.size
       });
     }
 
@@ -157,7 +180,7 @@ module.exports = async function handler(req, res) {
 
     // ─── POST /api/gameplay/puzzle/hint ───
     if (req.method === 'POST' && path === '/puzzle/hint') {
-      const { puzzle_id, hintNumber } = req.body;
+      const { puzzle_id } = req.body;
 
       const { data: team } = await supabase
         .from('teams')
@@ -170,18 +193,45 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'No hints remaining' });
       }
 
-      // Get hint from hints table
-      const { data: hints } = await supabase
+      // Get the next hint (based on how many hints used already for this puzzle)
+      const { data: usedHints } = await supabase
+        .from('team_hints_used')
+        .select('hint_id')
+        .eq('team_id', team.id)
+        .eq('puzzle_id', puzzle_id);
+      
+      const usedCount = (usedHints || []).length;
+      
+      // Get next available hint
+      const { data: availableHints } = await supabase
         .from('hints')
         .select('*')
         .eq('puzzle_id', puzzle_id)
-        .eq('hint_number', hintNumber)
         .eq('is_active', true)
-        .single();
+        .order('hint_number', { ascending: true });
       
-      if (!hints) return res.status(404).json({ error: 'Hint not available' });
+      if (!availableHints || availableHints.length === 0) {
+        return res.status(404).json({ error: 'No hints available for this puzzle' });
+      }
+      
+      // Find next unused hint
+      const usedHintIds = new Set((usedHints || []).map(h => h.hint_id));
+      const nextHint = availableHints.find(h => !usedHintIds.has(h.id));
+      
+      if (!nextHint) {
+        return res.status(400).json({ error: 'All hints used for this puzzle' });
+      }
 
-      // Update hints used
+      // Record hint usage
+      await supabase.from('team_hints_used').insert({
+        id: crypto.randomUUID(),
+        team_id: team.id,
+        puzzle_id: puzzle_id,
+        hint_id: nextHint.id,
+        created_at: new Date().toISOString()
+      });
+
+      // Update hints used count on team
       const { error: upErr } = await supabase
         .from('teams')
         .update({
@@ -191,9 +241,13 @@ module.exports = async function handler(req, res) {
       if (upErr) throw upErr;
 
       return res.json({
-        hint: hints.hint_text,
+        hint: {
+          hint_text: nextHint.hint_text,
+          hint_number: nextHint.hint_number,
+          time_penalty_seconds: nextHint.time_penalty_seconds || 300
+        },
         hintsRemaining: 2 - (team.hints_used || 0),
-        penaltyApplied: 10
+        penaltyApplied: nextHint.time_penalty_seconds || 300
       });
     }
 

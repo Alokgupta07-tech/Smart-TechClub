@@ -348,9 +348,9 @@ export default function TeamGameplay() {
           goToQuestion.mutate(data.next_puzzle.id);
         } else {
           // Find next question from allQuestions
-          const currentIndex = allQuestions.findIndex((q: any) => q.puzzle_id === puzzle?.id);
+          const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id);
           if (currentIndex >= 0 && currentIndex < allQuestions.length - 1) {
-            goToQuestion.mutate(allQuestions[currentIndex + 1].puzzle_id);
+            goToQuestion.mutate(allQuestions[currentIndex + 1].puzzle_id || allQuestions[currentIndex + 1].id);
           }
         }
         return;
@@ -388,9 +388,9 @@ export default function TeamGameplay() {
         goToQuestion.mutate(data.next_puzzle.id);
       } else {
         // Find next question from allQuestions list
-        const currentIndex = allQuestions.findIndex((q: any) => q.puzzle_id === puzzle?.id);
+        const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id);
         if (currentIndex >= 0 && currentIndex < allQuestions.length - 1) {
-          goToQuestion.mutate(allQuestions[currentIndex + 1].puzzle_id);
+          goToQuestion.mutate(allQuestions[currentIndex + 1].puzzle_id || allQuestions[currentIndex + 1].id);
         }
       }
     },
@@ -639,7 +639,7 @@ export default function TeamGameplay() {
     );
   }
   const progress: TeamProgress | null = progressData?.progress || null;
-  const allQuestions = allPuzzlesData?.session?.questions || [];
+  const allQuestions = allPuzzlesData?.puzzles || allPuzzlesData?.session?.questions || [];
   const sessionStats = allPuzzlesData?.session;
 
   // Get question status counts for exam navigation
@@ -647,7 +647,7 @@ export default function TeamGameplay() {
     const answered = allQuestions.filter((q: any) => q.status === 'completed').length;
     const skipped = allQuestions.filter((q: any) => q.status === 'skipped').length;
     const current = allQuestions.filter((q: any) => q.status === 'active').length;
-    const notVisited = allQuestions.filter((q: any) => q.status === 'not_started').length;
+    const notVisited = allQuestions.filter((q: any) => q.status === 'not_started' || q.status === 'not_visited').length;
     return { answered, skipped, current, notVisited, total: allQuestions.length };
   };
 
@@ -752,20 +752,20 @@ export default function TeamGameplay() {
       // Ctrl + Left Arrow: Previous question
       if (e.ctrlKey && e.key === 'ArrowLeft') {
         e.preventDefault();
-        const currentIndex = allQuestions.findIndex((q: any) => q.puzzle_id === puzzleData?.puzzle?.id);
+        const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzleData?.puzzle?.id);
         if (currentIndex > 0) {
           const prevQuestion = allQuestions[currentIndex - 1];
-          goToQuestion.mutate(prevQuestion.puzzle_id);
+          goToQuestion.mutate(prevQuestion.puzzle_id || prevQuestion.id);
         }
       }
       
       // Ctrl + Right Arrow: Next question
       if (e.ctrlKey && e.key === 'ArrowRight') {
         e.preventDefault();
-        const currentIndex = allQuestions.findIndex((q: any) => q.puzzle_id === puzzleData?.puzzle?.id);
+        const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzleData?.puzzle?.id);
         if (currentIndex < allQuestions.length - 1) {
           const nextQuestion = allQuestions[currentIndex + 1];
-          goToQuestion.mutate(nextQuestion.puzzle_id);
+          goToQuestion.mutate(nextQuestion.puzzle_id || nextQuestion.id);
         }
       }
     };
@@ -907,7 +907,7 @@ export default function TeamGameplay() {
   }
 
   // Check if question is completed (lock input)
-  const isQuestionCompleted = allQuestions.find((q: any) => q.puzzle_id === puzzle?.id)?.status === 'completed';
+  const isQuestionCompleted = allQuestions.find((q: any) => (q.puzzle_id || q.id) === puzzle?.id)?.status === 'completed';
   const isMarkedForReview = markedForReview.has(puzzle?.id || '');
 
   return (
@@ -1190,15 +1190,15 @@ export default function TeamGameplay() {
               <Button
                 type="button"
                 onClick={() => {
-                  const currentIndex = allQuestions.findIndex((q: any) => q.puzzle_id === puzzle?.id);
+                  const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id);
                   if (currentIndex > 0) {
                     const prevQuestion = allQuestions[currentIndex - 1];
-                    goToQuestion.mutate(prevQuestion.puzzle_id);
+                    goToQuestion.mutate(prevQuestion.puzzle_id || prevQuestion.id);
                   }
                 }}
                 variant="outline"
                 className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
-                disabled={goToQuestion.isPending || allQuestions.findIndex((q: any) => q.puzzle_id === puzzle?.id) <= 0}
+                disabled={goToQuestion.isPending || allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id) <= 0}
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Previous Question
@@ -1208,15 +1208,15 @@ export default function TeamGameplay() {
               <Button
                 type="button"
                 onClick={() => {
-                  const currentIndex = allQuestions.findIndex((q: any) => q.puzzle_id === puzzle?.id);
+                  const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id);
                   if (currentIndex < allQuestions.length - 1) {
                     const nextQuestion = allQuestions[currentIndex + 1];
-                    goToQuestion.mutate(nextQuestion.puzzle_id);
+                    goToQuestion.mutate(nextQuestion.puzzle_id || nextQuestion.id);
                   }
                 }}
                 variant="outline"
                 className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
-                disabled={goToQuestion.isPending || allQuestions.findIndex((q: any) => q.puzzle_id === puzzle?.id) >= allQuestions.length - 1}
+                disabled={goToQuestion.isPending || allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id) >= allQuestions.length - 1}
               >
                 Next Question
                 <ChevronRight className="w-4 h-4 ml-2" />
@@ -1349,20 +1349,21 @@ export default function TeamGameplay() {
               {/* Question Grid */}
               <div className="grid grid-cols-5 gap-2">
                 {allQuestions.map((q: any, index: number) => {
+                  const qId = q.puzzle_id || q.id;
                   const isAnswered = q.status === 'completed';
                   const isSkipped = q.status === 'skipped';
-                  const isCurrent = q.puzzle_id === puzzle?.id;
-                  const isNotStarted = q.status === 'not_started';
-                  const isReview = markedForReview.has(q.puzzle_id);
+                  const isCurrent = qId === puzzle?.id;
+                  const isNotStarted = q.status === 'not_started' || q.status === 'not_visited';
+                  const isReview = markedForReview.has(qId);
                   // Block navigation to answered questions - users cannot view answers during quiz
                   const canNavigate = !isCurrent && !isAnswered;
                   
                   return (
                     <button
-                      key={q.puzzle_id}
+                      key={qId}
                       onClick={() => {
                         if (canNavigate) {
-                          goToQuestion.mutate(q.puzzle_id);
+                          goToQuestion.mutate(qId);
                         }
                       }}
                       disabled={!canNavigate || goToQuestion.isPending}
@@ -1405,14 +1406,14 @@ export default function TeamGameplay() {
                       .filter((q: any) => q.status === 'skipped')
                       .map((q: any) => (
                         <button
-                          key={q.puzzle_id}
-                          onClick={() => goToQuestion.mutate(q.puzzle_id)}
+                          key={q.puzzle_id || q.id}
+                          onClick={() => goToQuestion.mutate(q.puzzle_id || q.id)}
                           disabled={goToQuestion.isPending}
                           className="w-full text-left p-2 rounded bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 transition-colors"
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-orange-400 truncate">
-                              L{q.level}.{q.puzzle_number}: {q.title}
+                              Q{q.puzzle_number || index + 1}: {q.title}
                             </span>
                             <ChevronRight className="w-4 h-4 text-orange-400" />
                           </div>

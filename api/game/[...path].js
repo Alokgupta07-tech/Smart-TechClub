@@ -58,6 +58,7 @@ module.exports = async function handler(req, res) {
                               path === '/skip-question' || path === '/time/skip-question' ||
                               path === '/complete-question' || path === '/time/complete-question' ||
                               path === '/skipped-questions' || path === '/time/skipped-questions' ||
+                              path === '/go-to-question' || path === '/time/go-to-question' ||
                               path.match(/^\/timer\/[^\/]+$/) || path.match(/^\/time\/timer\/[^\/]+$/);
     
     if (isTimeTrackingRoute) {
@@ -112,16 +113,49 @@ module.exports = async function handler(req, res) {
         var secs = totalTime % 60;
         var formatted = String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
         
+        // Fetch all puzzles for team's level
+        const { data: puzzles } = await supabase
+          .from('puzzles')
+          .select('*')
+          .eq('level', team.level || 1)
+          .order('puzzle_number', { ascending: true });
+        
+        // Get submissions for this team
+        const { data: submissions } = await supabase
+          .from('submissions')
+          .select('puzzle_id, is_correct')
+          .eq('team_id', team.id);
+        
+        const successfulPuzzles = new Set();
+        if (submissions) {
+          submissions.forEach(function(sub) {
+            if (sub.is_correct) successfulPuzzles.add(sub.puzzle_id);
+          });
+        }
+        
+        // Map puzzles with status
+        const puzzlesList = (puzzles || []).map(function(p) {
+          const isCompleted = successfulPuzzles.has(p.id);
+          return {
+            id: p.id,
+            puzzle_number: p.puzzle_number,
+            title: p.title,
+            points: p.points,
+            status: isCompleted ? 'completed' : 'not_visited'
+          };
+        });
+        
         return res.json({
           session: {
             totalTimeSeconds: totalTime,
             penaltySeconds: 0,
             effectiveTimeSeconds: totalTime,
-            questionsCompleted: 0,
+            questionsCompleted: successfulPuzzles.size,
             questionsSkipped: 0,
             skipsRemaining: 3,
             totalTimeFormatted: formatted
-          }
+          },
+          puzzles: puzzlesList
         });
       }
 
@@ -150,7 +184,53 @@ module.exports = async function handler(req, res) {
 
       // ─── POST /api/game/skip-question OR /api/game/time/skip-question ───
       if (req.method === 'POST' && (path === '/skip-question' || path === '/time/skip-question')) {
+        // Get all puzzles for current level
+        const { data: puzzles } = await supabase
+          .from('puzzles')
+          .select('*')
+          .eq('level', team.level || 1)
+          .order('puzzle_number', { ascending: true });
+        
+        if (puzzles && puzzles.length > 0) {
+          // Find current puzzle and next puzzle
+          const currentPuzzleId = req.body.puzzle_id;
+          const currentIndex = puzzles.findIndex(function(p) { return p.id === currentPuzzleId; });
+          const nextIndex = currentIndex >= 0 && currentIndex < puzzles.length - 1 ? currentIndex + 1 : 0;
+          
+          return res.json({ 
+            success: true, 
+            message: 'Question skipped',
+            next_puzzle: puzzles[nextIndex]
+          });
+        }
+        
         return res.json({ success: true, message: 'Question skipped' });
+      }
+
+      // ─── POST /api/game/go-to-question OR /api/game/time/go-to-question ───
+      if (req.method === 'POST' && (path === '/go-to-question' || path === '/time/go-to-question')) {
+        const puzzleId = req.body.puzzle_id;
+        
+        if (!puzzleId) {
+          return res.status(400).json({ error: 'puzzle_id required' });
+        }
+        
+        // Verify puzzle exists
+        const { data: puzzle } = await supabase
+          .from('puzzles')
+          .select('*')
+          .eq('id', puzzleId)
+          .single();
+        
+        if (!puzzle) {
+          return res.status(404).json({ error: 'Puzzle not found' });
+        }
+        
+        return res.json({ 
+          success: true, 
+          message: 'Navigated to question',
+          puzzle: puzzle
+        });
       }
 
       // ─── POST /api/game/complete-question OR /api/game/time/complete-question ───
