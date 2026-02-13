@@ -1,7 +1,11 @@
 {
   "name": "lockdown-hq-api",
   "version": "1.0.0",
+  "type": "commonjs",
   "private": true,
+  "engines": {
+    "node": ">=18.x"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
     "bcryptjs": "^2.4.3",
