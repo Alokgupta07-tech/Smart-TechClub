@@ -110,6 +110,8 @@ export default function GameControl() {
     refetchOnWindowFocus: false, // Prevent refetch on window focus
   });
 
+  const gameState: GameState | undefined = gameStateData;
+
   // ======= NEW: Fetch evaluation status for selected level =======
   const { data: evaluationData } = useQuery({
     queryKey: ['evaluationStatus', selectedLevel],
@@ -469,8 +471,6 @@ export default function GameControl() {
       });
     },
   });
-
-  const gameState: GameState | undefined = gameStateData;
   
   // Derive phase from game_active and game_ended_at for display
   const getCurrentPhase = (): string => {
