@@ -506,14 +506,33 @@ module.exports = async function handler(req, res) {
         .eq('id', gameStateId);
       if (gsErr) throw gsErr;
 
-      // Reset all teams
+      // Reset all teams - including start_time to clear timer
       const { error: tErr } = await supabase
         .from('teams')
-        .update({ level: 1, status: 'waiting' })
+        .update({ 
+          level: 1, 
+          status: 'waiting',
+          start_time: null,
+          score: 0
+        })
         .neq('id', '00000000-0000-0000-0000-000000000000'); // update all rows
       if (tErr) throw tErr;
 
-      return res.json({ message: 'Game reset' });
+      // Clear all submissions
+      const { error: subErr } = await supabase
+        .from('submissions')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      // Ignore error if table is empty
+
+      // Clear team_puzzles progress
+      const { error: tpErr } = await supabase
+        .from('team_puzzles')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      // Ignore error if table is empty
+
+      return res.json({ message: 'Game reset - all progress cleared' });
     }
 
     // ─── POST /api/game/level/unlock ───

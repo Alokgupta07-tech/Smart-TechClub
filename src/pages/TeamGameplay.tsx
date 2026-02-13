@@ -238,6 +238,19 @@ export default function TeamGameplay() {
   useEffect(() => {
     if (puzzleData?.time_remaining_seconds !== undefined) {
       setRemainingTime(puzzleData.time_remaining_seconds);
+      
+      // Reset timeExpired if we have fresh time remaining (game was restarted)
+      // Also detect if this is a fresh game by checking if time is close to full (e.g., > 2350 seconds = 39+ minutes)
+      if (puzzleData.time_remaining_seconds > 0 && !puzzleData.time_expired && !puzzleData.game_completed) {
+        setTimeExpired(false);
+        
+        // If nearly full time remaining (game just started/restarted), clear old session data
+        if (puzzleData.time_remaining_seconds >= 2350) {
+          localStorage.removeItem('examSession');
+          setMarkedForReview(new Set());
+          setTabSwitchCount(0);
+        }
+      }
     }
     // Handle game over from API
     if (puzzleData?.time_expired || puzzleData?.game_completed) {
@@ -1664,7 +1677,7 @@ export default function TeamGameplay() {
       </Dialog>
 
       {/* Time Expired Dialog */}
-      <Dialog open={timeExpired} onOpenChange={() => {}}>
+      <Dialog open={timeExpired} onOpenChange={(open) => !open && navigate('/leaderboard')}>
         <DialogContent className="bg-black/95 border-red-500 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-red-500 flex items-center gap-2 text-xl">
@@ -1696,7 +1709,10 @@ export default function TeamGameplay() {
 
           <DialogFooter className="mt-4">
             <Button
-              onClick={() => navigate('/leaderboard')}
+              onClick={() => {
+                setTimeExpired(false);
+                navigate('/leaderboard');
+              }}
               className="w-full bg-green-500 text-white hover:bg-green-600 font-bold text-lg py-6 flex items-center justify-center gap-2"
               style={{ minHeight: '56px' }}
             >
