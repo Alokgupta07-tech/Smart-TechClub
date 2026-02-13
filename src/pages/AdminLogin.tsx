@@ -112,6 +112,7 @@ const AdminLogin = () => {
                     {...register("email")}
                     type="email"
                     placeholder="admin@lockdown-hq.com"
+                    autoComplete="username"
                     className="pl-11 h-12 bg-background/50 border-destructive/20 focus:border-destructive/50 font-terminal"
                   />
                 </div>
