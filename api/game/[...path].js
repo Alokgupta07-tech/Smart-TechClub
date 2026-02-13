@@ -8,14 +8,39 @@ let cachedGameStateId = null;
 async function getGameStateId(supabase) {
   if (cachedGameStateId) return cachedGameStateId;
   
-  const { data } = await supabase.from('game_state').select('id').limit(1).single();
+  const { data, error } = await supabase.from('game_state').select('id').limit(1).single();
   if (data && data.id) {
     cachedGameStateId = data.id;
     return cachedGameStateId;
   }
   
-  // Fallback to ID 1 for initial setup
-  return 1;
+  // If no game state exists, create one
+  if (error || !data) {
+    const { data: newState, error: insertError } = await supabase
+      .from('game_state')
+      .insert({ 
+        game_active: false, 
+        current_level: 1, 
+        level1_open: true, 
+        level2_open: false 
+      })
+      .select('id')
+      .single();
+    
+    if (newState && newState.id) {
+      cachedGameStateId = newState.id;
+      return cachedGameStateId;
+    }
+    
+    // Last resort: try to get any existing row
+    const { data: anyState } = await supabase.from('game_state').select('id').limit(1);
+    if (anyState && anyState.length > 0) {
+      cachedGameStateId = anyState[0].id;
+      return cachedGameStateId;
+    }
+  }
+  
+  throw new Error('Unable to find or create game_state');
 }
 
 module.exports = async function handler(req, res) {
