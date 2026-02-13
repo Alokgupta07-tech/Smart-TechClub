@@ -283,7 +283,7 @@ const Admin = () => {
     }
 
     try {
-      const response = await fetchWithAuth('${API_BASE}/game/restart', {
+      const response = await fetchWithAuth(`${API_BASE}/game/restart`, {
         method: 'POST',
       });
 

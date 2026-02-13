@@ -62,6 +62,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Validate token with backend (non-blocking for UX)
         if (userRole === 'team') {
           const profile = await authAPI.getMyProfile();
+          // Defensive check: ensure profile has required fields
+          if (!profile || !profile.id || !profile.email) {
+            throw new Error('Invalid profile data received');
+          }
           setUser({
             id: profile.id,
             name: profile.name,
@@ -74,7 +78,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error('Auth validation failed:', error);
         // Only clear on explicit auth failures, not network errors
         const isAuthError = error instanceof Error && 
-          (error.message.includes('401') || error.message.includes('Invalid token'));
+          (error.message.includes('401') || error.message.includes('Invalid token') || 
+           error.message.includes('Invalid profile data'));
         
         if (isAuthError) {
           localStorage.removeItem('accessToken');

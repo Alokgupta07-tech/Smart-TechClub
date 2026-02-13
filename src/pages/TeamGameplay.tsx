@@ -589,6 +589,55 @@ export default function TeamGameplay() {
   });
 
   const puzzle: Puzzle | null = puzzleData?.puzzle || null;
+
+  // Handle puzzle loading error with dedicated UI
+  if (puzzleError) {
+    const errorMessage = (puzzleError as Error).message || 'Failed to load puzzle';
+    return (
+      <div className="container mx-auto p-6">
+        <BackButton />
+        <Card className="bg-black/40 border-red-500/40 mt-6">
+          <CardHeader>
+            <CardTitle className="text-red-500 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              Puzzle Loading Error
+            </CardTitle>
+            <CardDescription className="text-red-400">
+              {errorMessage}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-2">
+                <strong>Possible reasons:</strong>
+              </p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                <li>The game has not started yet</li>
+                <li>Network connectivity issues</li>
+                <li>API server is temporarily unavailable</li>
+                <li>Your session may have expired</li>
+              </ul>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] })}
+                className="bg-toxic-green text-black hover:bg-toxic-green/80"
+              >
+                Retry
+              </Button>
+              <Button
+                onClick={() => navigate('/dashboard')}
+                variant="outline"
+                className="border-toxic-green/40 text-toxic-green hover:bg-toxic-green/10"
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   const progress: TeamProgress | null = progressData?.progress || null;
   const allQuestions = allPuzzlesData?.session?.questions || [];
   const sessionStats = allPuzzlesData?.session;
@@ -833,19 +882,24 @@ export default function TeamGameplay() {
   if (!puzzle) {
     return (
       <div className="container mx-auto p-6">
-        <Card className="bg-black/40 border-toxic-green/20">
+        <BackButton />
+        <Card className="bg-black/40 border-toxic-green/20 mt-6">
           <CardHeader>
             <CardTitle className="text-toxic-green">No Active Puzzle</CardTitle>
             <CardDescription>
-              {puzzleError 
-                ? `Error: ${(puzzleError as Error).message}` 
-                : 'The game has not started yet or you have completed all puzzles.'}
+              The game has not started yet or you have completed all puzzles.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mb-4">
               If you've just registered or puzzles were recently added, please wait a moment and refresh the page.
             </p>
+            <Button
+              onClick={() => navigate('/dashboard')}
+              className="bg-toxic-green text-black hover:bg-toxic-green/80"
+            >
+              Go to Dashboard
+            </Button>
           </CardContent>
         </Card>
       </div>

@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   Eye,
   FileCheck,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BackButton } from '@/components/BackButton';
@@ -121,16 +122,14 @@ export default function GameControl() {
       }
       return response.json();
     },
-    refetchInterval: 15000, // Slower polling when re-enabled
+    refetchInterval: 15000, // Slower polling
     staleTime: 10000,
     retry: false, // Don't retry on 404
-    enabled: false, // Disable until evaluation feature is implemented
+    enabled: !!gameState?.game_active, // Enable when game is active
   });
 
   const evaluationStatus: EvaluationStatus | undefined = evaluationData;
 
-  // DISABLED: Evaluation endpoints not implemented yet
-  /*
   // Close Submissions mutation
   const closeSubmissions = useMutation({
     mutationFn: async (levelId: number) => {
@@ -248,7 +247,6 @@ export default function GameControl() {
       });
     },
   });
-  */
 
   // Start game mutation
   const startGame = useMutation({
@@ -624,35 +622,42 @@ export default function GameControl() {
         </Card>
       </div>
 
-      {/* Control Buttons */}
+      {/* Primary Game Controls */}
       <Card className="bg-black/40 border-toxic-green/20">
         <CardHeader>
-          <CardTitle className="text-toxic-green">Game Controls</CardTitle>
+          <CardTitle className="text-toxic-green flex items-center gap-2">
+            <Play className="w-5 h-5" />
+            Primary Game Controls
+          </CardTitle>
           <CardDescription>
-            Use these buttons to control the game flow
+            Main controls to start, pause, and end the game
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Start Game */}
+          {/* Start Game - Only shown when game hasn't started */}
           {currentPhase === 'not_started' && (
-            <div className="flex items-center justify-between p-4 border border-toxic-green/20 rounded-lg">
-              <div>
-                <h3 className="font-semibold text-toxic-green">Start Game</h3>
-                <p className="text-sm text-zinc-400">
+            <div className="flex items-center justify-between p-4 border-2 border-green-500/40 bg-green-500/10 rounded-lg">
+              <div className="flex-1">
+                <h3 className="font-semibold text-green-500 flex items-center gap-2">
+                  <Play className="w-5 h-5" />
+                  Start Game
+                </h3>
+                <p className="text-sm text-zinc-400 mt-1">
                   Begin the event and unlock Level 1 for all qualified teams
                 </p>
               </div>
               <Button
                 onClick={() => {
-                  // Use setTimeout to push to next task and show immediate feedback
-                  setTimeout(() => {
-                    startTransition(() => {
-                      startGame.mutate();
-                    });
-                  }, 0);
+                  if (confirm('Start the game now? This will activate Level 1 for all teams.')) {
+                    setTimeout(() => {
+                      startTransition(() => {
+                        startGame.mutate();
+                      });
+                    }, 0);
+                  }
                 }}
                 disabled={startGame.isPending}
-                className="bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
+                className="bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 min-w-[140px]"
               >
                 <Play className="w-4 h-4 mr-2" />
                 {startGame.isPending ? 'Starting...' : 'Start Game'}
@@ -660,41 +665,30 @@ export default function GameControl() {
             </div>
           )}
 
-          {/* Unlock Level 2 */}
-          {!!gameState?.level1_open && !gameState?.level2_open && (
-            <div className="flex items-center justify-between p-4 border border-orange-500/20 rounded-lg">
-              <div>
-                <h3 className="font-semibold text-orange-500">Unlock Level 2</h3>
-                <p className="text-sm text-zinc-400">
-                  Allow teams to progress to Level 2 puzzles
-                </p>
-              </div>
-              <Button
-                onClick={() => {
-                  // Use setTimeout to push to next task and show immediate feedback
-                  setTimeout(() => {
-                    startTransition(() => {
-                      unlockLevel2.mutate();
-                    });
-                  }, 0);
-                }}
-                disabled={unlockLevel2.isPending}
-                className="bg-orange-500 text-white hover:bg-orange-600"
-              >
-                <Unlock className="w-4 h-4 mr-2" />
-                {unlockLevel2.isPending ? 'Unlocking...' : 'Unlock Level 2'}
-              </Button>
-            </div>
-          )}
-
-          {/* Pause/Resume */}
+          {/* Pause/Resume Game - Only shown when game is active or paused */}
           {currentPhase !== 'not_started' && currentPhase !== 'completed' && (
-            <div className="flex items-center justify-between p-4 border border-yellow-500/20 rounded-lg">
-              <div>
-                <h3 className="font-semibold text-yellow-500">
-                  {currentPhase === 'paused' ? 'Resume Game' : 'Pause Game'}
+            <div className={`flex items-center justify-between p-4 border-2 rounded-lg ${
+              currentPhase === 'paused' 
+                ? 'border-green-500/40 bg-green-500/10' 
+                : 'border-yellow-500/40 bg-yellow-500/10'
+            }`}>
+              <div className="flex-1">
+                <h3 className={`font-semibold flex items-center gap-2 ${
+                  currentPhase === 'paused' ? 'text-green-500' : 'text-yellow-500'
+                }`}>
+                  {currentPhase === 'paused' ? (
+                    <>
+                      <Play className="w-5 h-5" />
+                      Resume Game
+                    </>
+                  ) : (
+                    <>
+                      <Pause className="w-5 h-5" />
+                      Pause Game
+                    </>
+                  )}
                 </h3>
-                <p className="text-sm text-zinc-400">
+                <p className="text-sm text-zinc-400 mt-1">
                   {currentPhase === 'paused'
                     ? 'Resume the game for all teams'
                     : 'Temporarily pause the game for all teams'}
@@ -703,66 +697,133 @@ export default function GameControl() {
               {currentPhase === 'paused' ? (
                 <Button
                   onClick={() => {
-                    setTimeout(() => {
-                      startTransition(() => {
-                        resumeGame.mutate();
-                      });
-                    }, 0);
+                    if (confirm('Resume the game for all teams?')) {
+                      setTimeout(() => {
+                        startTransition(() => {
+                          resumeGame.mutate();
+                        });
+                      }, 0);
+                    }
                   }}
                   disabled={resumeGame.isPending}
-                  className="bg-green-500 text-white hover:bg-green-600"
+                  className="bg-green-500 text-white hover:bg-green-600 min-w-[140px]"
                 >
                   <Play className="w-4 h-4 mr-2" />
-                  {resumeGame.isPending ? 'Resuming...' : 'Resume'}
+                  {resumeGame.isPending ? 'Resuming...' : 'Resume Game'}
                 </Button>
               ) : (
                 <Button
                   onClick={() => {
-                    setTimeout(() => {
-                      startTransition(() => {
-                        pauseGame.mutate();
-                      });
-                    }, 0);
+                    if (confirm('Pause the game for all teams? They can resume from where they stopped.')) {
+                      setTimeout(() => {
+                        startTransition(() => {
+                          pauseGame.mutate();
+                        });
+                      }, 0);
+                    }
                   }}
                   disabled={pauseGame.isPending}
-                  className="bg-yellow-500 text-black hover:bg-yellow-600"
+                  className="bg-yellow-500 text-black hover:bg-yellow-600 min-w-[140px]"
                 >
                   <Pause className="w-4 h-4 mr-2" />
-                  {pauseGame.isPending ? 'Pausing...' : 'Pause'}
+                  {pauseGame.isPending ? 'Pausing...' : 'Pause Game'}
                 </Button>
               )}
             </div>
           )}
 
-          {/* End Game */}
+          {/* End Game - Only shown when game is active or paused */}
           {currentPhase !== 'not_started' && currentPhase !== 'completed' && (
-            <div className="flex items-center justify-between p-4 border border-red-500/20 rounded-lg">
-              <div>
-                <h3 className="font-semibold text-red-500">End Game</h3>
-                <p className="text-sm text-zinc-400">
-                  Mark all active teams as completed and end the event
+            <div className="flex items-center justify-between p-4 border-2 border-red-500/40 bg-red-500/10 rounded-lg">
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-500 flex items-center gap-2">
+                  <Square className="w-5 h-5" />
+                  End Game
+                </h3>
+                <p className="text-sm text-zinc-400 mt-1">
+                  Mark all active teams as completed and end the event permanently
                 </p>
               </div>
               <Button
                 onClick={() => {
-                  setTimeout(() => {
-                    startTransition(() => {
-                      endGame.mutate();
-                    });
-                  }, 0);
+                  if (confirm('Are you sure you want to END the game? This will complete the event for all teams. This action cannot be undone!')) {
+                    setTimeout(() => {
+                      startTransition(() => {
+                        endGame.mutate();
+                      });
+                    }, 0);
+                  }
                 }}
                 disabled={endGame.isPending}
-                className="bg-red-500 text-white hover:bg-red-600"
+                className="bg-red-500 text-white hover:bg-red-600 min-w-[140px]"
               >
                 <Square className="w-4 h-4 mr-2" />
                 {endGame.isPending ? 'Ending...' : 'End Game'}
               </Button>
             </div>
           )}
+        </CardContent>
+      </Card>
 
+      {/* Level Management */}
+      {!!gameState?.game_active && (
+      <Card className="bg-black/40 border-purple-500/20">
+        <CardHeader>
+          <CardTitle className="text-purple-500 flex items-center gap-2">
+            <Layers className="w-5 h-5" />
+            Level Management
+          </CardTitle>
+          <CardDescription>
+            Control access to different game levels
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Unlock Level 2 */}
+          {!gameState?.level2_open && (
+            <div className="flex items-center justify-between p-4 border border-purple-500/20 rounded-lg">
+              <div className="flex-1">
+                <h3 className="font-semibold text-purple-500">Unlock Level 2</h3>
+                <p className="text-sm text-zinc-400">
+                  Allow teams to progress to Level 2 puzzles
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  if (confirm('Unlock Level 2 for all teams?')) {
+                    setTimeout(() => {
+                      startTransition(() => {
+                        unlockLevel2.mutate();
+                      });
+                    }, 0);
+                  }
+                }}
+                disabled={unlockLevel2.isPending}
+                className="bg-purple-500 text-white hover:bg-purple-600"
+              >
+                <Unlock className="w-4 h-4 mr-2" />
+                {unlockLevel2.isPending ? 'Unlocking...' : 'Unlock Level 2'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      )}
+
+      {/* Communication & Utilities */}
+      <Card className="bg-black/40 border-blue-500/20">
+        <CardHeader>
+          <CardTitle className="text-blue-500 flex items-center gap-2">
+            <MessageSquare className="w-5 h-5" />
+            Communication & Utilities
+          </CardTitle>
+          <CardDescription>
+            Broadcast messages and manage game content
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
           {/* Broadcast Message */}
           <div className="flex items-center justify-between p-4 border border-blue-500/20 rounded-lg">
-            <div>
+            <div className="flex-1">
               <h3 className="font-semibold text-blue-500">Broadcast Message</h3>
               <p className="text-sm text-zinc-400">
                 Send an announcement to all teams
@@ -778,52 +839,75 @@ export default function GameControl() {
           </div>
 
           {/* Manage Puzzles */}
-          <div className="flex items-center justify-between p-4 border border-purple-500/20 rounded-lg">
-            <div>
-              <h3 className="font-semibold text-purple-500">Manage Puzzles</h3>
+          <div className="flex items-center justify-between p-4 border border-cyan-500/20 rounded-lg">
+            <div className="flex-1">
+              <h3 className="font-semibold text-cyan-500">Manage Puzzles</h3>
               <p className="text-sm text-zinc-400">
                 Create, edit, and manage game puzzles
               </p>
             </div>
             <Link to="/admin/puzzles">
-              <Button className="bg-purple-500 text-white hover:bg-purple-600">
+              <Button className="bg-cyan-500 text-white hover:bg-cyan-600">
                 <Puzzle className="w-4 h-4 mr-2" />
                 Puzzles
               </Button>
             </Link>
           </div>
+        </CardContent>
+      </Card>
 
+      {/* Danger Zone */}
+      <Card className="bg-black/40 border-orange-500/30">
+        <CardHeader>
+          <CardTitle className=" text-orange-500 flex items-center gap-2">
+            <RefreshCw className="w-5 h-5" />
+            Danger Zone
+          </CardTitle>
+          <CardDescription className="text-orange-400/70">
+            ⚠️ Destructive actions - Use with extreme caution!
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
           {/* Restart Game */}
-          <div className="flex items-center justify-between p-4 border border-orange-500/20 rounded-lg">
-            <div>
-              <h3 className="font-semibold text-orange-500">Restart Game</h3>
-              <p className="text-sm text-zinc-400">
-                Reset the game to initial state (all progress will be lost)
+          <div className="flex items-center justify-between p-4 border-2 border-orange-500/40 bg-orange-500/10 rounded-lg">
+            <div className="flex-1">
+              <h3 className="font-semibold text-orange-500 flex items-center gap-2">
+                <RefreshCw className="w-5 h-5" />
+                Reset Game Completely
+              </h3>
+              <p className="text-sm text-zinc-400 mt-1">
+                ⚠️ WARNING: This will erase ALL team progress and reset the game to the initial state. This action cannot be undone!
               </p>
             </div>
             <Button
               onClick={() => {
-                if (confirm('Are you sure you want to restart the game? All team progress will be lost!')) {
-                  setTimeout(() => {
-                    startTransition(() => {
-                      restartGame.mutate();
+                if (confirm('⚠️ FINAL WARNING ⚠️\n\nAre you ABSOLUTELY SURE you want to RESET the entire game?\n\nThis will:\n- Delete all team progress\n- Clear all submissions\n- Reset game state to beginning\n\nThis action CANNOT be undone!\n\nType "RESET" in the next prompt to confirm.')) {
+                  const confirmation = prompt('Type RESET to confirm game reset:');
+                  if (confirmation === 'RESET') {
+                    setTimeout(() => {
+                      startTransition(() => {
+                        restartGame.mutate();
+                      });
+                    }, 0);
+                  } else {
+                    toast({
+                      title: 'Reset Cancelled',
+                      description: 'Confirmation text did not match. Game was not reset.',
                     });
-                  }, 0);
+                  }
                 }
               }}
               disabled={restartGame.isPending}
-              className="bg-orange-500 text-white hover:bg-orange-600"
+              className="bg-orange-500 text-white hover:bg-orange-600 min-w-[140px]"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
-              {restartGame.isPending ? 'Restarting...' : 'Restart Game'}
+              {restartGame.isPending ? 'Resetting...' : 'Reset Game'}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* ======= NEW: Level Evaluation Controls ======= */}
-      {/* DISABLED: Evaluation feature not yet implemented */}
-      {false && (
+      {/* Level Evaluation Controls */}
       <Card className="bg-black/40 border-cyan-500/30">
         <CardHeader>
           <CardTitle className="text-cyan-500 flex items-center gap-2">
@@ -1035,8 +1119,6 @@ export default function GameControl() {
           )}
         </CardContent>
       </Card>
-      )}
-      {/* ======= END NEW: Level Evaluation Controls ======= */}
 
       {/* Broadcast Dialog */}
       <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>
