@@ -123,8 +123,11 @@ const Login = () => {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/50" />
                   <Input
                     {...register("email")}
+                    id="login-email"
+                    name="email"
                     type="email"
                     placeholder="leader@smarttech.com"
+                    autoComplete="email"
                     className="pl-11 h-12 bg-background/50 border-primary/20 focus:border-primary/50 font-terminal"
                   />
                 </div>
@@ -144,6 +147,8 @@ const Login = () => {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/50" />
                   <Input
                     {...register("password")}
+                    id="login-password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     autoComplete="current-password"

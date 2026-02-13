@@ -110,6 +110,8 @@ const AdminLogin = () => {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-destructive/50" />
                   <Input
                     {...register("email")}
+                    id="admin-email"
+                    name="email"
                     type="email"
                     placeholder="admin@lockdown-hq.com"
                     autoComplete="username"
@@ -132,6 +134,8 @@ const AdminLogin = () => {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-destructive/50" />
                   <Input
                     {...register("password")}
+                    id="admin-password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     autoComplete="current-password"

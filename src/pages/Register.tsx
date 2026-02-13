@@ -331,7 +331,10 @@ const Register = () => {
                         <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/50" />
                         <Input
                           {...register("teamName")}
+                          id="team-name"
+                          name="teamName"
                           placeholder="Enter your team name..."
+                          autoComplete="organization"
                           className="pl-11 h-12 bg-background/50 border-primary/20 focus:border-primary/50 font-terminal"
                         />
                       </div>
@@ -351,8 +354,11 @@ const Register = () => {
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/50" />
                         <Input
                           {...register("password")}
+                          id="register-password"
+                          name="password"
                           type="password"
                           placeholder="Enter password (min 8 characters)"
+                          autoComplete="new-password"
                           className="pl-11 h-12 bg-background/50 border-primary/20 focus:border-primary/50 font-terminal"
                         />
                       </div>
@@ -372,8 +378,11 @@ const Register = () => {
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/50" />
                         <Input
                           {...register("confirmPassword")}
+                          id="confirm-password"
+                          name="confirmPassword"
                           type="password"
                           placeholder="Re-enter password"
+                          autoComplete="new-password"
                           className="pl-11 h-12 bg-background/50 border-primary/20 focus:border-primary/50 font-terminal"
                         />
                       </div>
@@ -445,7 +454,10 @@ const Register = () => {
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/50" />
                             <Input
                               {...register(`members.${index}.name`)}
+                              id={`member-${index}-name`}
+                              name={`members.${index}.name`}
                               placeholder="Name..."
+                              autoComplete="name"
                               className="pl-10 bg-background/50 border-primary/20 focus:border-primary/50 font-terminal text-sm"
                             />
                           </div>
@@ -464,8 +476,11 @@ const Register = () => {
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/50" />
                             <Input
                               {...register(`members.${index}.email`)}
+                              id={`member-${index}-email`}
+                              name={`members.${index}.email`}
                               type="email"
                               placeholder="email@example.com"
+                              autoComplete="email"
                               className="pl-10 bg-background/50 border-primary/20 focus:border-primary/50 font-terminal text-sm"
                             />
                           </div>
@@ -484,8 +499,11 @@ const Register = () => {
                             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/50" />
                             <Input
                               {...register(`members.${index}.phone`)}
+                              id={`member-${index}-phone`}
+                              name={`members.${index}.phone`}
                               type="tel"
                               placeholder="+91 9876543210"
+                              autoComplete="tel"
                               className="pl-10 bg-background/50 border-primary/20 focus:border-primary/50 font-terminal text-sm"
                             />
                           </div>

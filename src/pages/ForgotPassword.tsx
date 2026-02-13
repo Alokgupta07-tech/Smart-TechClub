@@ -97,6 +97,8 @@ const ForgotPassword = () => {
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/50" />
                     <Input
                       {...register("email")}
+                      id="forgot-email"
+                      name="email"
                       type="email"
                       placeholder="your@email.com"
                       autoComplete="email"

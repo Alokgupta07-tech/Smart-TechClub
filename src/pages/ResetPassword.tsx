@@ -106,6 +106,8 @@ const ResetPassword = () => {
                     <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/50" />
                     <Input
                       {...register("otp")}
+                      id="reset-otp"
+                      name="otp"
                       type="text"
                       placeholder="Enter reset code"
                       autoComplete="one-time-code"
@@ -129,6 +131,8 @@ const ResetPassword = () => {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/50" />
                     <Input
                       {...register("newPassword")}
+                      id="new-password"
+                      name="newPassword"
                       type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
                       autoComplete="new-password"
@@ -159,6 +163,8 @@ const ResetPassword = () => {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/50" />
                     <Input
                       {...register("confirmPassword")}
+                      id="reset-confirm-password"
+                      name="confirmPassword"
                       type={showConfirm ? "text" : "password"}
                       placeholder="••••••••"
                       autoComplete="new-password"
