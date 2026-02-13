@@ -209,7 +209,7 @@ export default function TeamGameplay() {
   }, [tabSwitchCount, toast]);
 
   // Fetch current puzzle
-  const { data: puzzleData, isLoading: puzzleLoading } = useQuery({
+  const { data: puzzleData, isLoading: puzzleLoading, error: puzzleError } = useQuery({
     queryKey: ['currentPuzzle'],
     queryFn: async () => {
       const token = localStorage.getItem('accessToken');
@@ -217,10 +217,14 @@ export default function TeamGameplay() {
         headers: { Authorization: `Bearer ${token}` },
       });
       
-      if (!response.ok) throw new Error('Failed to fetch puzzle');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch puzzle');
+      }
       return response.json();
     },
     refetchInterval: 10000, // Refresh every 10 seconds
+    retry: 3,
   });
 
   // Sync remaining time from API response
@@ -833,9 +837,16 @@ export default function TeamGameplay() {
           <CardHeader>
             <CardTitle className="text-toxic-green">No Active Puzzle</CardTitle>
             <CardDescription>
-              The game has not started yet or you have completed all puzzles.
+              {puzzleError 
+                ? `Error: ${(puzzleError as Error).message}` 
+                : 'The game has not started yet or you have completed all puzzles.'}
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              If you've just registered or puzzles were recently added, please wait a moment and refresh the page.
+            </p>
+          </CardContent>
         </Card>
       </div>
     );
