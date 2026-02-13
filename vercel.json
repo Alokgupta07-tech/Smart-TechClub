@@ -4,7 +4,6 @@
   "outputDirectory": "dist",
   "installCommand": "npm install && cd api && npm install",
   "framework": "vite",
-  "skewProtection": true,
   "rewrites": [
     { "source": "/api/health", "destination": "/api/health" },
     { "source": "/api/puzzles", "destination": "/api/puzzles/index" },
