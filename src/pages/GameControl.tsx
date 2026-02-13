@@ -92,6 +92,8 @@ export default function GameControl() {
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
   const [selectedLevel, setSelectedLevel] = useState<number>(1); // NEW: Track selected level for evaluation
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
 
   // Fetch game state
   const { data: gameStateData, isLoading } = useQuery({
@@ -893,21 +895,7 @@ export default function GameControl() {
               </p>
             </div>
             <Button
-              onClick={() => {
-                if (confirm('⚠️ FINAL WARNING ⚠️\n\nAre you ABSOLUTELY SURE you want to RESET the entire game?\n\nThis will:\n- Delete all team progress\n- Clear all submissions\n- Reset game state to beginning\n\nThis action CANNOT be undone!\n\nType "RESET" in the next prompt to confirm.')) {
-                  const confirmation = prompt('Type RESET to confirm game reset:');
-                  if (confirmation === 'RESET') {
-                    startTransition(() => {
-                      restartGame.mutate();
-                    });
-                  } else {
-                    toast({
-                      title: 'Reset Cancelled',
-                      description: 'Confirmation text did not match. Game was not reset.',
-                    });
-                  }
-                }
-              }}
+              onClick={() => setIsResetDialogOpen(true)}
               disabled={restartGame.isPending}
               className="bg-orange-500 text-white hover:bg-orange-600 min-w-[140px]"
             >
@@ -917,6 +905,77 @@ export default function GameControl() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Reset Game Confirmation Dialog */}
+      <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <DialogContent className="bg-zinc-900 border-orange-500/50">
+          <DialogHeader>
+            <DialogTitle className="text-orange-500 flex items-center gap-2">
+              <RefreshCw className="w-5 h-5" />
+              ⚠️ DANGER: Reset Game
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              This will permanently erase ALL team progress, submissions, and reset the game to its initial state. This action CANNOT be undone!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+              <p className="text-sm text-orange-400">
+                <strong>This will:</strong>
+              </p>
+              <ul className="text-sm text-orange-300 list-disc list-inside mt-2">
+                <li>Delete all team progress</li>
+                <li>Clear all submissions</li>
+                <li>Reset game state to beginning</li>
+              </ul>
+            </div>
+            <div>
+              <Label htmlFor="reset-confirm" className="text-zinc-400">
+                Type <span className="text-orange-500 font-bold">RESET</span> to confirm:
+              </Label>
+              <Input
+                id="reset-confirm"
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                placeholder="Type RESET"
+                className="mt-2 bg-zinc-800 border-zinc-700"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsResetDialogOpen(false);
+                setResetConfirmText('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (resetConfirmText === 'RESET') {
+                  setIsResetDialogOpen(false);
+                  setResetConfirmText('');
+                  startTransition(() => {
+                    restartGame.mutate();
+                  });
+                } else {
+                  toast({
+                    title: 'Invalid Confirmation',
+                    description: 'Please type RESET exactly to confirm.',
+                    variant: 'destructive',
+                  });
+                }
+              }}
+              disabled={resetConfirmText !== 'RESET' || restartGame.isPending}
+              className="bg-orange-500 text-white hover:bg-orange-600"
+            >
+              {restartGame.isPending ? 'Resetting...' : 'Reset Game'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Level Evaluation Controls */}
       <Card className="bg-black/40 border-cyan-500/30">
