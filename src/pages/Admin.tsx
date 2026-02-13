@@ -76,9 +76,9 @@ const Admin = () => {
   // ============================================
   // DERIVED STATE - NO HARDCODED VALUES
   // ============================================
-  const filteredTeams = teams?.filter(team => 
+  const filteredTeams = Array.isArray(teams) ? teams.filter(team => 
     team.teamName.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  ) : [];
 
   // ============================================
   // HELPER FUNCTIONS
@@ -175,7 +175,7 @@ const Admin = () => {
   };
 
   const handleActivateAllTeams = async () => {
-    const waitingTeams = teams?.filter(t => t.status === 'waiting') || [];
+    const waitingTeams = Array.isArray(teams) ? teams.filter(t => t.status === 'waiting') : [];
     
     if (waitingTeams.length === 0) {
       toast.info('No teams waiting for approval');
@@ -225,7 +225,7 @@ const Admin = () => {
   };
 
   const handlePauseAllTeams = async () => {
-    const activeTeams = teams?.filter(t => t.status === 'active') || [];
+    const activeTeams = Array.isArray(teams) ? teams.filter(t => t.status === 'active') : [];
     
     if (activeTeams.length === 0) {
       toast.info('No active teams to pause');
@@ -752,7 +752,7 @@ const Admin = () => {
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 text-primary animate-spin" />
                   </div>
-                ) : alerts && alerts.length > 0 ? (
+                ) : Array.isArray(alerts) && alerts.length > 0 ? (
                   <div className="space-y-3">
                     {alerts.slice(0, 10).map((alert) => (
                       <div 
@@ -878,7 +878,7 @@ const Admin = () => {
                   TEAM MEMBERS ({selectedTeam.members?.length || 0})
                 </label>
                 <div className="space-y-2">
-                  {selectedTeam.members && selectedTeam.members.length > 0 ? (
+                  {Array.isArray(selectedTeam.members) && selectedTeam.members.length > 0 ? (
                     selectedTeam.members.map((member: any, index: number) => (
                       <div key={member.id || index} className="p-3 rounded-lg bg-muted/30 border border-primary/10">
                         <div className="flex justify-between items-start">

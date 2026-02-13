@@ -116,18 +116,23 @@ export default function GameControl() {
   const { data: evaluationData } = useQuery({
     queryKey: ['evaluationStatus', selectedLevel],
     queryFn: async () => {
-      const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${selectedLevel}/status`);
-      
-      if (!response.ok) {
-        // Evaluation endpoints not implemented yet - return null
+      try {
+        const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${selectedLevel}/status`);
+        
+        if (!response.ok) {
+          // Evaluation endpoints not implemented yet - return null silently
+          return null;
+        }
+        return response.json();
+      } catch (error) {
+        // Silently fail if endpoint doesn't exist
         return null;
       }
-      return response.json();
     },
-    refetchInterval: 15000, // Slower polling
-    staleTime: 10000,
+    refetchInterval: false, // Disable polling since endpoint doesn't exist yet
+    staleTime: Infinity,
     retry: false, // Don't retry on 404
-    enabled: !!gameState?.game_active, // Enable when game is active
+    enabled: false, // Disable until evaluation endpoints are implemented
   });
 
   const evaluationStatus: EvaluationStatus | undefined = evaluationData;
