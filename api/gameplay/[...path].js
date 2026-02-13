@@ -104,7 +104,7 @@ module.exports = async function handler(req, res) {
 
     // ─── POST /api/gameplay/puzzle/submit ───
     if (req.method === 'POST' && path === '/puzzle/submit') {
-      const { puzzleId, answer } = req.body;
+      const { puzzle_id, answer } = req.body;
 
       const { data: team, error: tErr } = await supabase
         .from('teams')
@@ -118,7 +118,7 @@ module.exports = async function handler(req, res) {
       const { data: puzzle, error: pErr } = await supabase
         .from('puzzles')
         .select('*')
-        .eq('id', puzzleId)
+        .eq('id', puzzle_id)
         .single();
       if (pErr || !puzzle) {
         return res.status(404).json({ error: 'Puzzle not found' });
@@ -132,7 +132,7 @@ module.exports = async function handler(req, res) {
         const { error: subErr } = await supabase.from('submissions').insert({
           id: crypto.randomUUID(),
           team_id: team.id,
-          puzzle_id: puzzleId,
+          puzzle_id: puzzle_id,
           submitted_answer: answer,
           is_correct: true,
           score_awarded: puzzle.points
@@ -145,7 +145,7 @@ module.exports = async function handler(req, res) {
         await supabase.from('submissions').insert({
           id: crypto.randomUUID(),
           team_id: team.id,
-          puzzle_id: puzzleId,
+          puzzle_id: puzzle_id,
           submitted_answer: answer,
           is_correct: false,
           score_awarded: 0
@@ -157,7 +157,7 @@ module.exports = async function handler(req, res) {
 
     // ─── POST /api/gameplay/puzzle/hint ───
     if (req.method === 'POST' && path === '/puzzle/hint') {
-      const { puzzleId, hintNumber } = req.body;
+      const { puzzle_id, hintNumber } = req.body;
 
       const { data: team } = await supabase
         .from('teams')
@@ -174,7 +174,7 @@ module.exports = async function handler(req, res) {
       const { data: hints } = await supabase
         .from('hints')
         .select('*')
-        .eq('puzzle_id', puzzleId)
+        .eq('puzzle_id', puzzle_id)
         .eq('hint_number', hintNumber)
         .eq('is_active', true)
         .single();
