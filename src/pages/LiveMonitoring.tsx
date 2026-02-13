@@ -357,7 +357,9 @@ export default function LiveMonitoring() {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-sm">
-                    {team.time_elapsed || formatElapsedTime(team.elapsed_seconds)}
+                    {team.status === 'waiting' 
+                      ? '--:--:--' 
+                      : (team.time_elapsed || formatElapsedTime(team.elapsed_seconds))}
                   </TableCell>
                   <TableCell className="text-sm text-zinc-400">
                     {team.last_activity ? formatTimestamp(team.last_activity) : '-'}

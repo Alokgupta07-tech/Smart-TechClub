@@ -739,7 +739,9 @@ const AdminLevelManagement = () => {
                               <span className="text-xs font-terminal">{team.progress}%</span>
                             </div>
                           </td>
-                          <td className="py-3 px-2 font-terminal text-sm">{team.timeElapsed || "--:--:--"}</td>
+                          <td className="py-3 px-2 font-terminal text-sm">
+                            {team.status === 'waiting' ? '--:--:--' : (team.timeElapsed || "--:--:--")}
+                          </td>
                           <td className="py-3 px-2">
                             {team.qualifiedForLevel2 || team.level1Completed ? (
                               <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
@@ -1099,7 +1101,9 @@ const AdminLevelManagement = () => {
                                   <span className="text-xs font-terminal">{team.progress}%</span>
                                 </div>
                               </td>
-                              <td className="py-3 px-2 font-terminal text-sm">{team.timeElapsed || "--:--:--"}</td>
+                              <td className="py-3 px-2 font-terminal text-sm">
+                                {team.status === 'waiting' ? '--:--:--' : (team.timeElapsed || "--:--:--")}
+                              </td>
                               <td className="py-3 px-2">
                                 <div className="flex gap-2">
                                   {team.status === "waiting" ? (

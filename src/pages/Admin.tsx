@@ -878,7 +878,9 @@ const Admin = () => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-terminal text-muted-foreground">TIME ELAPSED</label>
-                  <div className="text-sm font-terminal">{selectedTeam.timeElapsed || '--:--:--'}</div>
+                  <div className="text-sm font-terminal">
+                    {selectedTeam.status === 'waiting' ? '--:--:--' : (selectedTeam.timeElapsed || '--:--:--')}
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-terminal text-muted-foreground">HINTS USED</label>

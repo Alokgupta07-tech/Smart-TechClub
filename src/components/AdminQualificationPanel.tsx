@@ -290,7 +290,11 @@ function TeamQualificationTable() {
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex flex-col items-center">
-                        <span className="text-xl font-terminal font-bold text-primary">{team.timeElapsed || '00:00:00'}</span>
+                        <span className="text-xl font-terminal font-bold text-primary">
+                          {team.status === 'waiting' || (team.correctAnswers === 0 && team.wrongAnswers === 0) 
+                            ? '--:--:--' 
+                            : (team.timeElapsed || '00:00:00')}
+                        </span>
                         <span className="text-xs text-muted-foreground">total time</span>
                       </div>
                     </TableCell>
