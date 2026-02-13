@@ -215,8 +215,8 @@ module.exports = async function handler(req, res) {
       return res.json(alerts);
     }
 
-    // ─── PUT /api/admin/teams/:id/status ───
-    if (req.method === 'PUT' && path.match(/^\/teams\/[^\/]+\/status$/)) {
+    // ─── PUT/PATCH /api/admin/teams/:id/status ───
+    if ((req.method === 'PUT' || req.method === 'PATCH') && path.match(/^\/teams\/[^\/]+\/status$/)) {
       var statusTeamId = path.split('/')[2];
       const { status } = req.body;
 
@@ -272,6 +272,35 @@ module.exports = async function handler(req, res) {
       if (error) throw error;
 
       return res.json({ message: 'Team ' + action + ' successful' });
+    }
+
+    // ─── POST /api/admin/teams/:id/qualify-level2 ───
+    if (req.method === 'POST' && path.match(/^\/teams\/[^\/]+\/qualify-level2$/)) {
+      var qualifyTeamId = path.split('/')[2];
+      
+      const { error } = await supabase
+        .from('teams')
+        .update({ 
+          status: 'qualified',
+          level: 2
+        })
+        .eq('id', qualifyTeamId);
+      if (error) throw error;
+
+      return res.json({ message: 'Team qualified for Level 2' });
+    }
+
+    // ─── POST /api/admin/teams/:id/disqualify ───
+    if (req.method === 'POST' && path.match(/^\/teams\/[^\/]+\/disqualify$/)) {
+      var disqualifyTeamId = path.split('/')[2];
+      
+      const { error } = await supabase
+        .from('teams')
+        .update({ status: 'disqualified' })
+        .eq('id', disqualifyTeamId);
+      if (error) throw error;
+
+      return res.json({ message: 'Team disqualified' });
     }
 
     // ─── GET /api/admin/monitor/live ───
