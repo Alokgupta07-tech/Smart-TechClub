@@ -32,6 +32,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -94,6 +104,19 @@ export default function GameControl() {
   const [selectedLevel, setSelectedLevel] = useState<number>(1); // NEW: Track selected level for evaluation
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
+  
+  // Generic confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    action: () => void;
+    variant?: 'default' | 'destructive';
+  }>({ open: false, title: '', description: '', action: () => {} });
+  
+  const showConfirm = (title: string, description: string, action: () => void, variant: 'default' | 'destructive' = 'default') => {
+    setConfirmDialog({ open: true, title, description, action, variant });
+  };
 
   // Fetch game state
   const { data: gameStateData, isLoading } = useQuery({
@@ -672,13 +695,11 @@ export default function GameControl() {
                 </p>
               </div>
               <Button
-                onClick={() => {
-                  if (confirm('Start the game now? This will activate Level 1 for all teams.')) {
-                    startTransition(() => {
-                      startGame.mutate();
-                    });
-                  }
-                }}
+                onClick={() => showConfirm(
+                  'Start Game',
+                  'Start the game now? This will activate Level 1 for all teams.',
+                  () => startTransition(() => startGame.mutate())
+                )}
                 disabled={startGame.isPending}
                 className="bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 min-w-[140px]"
               >
@@ -719,13 +740,11 @@ export default function GameControl() {
               </div>
               {currentPhase === 'paused' ? (
                 <Button
-                  onClick={() => {
-                    if (confirm('Resume the game for all teams?')) {
-                      startTransition(() => {
-                        resumeGame.mutate();
-                      });
-                    }
-                  }}
+                  onClick={() => showConfirm(
+                    'Resume Game',
+                    'Resume the game for all teams?',
+                    () => startTransition(() => resumeGame.mutate())
+                  )}
                   disabled={resumeGame.isPending}
                   className="bg-green-500 text-white hover:bg-green-600 min-w-[140px]"
                 >
@@ -734,13 +753,11 @@ export default function GameControl() {
                 </Button>
               ) : (
                 <Button
-                  onClick={() => {
-                    if (confirm('Pause the game for all teams? They can resume from where they stopped.')) {
-                      startTransition(() => {
-                        pauseGame.mutate();
-                      });
-                    }
-                  }}
+                  onClick={() => showConfirm(
+                    'Pause Game',
+                    'Pause the game for all teams? They can resume from where they stopped.',
+                    () => startTransition(() => pauseGame.mutate())
+                  )}
                   disabled={pauseGame.isPending}
                   className="bg-yellow-500 text-black hover:bg-yellow-600 min-w-[140px]"
                 >
@@ -764,13 +781,12 @@ export default function GameControl() {
                 </p>
               </div>
               <Button
-                onClick={() => {
-                  if (confirm('Are you sure you want to END the game? This will complete the event for all teams. This action cannot be undone!')) {
-                    startTransition(() => {
-                      endGame.mutate();
-                    });
-                  }
-                }}
+                onClick={() => showConfirm(
+                  'End Game',
+                  'Are you sure you want to END the game? This will complete the event for all teams. This action cannot be undone!',
+                  () => startTransition(() => endGame.mutate()),
+                  'destructive'
+                )}
                 disabled={endGame.isPending}
                 className="bg-red-500 text-white hover:bg-red-600 min-w-[140px]"
               >
@@ -805,13 +821,11 @@ export default function GameControl() {
                 </p>
               </div>
               <Button
-                onClick={() => {
-                  if (confirm('Unlock Level 2 for all teams?')) {
-                    startTransition(() => {
-                      unlockLevel2.mutate();
-                    });
-                  }
-                }}
+                onClick={() => showConfirm(
+                  'Unlock Level 2',
+                  'Unlock Level 2 for all teams?',
+                  () => startTransition(() => unlockLevel2.mutate())
+                )}
                 disabled={unlockLevel2.isPending}
                 className="bg-purple-500 text-white hover:bg-purple-600"
               >
@@ -1120,11 +1134,11 @@ export default function GameControl() {
                 </p>
               </div>
               <Button
-                onClick={() => {
-                  if (confirm(`Evaluate all answers for Level ${selectedLevel}? This will calculate scores and qualification.`)) {
-                    evaluateAnswers.mutate(selectedLevel);
-                  }
-                }}
+                onClick={() => showConfirm(
+                  'Evaluate Answers',
+                  `Evaluate all answers for Level ${selectedLevel}? This will calculate scores and qualification.`,
+                  () => evaluateAnswers.mutate(selectedLevel)
+                )}
                 disabled={!evaluationStatus?.actions?.can_evaluate || evaluateAnswers.isPending}
                 className="bg-yellow-500 text-black hover:bg-yellow-600 disabled:opacity-50"
               >
@@ -1147,11 +1161,11 @@ export default function GameControl() {
                 </p>
               </div>
               <Button
-                onClick={() => {
-                  if (confirm(`Publish Level ${selectedLevel} results? Teams will see their scores and qualification status.`)) {
-                    publishResults.mutate(selectedLevel);
-                  }
-                }}
+                onClick={() => showConfirm(
+                  'Publish Results',
+                  `Publish Level ${selectedLevel} results? Teams will see their scores and qualification status.`,
+                  () => publishResults.mutate(selectedLevel)
+                )}
                 disabled={!evaluationStatus?.actions?.can_publish || publishResults.isPending}
                 className="bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
               >
@@ -1247,6 +1261,30 @@ export default function GameControl() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Generic Confirmation Dialog */}
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent className="bg-zinc-900 border-zinc-700">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription className="text-zinc-400">
+              {confirmDialog.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                confirmDialog.action();
+                setConfirmDialog(prev => ({ ...prev, open: false }));
+              }}
+              className={confirmDialog.variant === 'destructive' ? 'bg-red-500 hover:bg-red-600' : ''}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

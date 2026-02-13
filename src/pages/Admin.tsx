@@ -49,6 +49,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { TerminalCard } from "@/components/TerminalCard";
 import { BiohazardIcon } from "@/components/BiohazardIcon";
 import { cn } from "@/lib/utils";
@@ -66,6 +76,19 @@ const Admin = () => {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<"teams" | "timeTracking" | "qualification" | "levels">("levels");
+  
+  // Generic confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    action: () => void;
+    variant?: 'default' | 'destructive';
+  }>({ open: false, title: '', description: '', action: () => {} });
+  
+  const showConfirm = (title: string, description: string, action: () => void, variant: 'default' | 'destructive' = 'default') => {
+    setConfirmDialog({ open: true, title, description, action, variant });
+  };
 
   // Fetch real data from MySQL backend
   const { data: teams, isLoading: teamsLoading, error: teamsError } = useTeams();
@@ -111,24 +134,27 @@ const Admin = () => {
     teamAction.mutate({ teamId, action });
   };
 
-  const handleDeleteTeam = async (teamId: string, teamName: string) => {
-    if (!confirm(`Are you sure you want to delete team "${teamName}"? This action cannot be undone.`)) {
-      return;
-    }
+  const handleDeleteTeam = (teamId: string, teamName: string) => {
+    showConfirm(
+      'Delete Team',
+      `Are you sure you want to delete team "${teamName}"? This action cannot be undone.`,
+      async () => {
+        try {
+          const response = await fetchWithAuth(`${API_BASE}/admin/teams/${teamId}`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetchWithAuth(`${API_BASE}/admin/teams/${teamId}`, {
-        method: 'DELETE',
-      });
+          if (!response.ok) throw new Error('Failed to delete team');
 
-      if (!response.ok) throw new Error('Failed to delete team');
-
-      toast.success(`Team "${teamName}" deleted successfully`);
-      window.location.reload();
-    } catch (error) {
-      toast.error('Failed to delete team');
-      console.error(error);
-    }
+          toast.success(`Team "${teamName}" deleted successfully`);
+          window.location.reload();
+        } catch (error) {
+          toast.error('Failed to delete team');
+          console.error(error);
+        }
+      },
+      'destructive'
+    );
   };
 
   const handleQualifyTeam = async (teamId: string, teamName: string, currentStatus: string) => {
@@ -174,7 +200,7 @@ const Admin = () => {
     }
   };
 
-  const handleActivateAllTeams = async () => {
+  const handleActivateAllTeams = () => {
     const waitingTeams = Array.isArray(teams) ? teams.filter(t => t.status === 'waiting') : [];
     
     if (waitingTeams.length === 0) {
@@ -182,49 +208,51 @@ const Admin = () => {
       return;
     }
 
-    if (!confirm(`Are you sure you want to activate all ${waitingTeams.length} waiting teams?`)) {
-      return;
-    }
-
-    try {
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const team of waitingTeams) {
+    showConfirm(
+      'Activate All Teams',
+      `Are you sure you want to activate all ${waitingTeams.length} waiting teams?`,
+      async () => {
         try {
-          const response = await fetchWithAuth(`${API_BASE}/admin/teams/${team.id}/status`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status: 'active' })
-          });
+          let successCount = 0;
+          let failCount = 0;
 
-          if (response.ok) {
-            successCount++;
-          } else {
-            failCount++;
+          for (const team of waitingTeams) {
+            try {
+              const response = await fetchWithAuth(`${API_BASE}/admin/teams/${team.id}/status`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: 'active' })
+              });
+
+              if (response.ok) {
+                successCount++;
+              } else {
+                failCount++;
+              }
+            } catch {
+              failCount++;
+            }
           }
-        } catch {
-          failCount++;
+
+          if (successCount > 0) {
+            toast.success(`${successCount} teams activated successfully!`);
+          }
+          if (failCount > 0) {
+            toast.error(`Failed to activate ${failCount} teams`);
+          }
+          
+          window.location.reload();
+        } catch (error) {
+          toast.error('Failed to activate teams');
+          console.error(error);
         }
       }
-
-      if (successCount > 0) {
-        toast.success(`${successCount} teams activated successfully!`);
-      }
-      if (failCount > 0) {
-        toast.error(`Failed to activate ${failCount} teams`);
-      }
-      
-      window.location.reload();
-    } catch (error) {
-      toast.error('Failed to activate teams');
-      console.error(error);
-    }
+    );
   };
 
-  const handlePauseAllTeams = async () => {
+  const handlePauseAllTeams = () => {
     const activeTeams = Array.isArray(teams) ? teams.filter(t => t.status === 'active') : [];
     
     if (activeTeams.length === 0) {
@@ -232,69 +260,74 @@ const Admin = () => {
       return;
     }
 
-    if (!confirm(`Are you sure you want to pause all ${activeTeams.length} active teams?`)) {
-      return;
-    }
-
-    try {
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const team of activeTeams) {
+    showConfirm(
+      'Pause All Teams',
+      `Are you sure you want to pause all ${activeTeams.length} active teams?`,
+      async () => {
         try {
-          const response = await fetchWithAuth(`${API_BASE}/admin/teams/${team.id}/status`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status: 'waiting' })
-          });
+          let successCount = 0;
+          let failCount = 0;
 
-          if (response.ok) {
-            successCount++;
-          } else {
-            failCount++;
+          for (const team of activeTeams) {
+            try {
+              const response = await fetchWithAuth(`${API_BASE}/admin/teams/${team.id}/status`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: 'waiting' })
+              });
+
+              if (response.ok) {
+                successCount++;
+              } else {
+                failCount++;
+              }
+            } catch {
+              failCount++;
+            }
           }
-        } catch {
-          failCount++;
+
+          if (successCount > 0) {
+            toast.success(`${successCount} teams paused successfully!`);
+          }
+          if (failCount > 0) {
+            toast.error(`Failed to pause ${failCount} teams`);
+          }
+          
+          window.location.reload();
+        } catch (error) {
+          toast.error('Failed to pause teams');
+          console.error(error);
         }
       }
-
-      if (successCount > 0) {
-        toast.success(`${successCount} teams paused successfully!`);
-      }
-      if (failCount > 0) {
-        toast.error(`Failed to pause ${failCount} teams`);
-      }
-      
-      window.location.reload();
-    } catch (error) {
-      toast.error('Failed to pause teams');
-      console.error(error);
-    }
+    );
   };
 
   // ============================================
   // QUICK ACTIONS HANDLERS
   // ============================================
-  const handleResetGame = async () => {
-    if (!confirm('Are you sure you want to RESET THE ENTIRE GAME? This will clear all team progress, submissions, and activity logs!')) {
-      return;
-    }
+  const handleResetGame = () => {
+    showConfirm(
+      'Reset Game',
+      'Are you sure you want to RESET THE ENTIRE GAME? This will clear all team progress, submissions, and activity logs!',
+      async () => {
+        try {
+          const response = await fetchWithAuth(`${API_BASE}/game/restart`, {
+            method: 'POST',
+          });
 
-    try {
-      const response = await fetchWithAuth(`${API_BASE}/game/restart`, {
-        method: 'POST',
-      });
+          if (!response.ok) throw new Error('Failed to reset game');
 
-      if (!response.ok) throw new Error('Failed to reset game');
-
-      toast.success('Game reset successfully! All progress cleared.');
-      window.location.reload();
-    } catch (error) {
-      toast.error('Failed to reset game');
-      console.error(error);
-    }
+          toast.success('Game reset successfully! All progress cleared.');
+          window.location.reload();
+        } catch (error) {
+          toast.error('Failed to reset game');
+          console.error(error);
+        }
+      },
+      'destructive'
+    );
   };
 
   const handleExportResults = async () => {
@@ -934,6 +967,30 @@ const Admin = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Generic Confirmation Dialog */}
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent className="bg-zinc-900 border-zinc-700">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription className="text-zinc-400">
+              {confirmDialog.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                confirmDialog.action();
+                setConfirmDialog(prev => ({ ...prev, open: false }));
+              }}
+              className={confirmDialog.variant === 'destructive' ? 'bg-red-500 hover:bg-red-600' : ''}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
