@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -345,10 +345,12 @@ export default function TeamGameplay() {
         setAnswer('');
         setCurrentHint('');
         
-        // Invalidate queries first
-        await queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
-        await queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
-        await queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
+        // Invalidate queries in low-priority batch
+        startTransition(() => {
+          queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
+          queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
+          queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
+        });
         
         // Navigate to next question - either from backend or find it ourselves
         if (data.next_puzzle && data.next_puzzle.id) {
@@ -377,9 +379,12 @@ export default function TeamGameplay() {
       setAnswer('');
       setCurrentHint('');
       
-      await queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
-      await queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
-      await queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
+      // Invalidate queries in low-priority batch
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
+        queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
+        queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
+      });
       
       if (data.game_completed) {
         toast({
@@ -445,8 +450,10 @@ export default function TeamGameplay() {
         description: `Time penalty: +${penalty} minutes`,
         className: 'bg-yellow-500 text-black',
       });
-      queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
-      queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
+        queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
+      });
     },
     onError: (error: any) => {
       toast({
@@ -505,9 +512,11 @@ export default function TeamGameplay() {
         goToQuestion.mutate(data.next_puzzle.id);
       } else {
         // Fallback: refetch and find next question
-        queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
-        queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
-        queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
+        startTransition(() => {
+          queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
+          queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
+          queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
+        });
       }
     },
     onError: (error: Error) => {
@@ -531,8 +540,10 @@ export default function TeamGameplay() {
       setCurrentHint('');
       setSelectedPuzzleId(data.puzzleId);
       // Also invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
-      queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
+        queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -554,8 +565,10 @@ export default function TeamGameplay() {
       setAnswer('');
       setCurrentHint('');
       setSelectedPuzzleId(data.puzzleId);
-      queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
-      queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
+        queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -598,7 +611,7 @@ export default function TeamGameplay() {
             </div>
             <div className="flex gap-2">
               <Button
-                onClick={() => queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] })}
+                onClick={() => startTransition(() => queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] }))}
                 className="bg-toxic-green text-black hover:bg-toxic-green/80"
               >
                 Retry

@@ -164,7 +164,9 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      });
       toast({
         title: 'Submissions Closed',
         description: `Level ${selectedLevel} submissions are now closed. ${data.teams_affected} teams affected.`,
@@ -193,7 +195,9 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      });
       toast({
         title: 'Evaluation Complete',
         description: `${data.stats.submissions_evaluated} submissions evaluated. ${data.stats.correct_answers || 0} correct.`,
@@ -222,8 +226,10 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
-      queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+        queryClient.invalidateQueries({ queryKey: ['gameState'] });
+      });
       toast({
         title: 'Results Published!',
         description: `Level ${selectedLevel} results are now visible. ${data.stats.qualified} qualified, ${data.stats.disqualified} disqualified.`,
@@ -253,7 +259,9 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      });
       toast({
         title: 'Submissions Reopened',
         description: `Level ${selectedLevel} submissions are now open again.`,
@@ -293,7 +301,7 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      queueMicrotask(() => {
+      startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
       
@@ -341,7 +349,7 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      queueMicrotask(() => {
+      startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
       
@@ -375,7 +383,7 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      queueMicrotask(() => {
+      startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
       
@@ -398,7 +406,7 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      queueMicrotask(() => {
+      startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
       
@@ -421,7 +429,7 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      queueMicrotask(() => {
+      startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
       
@@ -444,7 +452,7 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      queueMicrotask(() => {
+      startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
       
