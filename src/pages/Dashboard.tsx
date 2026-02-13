@@ -31,6 +31,9 @@ import * as authAPI from "@/lib/authApi";
 import { InventoryPanel } from "@/components/InventoryPanel";
 import { BackButton } from "@/components/BackButton";
 import { QualificationMessageModal, QualificationBanner } from "@/components/QualificationMessageModal";
+// Celebration Modal - Shows winner/runner-up celebration when results are published
+import { CelebrationModal } from "@/components/CelebrationModal";
+import { useCelebration } from "@/hooks/useCelebration";
 
 interface TeamData {
   id: string;
@@ -67,6 +70,10 @@ const Dashboard = () => {
   const [team, setTeam] = useState<TeamData | null>(null);
   const [broadcasts, setBroadcasts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Celebration modal hook - shows winner/runner-up celebration when results are published
+  // Pass the current team ID to check if they're in the top 3
+  const celebration = useCelebration(team?.id || null);
 
   // Fetch team data
   useEffect(() => {
@@ -544,6 +551,13 @@ const Dashboard = () => {
       
       {/* Qualification Message Modal - Shows notifications from admin */}
       <QualificationMessageModal autoShow={true} />
+      
+      {/* Celebration Modal - Shows when results are published and user is in top 3 */}
+      <CelebrationModal
+        isResultPublished={celebration.isResultPublished}
+        resultData={celebration.resultData}
+        onClose={celebration.onClose}
+      />
     </div>
   );
 };
