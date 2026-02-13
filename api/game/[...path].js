@@ -53,21 +53,49 @@ module.exports = async function handler(req, res) {
 
     // ─── GET /api/game/features — Public (for celebration modal trigger) ───
     if (req.method === 'GET' && path === '/features') {
-      const { data: states, error } = await supabase
-        .from('game_state')
-        .select('game_active, game_ended_at, results_published')
-        .limit(1);
+      try {
+        const { data: states, error } = await supabase
+          .from('game_state')
+          .select('game_active, game_ended_at, results_published')
+          .limit(1);
 
-      if (error) throw error;
+        // Handle case where results_published column doesn't exist yet
+        if (error && error.message && error.message.includes('results_published')) {
+          // Fallback: fetch without results_published
+          const { data: fallbackStates } = await supabase
+            .from('game_state')
+            .select('game_active, game_ended_at')
+            .limit(1);
+          
+          const fallbackState = fallbackStates && fallbackStates.length > 0 ? fallbackStates[0] : {};
+          return res.json({
+            resultsPublished: false,
+            gameEnded: !!fallbackState.game_ended_at,
+            gameActive: fallbackState.game_active || false,
+            gameEndTime: fallbackState.game_ended_at || null
+          });
+        }
 
-      const gameState = states && states.length > 0 ? states[0] : {};
-      
-      return res.json({
-        resultsPublished: gameState.results_published || false,
-        gameEnded: !!gameState.game_ended_at,
-        gameActive: gameState.game_active || false,
-        gameEndTime: gameState.game_ended_at || null
-      });
+        if (error) throw error;
+
+        const gameState = states && states.length > 0 ? states[0] : {};
+        
+        return res.json({
+          resultsPublished: gameState.results_published || false,
+          gameEnded: !!gameState.game_ended_at,
+          gameActive: gameState.game_active || false,
+          gameEndTime: gameState.game_ended_at || null
+        });
+      } catch (featuresError) {
+        // Graceful fallback if anything fails
+        console.error('Features endpoint error:', featuresError.message);
+        return res.json({
+          resultsPublished: false,
+          gameEnded: false,
+          gameActive: false,
+          gameEndTime: null
+        });
+      }
     }
 
     // ─── User-authenticated time tracking routes ───

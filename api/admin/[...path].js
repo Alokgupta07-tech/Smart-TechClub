@@ -605,6 +605,13 @@ module.exports = async function handler(req, res) {
         .eq('id', existing.id);
 
       if (updateError) {
+        // If column doesn't exist, inform admin to run migration
+        if (updateError.message && updateError.message.includes('results_published')) {
+          return res.status(400).json({ 
+            error: 'Column "results_published" not found. Please run the migration: server/migrations/add-results-published.sql',
+            migrationRequired: true
+          });
+        }
         console.error('Failed to update results_published:', updateError);
         return res.status(500).json({ error: 'Failed to update results status' });
       }
@@ -618,20 +625,33 @@ module.exports = async function handler(req, res) {
 
     // ─── GET /api/admin/results-status — Check if results are published ───
     if (req.method === 'GET' && path === '/results-status') {
-      const { data: gameState, error } = await supabase
-        .from('game_state')
-        .select('results_published, game_ended_at')
-        .limit(1)
-        .single();
+      try {
+        const { data: gameState, error } = await supabase
+          .from('game_state')
+          .select('results_published, game_ended_at')
+          .limit(1)
+          .single();
 
-      if (error) {
-        return res.status(500).json({ error: 'Failed to fetch results status' });
+        // Handle case where column doesn't exist
+        if (error && error.message && error.message.includes('results_published')) {
+          return res.json({ 
+            resultsPublished: false,
+            gameEnded: false
+          });
+        }
+
+        if (error) {
+          return res.status(500).json({ error: 'Failed to fetch results status' });
+        }
+
+        return res.json({ 
+          resultsPublished: gameState?.results_published || false,
+          gameEnded: !!gameState?.game_ended_at
+        });
+      } catch (err) {
+        console.error('Results status error:', err.message);
+        return res.json({ resultsPublished: false, gameEnded: false });
       }
-
-      return res.json({ 
-        resultsPublished: gameState?.results_published || false,
-        gameEnded: !!gameState?.game_ended_at
-      });
     }
 
     return res.status(404).json({ error: 'Endpoint not found' });
