@@ -1681,13 +1681,14 @@ export default function TeamGameplay() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="mt-4">
             <Button
               onClick={() => navigate('/leaderboard')}
-              className="w-full bg-toxic-green text-black hover:bg-toxic-green/80"
+              className="w-full bg-green-500 text-white hover:bg-green-600 font-bold text-lg py-6 flex items-center justify-center gap-2"
+              style={{ minHeight: '56px' }}
             >
-              <Trophy className="w-4 h-4 mr-2" />
-              View Leaderboard
+              <Trophy className="w-5 h-5" />
+              <span>View Leaderboard</span>
             </Button>
           </DialogFooter>
         </DialogContent>
