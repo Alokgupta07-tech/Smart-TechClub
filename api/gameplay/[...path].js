@@ -49,18 +49,57 @@ module.exports = async function handler(req, res) {
         return res.status(404).json({ error: 'Team not found' });
       }
 
-      const { data: puzzles } = await supabase
+      const { data: puzzles, error: pErr } = await supabase
         .from('puzzles')
-        .select('id, title, description, puzzle_type, level, points')
+        .select('*')
         .eq('level', team.level)
-        .order('puzzle_number', { ascending: true })
-        .limit(1);
+        .order('puzzle_number', { ascending: true });
+
+      if (pErr) throw pErr;
 
       if (!puzzles || puzzles.length === 0) {
-        return res.json({ message: 'No puzzles available for this level', puzzle: null });
+        return res.status(404).json({ 
+          success: false, 
+          error: 'No active puzzle found. Please wait for the game to start or contact admin.' 
+        });
       }
 
-      return res.json({ puzzle: puzzles[0], team: mapTeam(team) });
+      // Get the first puzzle for the team's level
+      const puzzle = puzzles[0];
+
+      // Get puzzle progress
+      const { data: progress } = await supabase
+        .from('team_progress')
+        .select('*')
+        .eq('team_id', team.id)
+        .eq('puzzle_id', puzzle.id);
+
+      // Get hints
+      const { data: allHints } = await supabase
+        .from('hints')
+        .select('*')
+        .eq('puzzle_id', puzzle.id)
+        .order('hint_order', { ascending: true });
+
+      const { data: usedHints } = await supabase
+        .from('team_hints_used')
+        .select('hint_id')
+        .eq('team_id', team.id)
+        .eq('puzzle_id', puzzle.id);
+
+      const usedHintIds = (usedHints || []).map(h => h.hint_id);
+      const availableHints = (allHints || []).filter(h => !usedHintIds.includes(h.id));
+
+      return res.json({
+        success: true,
+        puzzle: {
+          ...puzzle,
+          progress: (progress && progress[0]) || { attempts: 0, hints_used: 0 },
+          available_hints: availableHints.length,
+          total_hints: (allHints || []).length
+        },
+        team: mapTeam(team)
+      });
     }
 
     // ─── POST /api/gameplay/puzzle/submit ───

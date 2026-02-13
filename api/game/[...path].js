@@ -58,7 +58,7 @@ module.exports = async function handler(req, res) {
                               path === '/skip-question' || path === '/time/skip-question' ||
                               path === '/complete-question' || path === '/time/complete-question' ||
                               path === '/skipped-questions' || path === '/time/skipped-questions' ||
-                              path.match(/^/timer/[^/]+$/) || path.match(/^/time/timer/[^/]+$/);
+                              path.match(/^\/timer\/[^\/]+$/) || path.match(/^\/time\/timer\/[^\/]+$/);
     
     if (isTimeTrackingRoute) {
       const authResult = verifyAuth(req);
@@ -164,6 +164,31 @@ module.exports = async function handler(req, res) {
       }
 
       return res.status(404).json({ error: 'Time tracking endpoint not found' });
+    }
+
+    // ─── GET /api/game/broadcast — Fetch broadcast messages (team auth) ───
+    if (req.method === 'GET' && path === '/broadcast') {
+      const authResult = verifyAuth(req);
+      if (authResult.error) {
+        return res.status(authResult.status).json({ error: authResult.error, code: authResult.code });
+      }
+
+      const { data: broadcasts, error: bErr } = await supabase
+        .from('broadcasts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (bErr) throw bErr;
+
+      // Filter out expired messages
+      const now = new Date();
+      const activeMessages = (broadcasts || []).filter(function(b) {
+        if (!b.expires_at) return true;
+        return new Date(b.expires_at) > now;
+      });
+
+      return res.json({ messages: activeMessages });
     }
 
     // ─── Protected admin routes below ───
