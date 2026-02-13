@@ -693,6 +693,8 @@ const AdminLevelManagement = () => {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
+                      id="level1-team-search"
+                      name="search"
                       placeholder="Search teams..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -1041,6 +1043,8 @@ const AdminLevelManagement = () => {
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
+                          id="level2-team-search"
+                          name="search"
                           placeholder="Search qualified teams..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
@@ -1184,6 +1188,8 @@ const AdminLevelManagement = () => {
               <div className="col-span-2">
                 <label className="text-sm font-terminal text-muted-foreground">TITLE</label>
                 <Input
+                  id="puzzle-title"
+                  name="title"
                   value={puzzleForm.title}
                   onChange={(e) => setPuzzleForm({ ...puzzleForm, title: e.target.value })}
                   placeholder="Enter question title"
@@ -1194,6 +1200,8 @@ const AdminLevelManagement = () => {
               <div className="col-span-2">
                 <label className="text-sm font-terminal text-muted-foreground">DESCRIPTION</label>
                 <Textarea
+                  id="puzzle-description"
+                  name="description"
                   value={puzzleForm.description}
                   onChange={(e) => setPuzzleForm({ ...puzzleForm, description: e.target.value })}
                   placeholder="Enter question description/instructions"
@@ -1225,6 +1233,8 @@ const AdminLevelManagement = () => {
               <div>
                 <label className="text-sm font-terminal text-muted-foreground">POINTS</label>
                 <Input
+                  id="puzzle-points"
+                  name="points"
                   type="number"
                   value={puzzleForm.points}
                   onChange={(e) => setPuzzleForm({ ...puzzleForm, points: parseInt(e.target.value) || 100 })}
@@ -1235,6 +1245,8 @@ const AdminLevelManagement = () => {
               <div className="col-span-2">
                 <label className="text-sm font-terminal text-muted-foreground">PUZZLE CONTENT</label>
                 <Textarea
+                  id="puzzle-content"
+                  name="puzzle_content"
                   value={puzzleForm.puzzle_content}
                   onChange={(e) => setPuzzleForm({ ...puzzleForm, puzzle_content: e.target.value })}
                   placeholder="Enter the puzzle/question content"
@@ -1246,6 +1258,8 @@ const AdminLevelManagement = () => {
               <div>
                 <label className="text-sm font-terminal text-muted-foreground">CORRECT ANSWER</label>
                 <Input
+                  id="puzzle-answer"
+                  name="correct_answer"
                   value={puzzleForm.correct_answer}
                   onChange={(e) => setPuzzleForm({ ...puzzleForm, correct_answer: e.target.value })}
                   placeholder="Enter correct answer"
@@ -1256,6 +1270,8 @@ const AdminLevelManagement = () => {
               <div>
                 <label className="text-sm font-terminal text-muted-foreground">TIME LIMIT (minutes)</label>
                 <Input
+                  id="puzzle-time-limit"
+                  name="time_limit_minutes"
                   type="number"
                   value={puzzleForm.time_limit_minutes}
                   onChange={(e) => setPuzzleForm({ ...puzzleForm, time_limit_minutes: parseInt(e.target.value) || 10 })}

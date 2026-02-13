@@ -199,6 +199,8 @@ const TeamMembers = () => {
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
+              id="member-search"
+              name="search"
               placeholder="Search teams or members..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}

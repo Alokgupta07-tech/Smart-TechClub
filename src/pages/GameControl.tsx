@@ -1139,6 +1139,8 @@ export default function GameControl() {
             <div>
               <Label>Message</Label>
               <Textarea
+                id="broadcast-message"
+                name="message"
                 value={broadcastMessage}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 placeholder="Enter your message..."

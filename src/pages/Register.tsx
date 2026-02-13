@@ -223,10 +223,13 @@ const Register = () => {
                         VERIFICATION CODE
                       </label>
                       <Input
+                        id="otp-code"
+                        name="otp"
                         value={otp}
                         onChange={(e) => setOtp(e.target.value)}
                         placeholder="Enter 6-digit code"
                         maxLength={6}
+                        autoComplete="one-time-code"
                         className="h-12 bg-background/50 border-primary/20 focus:border-primary/50 font-terminal text-center text-2xl tracking-widest"
                       />
                     </div>

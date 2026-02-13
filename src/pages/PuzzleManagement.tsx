@@ -380,6 +380,8 @@ export default function PuzzleManagement() {
               <div>
                 <Label htmlFor="puzzle_number">Puzzle Number</Label>
                 <Input
+                  id="puzzle_number"
+                  name="puzzle_number"
                   type="number"
                   value={formData.puzzle_number}
                   onChange={(e) => setFormData({ ...formData, puzzle_number: parseInt(e.target.value) })}
@@ -390,6 +392,8 @@ export default function PuzzleManagement() {
             <div>
               <Label htmlFor="title">Title</Label>
               <Input
+                id="title"
+                name="title"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="e.g., System Access Breach"
@@ -399,6 +403,8 @@ export default function PuzzleManagement() {
             <div>
               <Label htmlFor="description">Description</Label>
               <Textarea
+                id="description"
+                name="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Puzzle instructions..."
@@ -431,6 +437,8 @@ export default function PuzzleManagement() {
               <div>
                 <Label htmlFor="points">Points</Label>
                 <Input
+                  id="points"
+                  name="points"
                   type="number"
                   value={formData.points}
                   onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) })}
@@ -441,6 +449,8 @@ export default function PuzzleManagement() {
             <div>
               <Label htmlFor="puzzle_content">Puzzle Content</Label>
               <Textarea
+                id="puzzle_content"
+                name="puzzle_content"
                 value={formData.puzzle_content}
                 onChange={(e) => setFormData({ ...formData, puzzle_content: e.target.value })}
                 placeholder="The actual puzzle content..."
@@ -452,6 +462,8 @@ export default function PuzzleManagement() {
               <div>
                 <Label htmlFor="correct_answer">Correct Answer</Label>
                 <Input
+                  id="correct_answer"
+                  name="correct_answer"
                   value={formData.correct_answer}
                   onChange={(e) => setFormData({ ...formData, correct_answer: e.target.value })}
                   placeholder="The answer..."
@@ -461,6 +473,8 @@ export default function PuzzleManagement() {
               <div>
                 <Label htmlFor="time_limit">Time Limit (minutes)</Label>
                 <Input
+                  id="time_limit"
+                  name="time_limit"
                   type="number"
                   value={formData.time_limit_minutes}
                   onChange={(e) => setFormData({ ...formData, time_limit_minutes: parseInt(e.target.value) })}
@@ -495,6 +509,8 @@ export default function PuzzleManagement() {
             <div>
               <Label>Title</Label>
               <Input
+                id="edit-title"
+                name="title"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               />
@@ -503,6 +519,8 @@ export default function PuzzleManagement() {
             <div>
               <Label>Description</Label>
               <Textarea
+                id="edit-description"
+                name="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
@@ -512,6 +530,8 @@ export default function PuzzleManagement() {
             <div>
               <Label>Puzzle Content</Label>
               <Textarea
+                id="edit-puzzle-content"
+                name="puzzle_content"
                 value={formData.puzzle_content}
                 onChange={(e) => setFormData({ ...formData, puzzle_content: e.target.value })}
                 rows={4}
@@ -522,6 +542,8 @@ export default function PuzzleManagement() {
               <div>
                 <Label>Correct Answer</Label>
                 <Input
+                  id="edit-correct-answer"
+                  name="correct_answer"
                   value={formData.correct_answer}
                   onChange={(e) => setFormData({ ...formData, correct_answer: e.target.value })}
                 />
@@ -530,6 +552,8 @@ export default function PuzzleManagement() {
               <div>
                 <Label>Points</Label>
                 <Input
+                  id="edit-points"
+                  name="points"
                   type="number"
                   value={formData.points}
                   onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) })}
