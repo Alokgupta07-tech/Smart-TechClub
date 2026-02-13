@@ -258,9 +258,8 @@ export default function GameControl() {
       if (!response.ok) throw new Error('Failed to start game');
       return response.json();
     },
-    onMutate: async () => {
-      // Optimistic update
-      await queryClient.cancelQueries({ queryKey: ['gameState'] });
+    onMutate: () => {
+      // Optimistic update (non-blocking)
       const previousState = queryClient.getQueryData(['gameState']);
       
       queryClient.setQueryData(['gameState'], (old: any) => ({
@@ -274,9 +273,9 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      setTimeout(() => {
+      queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
-      }, 100);
+      });
       
       toast({
         title: 'Success',
@@ -308,12 +307,10 @@ export default function GameControl() {
       if (!response.ok) throw new Error('Failed to unlock Level 2');
       return response.json();
     },
-    onMutate: async () => {
-      // Optimistic update - show immediate feedback
-      await queryClient.cancelQueries({ queryKey: ['gameState'] });
+    onMutate: () => {
+      // Optimistic update (non-blocking)
       const previousState = queryClient.getQueryData(['gameState']);
       
-      // Optimistically update the cache
       queryClient.setQueryData(['gameState'], (old: any) => ({
         ...old,
         level2_open: true,
@@ -324,9 +321,9 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      setTimeout(() => {
+      queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
-      }, 100);
+      });
       
       toast({
         title: 'Success',
@@ -358,9 +355,9 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      setTimeout(() => {
+      queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
-      }, 100);
+      });
       
       toast({
         title: 'Game Paused',
@@ -381,9 +378,9 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      setTimeout(() => {
+      queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
-      }, 100);
+      });
       
       toast({
         title: 'Game Resumed',
@@ -404,9 +401,9 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      setTimeout(() => {
+      queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
-      }, 100);
+      });
       
       toast({
         title: 'Game Ended',
@@ -427,9 +424,9 @@ export default function GameControl() {
     },
     onSuccess: () => {
       // Defer invalidation to prevent blocking
-      setTimeout(() => {
+      queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
-      }, 100);
+      });
       
       toast({
         title: 'Game Restarted',
@@ -649,11 +646,9 @@ export default function GameControl() {
               <Button
                 onClick={() => {
                   if (confirm('Start the game now? This will activate Level 1 for all teams.')) {
-                    setTimeout(() => {
-                      startTransition(() => {
-                        startGame.mutate();
-                      });
-                    }, 0);
+                    startTransition(() => {
+                      startGame.mutate();
+                    });
                   }
                 }}
                 disabled={startGame.isPending}
@@ -698,11 +693,9 @@ export default function GameControl() {
                 <Button
                   onClick={() => {
                     if (confirm('Resume the game for all teams?')) {
-                      setTimeout(() => {
-                        startTransition(() => {
-                          resumeGame.mutate();
-                        });
-                      }, 0);
+                      startTransition(() => {
+                        resumeGame.mutate();
+                      });
                     }
                   }}
                   disabled={resumeGame.isPending}
@@ -715,11 +708,9 @@ export default function GameControl() {
                 <Button
                   onClick={() => {
                     if (confirm('Pause the game for all teams? They can resume from where they stopped.')) {
-                      setTimeout(() => {
-                        startTransition(() => {
-                          pauseGame.mutate();
-                        });
-                      }, 0);
+                      startTransition(() => {
+                        pauseGame.mutate();
+                      });
                     }
                   }}
                   disabled={pauseGame.isPending}
@@ -747,11 +738,9 @@ export default function GameControl() {
               <Button
                 onClick={() => {
                   if (confirm('Are you sure you want to END the game? This will complete the event for all teams. This action cannot be undone!')) {
-                    setTimeout(() => {
-                      startTransition(() => {
-                        endGame.mutate();
-                      });
-                    }, 0);
+                    startTransition(() => {
+                      endGame.mutate();
+                    });
                   }
                 }}
                 disabled={endGame.isPending}
@@ -790,11 +779,9 @@ export default function GameControl() {
               <Button
                 onClick={() => {
                   if (confirm('Unlock Level 2 for all teams?')) {
-                    setTimeout(() => {
-                      startTransition(() => {
-                        unlockLevel2.mutate();
-                      });
-                    }, 0);
+                    startTransition(() => {
+                      unlockLevel2.mutate();
+                    });
                   }
                 }}
                 disabled={unlockLevel2.isPending}
@@ -884,11 +871,9 @@ export default function GameControl() {
                 if (confirm('⚠️ FINAL WARNING ⚠️\n\nAre you ABSOLUTELY SURE you want to RESET the entire game?\n\nThis will:\n- Delete all team progress\n- Clear all submissions\n- Reset game state to beginning\n\nThis action CANNOT be undone!\n\nType "RESET" in the next prompt to confirm.')) {
                   const confirmation = prompt('Type RESET to confirm game reset:');
                   if (confirmation === 'RESET') {
-                    setTimeout(() => {
-                      startTransition(() => {
-                        restartGame.mutate();
-                      });
-                    }, 0);
+                    startTransition(() => {
+                      restartGame.mutate();
+                    });
                   } else {
                     toast({
                       title: 'Reset Cancelled',
