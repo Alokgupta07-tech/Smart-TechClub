@@ -337,9 +337,12 @@ const Admin = () => {
       if (!response.ok) throw new Error('Failed to fetch team details');
 
       const teamData = await response.json();
+      console.log('Team details loaded:', teamData);
+      console.log('Members count:', teamData.members?.length || 0);
       setSelectedTeam(teamData);
       setIsDetailsOpen(true);
     } catch (error) {
+      console.error('Failed to load team details:', error);
       toast.error('Failed to load team details');
     }
   };
@@ -901,8 +904,14 @@ const Admin = () => {
                       </div>
                     ))
                   ) : (
-                    <div className="text-sm text-muted-foreground font-terminal p-4 text-center border border-dashed border-primary/20 rounded-lg">
-                      No member details available
+                    <div className="p-4 text-center border border-dashed border-primary/20 rounded-lg">
+                      <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-50" />
+                      <div className="text-sm text-muted-foreground font-terminal mb-1">
+                        No additional members registered
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Team leader: {selectedTeam.leader_name || 'Unknown'}
+                      </div>
                     </div>
                   )}
                 </div>

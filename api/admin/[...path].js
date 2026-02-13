@@ -96,15 +96,25 @@ module.exports = async function handler(req, res) {
         .eq('id', team.user_id)
         .single();
 
-      const { data: members } = await supabase
+      const { data: members, error: membersErr } = await supabase
         .from('team_members')
         .select('*')
-        .eq('team_id', teamId);
+        .eq('team_id', teamId)
+        .order('is_leader', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      if (membersErr) {
+        console.error('Error fetching members:', membersErr);
+      }
 
       var usMap = {};
       if (leader) usMap[team.user_id] = leader;
       var mapped = mapTeam(team, usMap);
       mapped.members = members || [];
+      
+      // Add debug logging
+      console.log('Team details for', teamId, '- Members count:', (members || []).length);
+      
       return res.json(mapped);
     }
 
