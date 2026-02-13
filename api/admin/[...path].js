@@ -578,6 +578,62 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // ─── POST /api/admin/publish-results — Publish/unpublish final results ───
+    // This triggers the celebration modal for top 3 teams
+    if (req.method === 'POST' && path === '/publish-results') {
+      const { publish } = req.body;
+      const shouldPublish = publish !== false; // Default to true if not specified
+
+      // Get the game_state ID
+      const { data: existing } = await supabase
+        .from('game_state')
+        .select('id')
+        .limit(1)
+        .single();
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Game state not found' });
+      }
+
+      // Update results_published flag
+      const { error: updateError } = await supabase
+        .from('game_state')
+        .update({ 
+          results_published: shouldPublish,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id);
+
+      if (updateError) {
+        console.error('Failed to update results_published:', updateError);
+        return res.status(500).json({ error: 'Failed to update results status' });
+      }
+
+      return res.json({ 
+        success: true, 
+        resultsPublished: shouldPublish,
+        message: shouldPublish ? 'Results published! Top 3 teams will see celebration.' : 'Results unpublished.'
+      });
+    }
+
+    // ─── GET /api/admin/results-status — Check if results are published ───
+    if (req.method === 'GET' && path === '/results-status') {
+      const { data: gameState, error } = await supabase
+        .from('game_state')
+        .select('results_published, game_ended_at')
+        .limit(1)
+        .single();
+
+      if (error) {
+        return res.status(500).json({ error: 'Failed to fetch results status' });
+      }
+
+      return res.json({ 
+        resultsPublished: gameState?.results_published || false,
+        gameEnded: !!gameState?.game_ended_at
+      });
+    }
+
     return res.status(404).json({ error: 'Endpoint not found' });
 
   } catch (error) {

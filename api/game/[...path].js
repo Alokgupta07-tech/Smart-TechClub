@@ -43,11 +43,31 @@ module.exports = async function handler(req, res) {
           level1_open: true,
           level2_open: false,
           game_started_at: null,
-          game_ended_at: null
+          game_ended_at: null,
+          results_published: false
         });
       }
 
       return res.json(states[0]);
+    }
+
+    // ─── GET /api/game/features — Public (for celebration modal trigger) ───
+    if (req.method === 'GET' && path === '/features') {
+      const { data: states, error } = await supabase
+        .from('game_state')
+        .select('game_active, game_ended_at, results_published')
+        .limit(1);
+
+      if (error) throw error;
+
+      const gameState = states && states.length > 0 ? states[0] : {};
+      
+      return res.json({
+        resultsPublished: gameState.results_published || false,
+        gameEnded: !!gameState.game_ended_at,
+        gameActive: gameState.game_active || false,
+        gameEndTime: gameState.game_ended_at || null
+      });
     }
 
     // ─── User-authenticated time tracking routes ───
