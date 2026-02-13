@@ -107,6 +107,7 @@ module.exports = async function handler(req, res) {
                               path === '/complete-question' || path === '/time/complete-question' ||
                               path === '/skipped-questions' || path === '/time/skipped-questions' ||
                               path === '/go-to-question' || path === '/time/go-to-question' ||
+                              path === '/game-summary' || path === '/time/game-summary' ||
                               path.match(/^\/timer\/[^\/]+$/) || path.match(/^\/time\/timer\/[^\/]+$/);
     
     if (isTimeTrackingRoute) {
@@ -120,7 +121,7 @@ module.exports = async function handler(req, res) {
       // Get user's team
       const { data: team } = await supabase
         .from('teams')
-        .select('id, team_name, status, start_time, hints_used')
+        .select('id, team_name, level, status, start_time, hints_used')
         .eq('user_id', user.userId)
         .single();
 
@@ -289,6 +290,78 @@ module.exports = async function handler(req, res) {
       // ─── GET /api/game/skipped-questions OR /api/game/time/skipped-questions ───
       if (req.method === 'GET' && (path === '/skipped-questions' || path === '/time/skipped-questions')) {
         return res.json({ skippedQuestions: [] });
+      }
+
+      // ─── GET /api/game/game-summary OR /api/game/time/game-summary ───
+      if (req.method === 'GET' && (path === '/game-summary' || path === '/time/game-summary')) {
+        // Get all puzzles for team's level
+        const { data: allPuzzles } = await supabase
+          .from('puzzles')
+          .select('id, puzzle_number, title, level, points')
+          .eq('level', team.level || 1)
+          .eq('is_active', true)
+          .order('puzzle_number', { ascending: true });
+
+        // Get all submissions for this team
+        const { data: submissions } = await supabase
+          .from('submissions')
+          .select('puzzle_id, submitted_answer, is_correct, created_at')
+          .eq('team_id', team.id)
+          .order('created_at', { ascending: false });
+
+        // Build question summary
+        const questionSummary = (allPuzzles || []).map(function(q) {
+          const questionSubmissions = (submissions || []).filter(function(s) { return s.puzzle_id === q.id; });
+          const correctSubmission = questionSubmissions.find(function(s) { return s.is_correct; });
+          const latestSubmission = questionSubmissions[0];
+
+          return {
+            questionNumber: q.puzzle_number,
+            title: q.title,
+            level: q.level,
+            points: q.points,
+            attempted: questionSubmissions.length > 0,
+            status: correctSubmission ? 'correct' : (latestSubmission ? 'wrong' : 'not_attempted'),
+            attempts: questionSubmissions.length,
+            submittedAnswer: latestSubmission ? latestSubmission.submitted_answer : null,
+            isCorrect: !!correctSubmission,
+            submittedAt: latestSubmission ? latestSubmission.created_at : null
+          };
+        });
+
+        const totalQuestions = (allPuzzles || []).length;
+        const attemptedQuestions = questionSummary.filter(function(q) { return q.attempted; }).length;
+        const correctAnswers = questionSummary.filter(function(q) { return q.isCorrect; }).length;
+        const wrongAnswers = attemptedQuestions - correctAnswers;
+        const notAttempted = totalQuestions - attemptedQuestions;
+
+        const startTime = team.start_time ? new Date(team.start_time) : null;
+        const endTime = new Date();
+        const totalTimeSeconds = startTime ? Math.floor((endTime - startTime) / 1000) : 0;
+
+        return res.json({
+          success: true,
+          summary: {
+            team: {
+              id: team.id,
+              name: team.team_name,
+              level: team.level || 1,
+              status: team.status,
+              hintsUsed: team.hints_used || 0
+            },
+            stats: {
+              totalQuestions: totalQuestions,
+              attemptedQuestions: attemptedQuestions,
+              correctAnswers: correctAnswers,
+              wrongAnswers: wrongAnswers,
+              notAttempted: notAttempted,
+              totalTimeSeconds: totalTimeSeconds,
+              qualificationThreshold: 8,
+              qualified: correctAnswers >= 8
+            },
+            questions: questionSummary
+          }
+        });
       }
 
       return res.status(404).json({ error: 'Time tracking endpoint not found' });
