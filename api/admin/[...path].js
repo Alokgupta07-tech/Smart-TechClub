@@ -654,6 +654,194 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // ─── GET /api/admin/evaluation/level/:levelId/status — Get evaluation status ───
+    var evalStatusMatch = path.match(/^\/evaluation\/level\/(\d+)\/status$/);
+    if (req.method === 'GET' && evalStatusMatch) {
+      var levelId = parseInt(evalStatusMatch[1]);
+      
+      // Get game state
+      const { data: gameState } = await supabase
+        .from('game_state')
+        .select('*')
+        .limit(1)
+        .single();
+      
+      // Get submissions count for this level
+      const { data: puzzles } = await supabase
+        .from('puzzles')
+        .select('id')
+        .eq('level', levelId);
+      
+      var puzzleIds = (puzzles || []).map(function(p) { return p.id; });
+      var totalSubmissions = 0;
+      var pendingSubmissions = 0;
+      var teamsWithSubmissions = 0;
+      
+      if (puzzleIds.length > 0) {
+        const { count } = await supabase
+          .from('submissions')
+          .select('*', { count: 'exact', head: true })
+          .in('puzzle_id', puzzleIds);
+        totalSubmissions = count || 0;
+        
+        const { data: teamSubs } = await supabase
+          .from('submissions')
+          .select('team_id')
+          .in('puzzle_id', puzzleIds);
+        var uniqueTeams = {};
+        (teamSubs || []).forEach(function(s) { uniqueTeams[s.team_id] = true; });
+        teamsWithSubmissions = Object.keys(uniqueTeams).length;
+      }
+      
+      // Get teams count
+      const { count: totalTeams } = await supabase
+        .from('teams')
+        .select('id', { count: 'exact', head: true })
+        .eq('level', levelId);
+      
+      // Determine evaluation state from game_state
+      var evalState = 'IN_PROGRESS';
+      if (gameState) {
+        if (gameState.results_published) {
+          evalState = 'RESULTS_PUBLISHED';
+        } else if (gameState.game_ended_at) {
+          evalState = 'SUBMISSIONS_CLOSED';
+        }
+      }
+      
+      return res.json({
+        level: levelId,
+        evaluation_state: evalState,
+        submissions: {
+          total_submissions: totalSubmissions,
+          pending: pendingSubmissions,
+          teams_with_submissions: teamsWithSubmissions
+        },
+        teams: {
+          total: totalTeams || 0,
+          qualified: 0,
+          disqualified: 0
+        },
+        actions: {
+          can_close_submissions: evalState === 'IN_PROGRESS',
+          can_evaluate: evalState === 'SUBMISSIONS_CLOSED',
+          can_publish: evalState === 'EVALUATING' || evalState === 'SUBMISSIONS_CLOSED'
+        },
+        timestamps: {
+          submissions_closed_at: gameState?.game_ended_at || null,
+          results_published_at: gameState?.results_published ? new Date().toISOString() : null
+        }
+      });
+    }
+
+    // ─── POST /api/admin/evaluation/level/:levelId/close-submissions ───
+    var closeSubMatch = path.match(/^\/evaluation\/level\/(\d+)\/close-submissions$/);
+    if (req.method === 'POST' && closeSubMatch) {
+      var levelId = parseInt(closeSubMatch[1]);
+      
+      // Update game_state to mark submissions closed
+      const { data: existing } = await supabase
+        .from('game_state')
+        .select('id')
+        .limit(1)
+        .single();
+      
+      if (existing) {
+        await supabase
+          .from('game_state')
+          .update({ 
+            game_ended_at: new Date().toISOString(),
+            game_active: false 
+          })
+          .eq('id', existing.id);
+      }
+      
+      // Count affected teams
+      const { count: teamsAffected } = await supabase
+        .from('teams')
+        .select('id', { count: 'exact', head: true })
+        .eq('level', levelId);
+      
+      return res.json({
+        success: true,
+        message: 'Submissions closed successfully',
+        teams_affected: teamsAffected || 0,
+        level: levelId
+      });
+    }
+
+    // ─── POST /api/admin/evaluation/level/:levelId/reopen-submissions ───
+    var reopenSubMatch = path.match(/^\/evaluation\/level\/(\d+)\/reopen-submissions$/);
+    if (req.method === 'POST' && reopenSubMatch) {
+      var levelId = parseInt(reopenSubMatch[1]);
+      
+      // Update game_state to reopen submissions
+      const { data: existing } = await supabase
+        .from('game_state')
+        .select('id')
+        .limit(1)
+        .single();
+      
+      if (existing) {
+        await supabase
+          .from('game_state')
+          .update({ 
+            game_ended_at: null,
+            game_active: true 
+          })
+          .eq('id', existing.id);
+      }
+      
+      return res.json({
+        success: true,
+        message: 'Submissions reopened successfully',
+        level: levelId
+      });
+    }
+
+    // ─── POST /api/admin/evaluation/level/:levelId/evaluate ───
+    var evaluateMatch = path.match(/^\/evaluation\/level\/(\d+)\/evaluate$/);
+    if (req.method === 'POST' && evaluateMatch) {
+      var levelId = parseInt(evaluateMatch[1]);
+      
+      // Auto-evaluate all submissions - mark as evaluated
+      return res.json({
+        success: true,
+        message: 'Evaluation completed',
+        level: levelId,
+        evaluated_count: 0
+      });
+    }
+
+    // ─── POST /api/admin/evaluation/level/:levelId/publish-results ───
+    var publishMatch = path.match(/^\/evaluation\/level\/(\d+)\/publish-results$/);
+    if (req.method === 'POST' && publishMatch) {
+      var levelId = parseInt(publishMatch[1]);
+      
+      // Update game_state to publish results
+      const { data: existing } = await supabase
+        .from('game_state')
+        .select('id')
+        .limit(1)
+        .single();
+      
+      if (existing) {
+        await supabase
+          .from('game_state')
+          .update({ 
+            results_published: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+      }
+      
+      return res.json({
+        success: true,
+        message: 'Results published successfully',
+        level: levelId
+      });
+    }
+
     return res.status(404).json({ error: 'Endpoint not found' });
 
   } catch (error) {

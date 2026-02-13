@@ -129,10 +129,9 @@ export default function GameControl() {
         return null;
       }
     },
-    refetchInterval: false, // Disable polling since endpoint doesn't exist yet
-    staleTime: Infinity,
+    refetchInterval: 10000, // Poll every 10 seconds
+    staleTime: 5000,
     retry: false, // Don't retry on 404
-    enabled: false, // Disable until evaluation endpoints are implemented
   });
 
   const evaluationStatus: EvaluationStatus | undefined = evaluationData;
