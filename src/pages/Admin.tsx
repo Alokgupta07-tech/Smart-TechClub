@@ -469,6 +469,14 @@ const Admin = () => {
               Game Control
             </Button>
             <Button 
+              onClick={() => navigate('/admin/team-members')} 
+              variant="outline" 
+              className="gap-2 !bg-gray-800 !text-white !border-blue-500 hover:!bg-blue-900"
+            >
+              <Users className="w-4 h-4" />
+              All Team Members
+            </Button>
+            <Button 
               onClick={() => navigate('/admin/monitoring')} 
               variant="outline" 
               className="gap-2 !bg-gray-800 !text-white !border-green-500 hover:!bg-green-900"
@@ -840,34 +848,62 @@ const Admin = () => {
                 </div>
               </div>
 
+              {/* Team Leader */}
+              {(selectedTeam.leader_name || selectedTeam.leader_email) && (
+                <div className="space-y-2">
+                  <label className="text-xs font-terminal text-muted-foreground">TEAM LEADER</label>
+                  <div className="p-3 rounded-lg bg-primary/10 border border-primary/30">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-terminal text-sm text-foreground flex items-center gap-2">
+                          <Users className="w-4 h-4 text-primary" />
+                          {selectedTeam.leader_name || 'N/A'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{selectedTeam.leader_email || 'N/A'}</div>
+                      </div>
+                      <span className="text-xs font-terminal px-2 py-1 rounded border bg-primary/20 text-primary border-primary/30">
+                        LEADER
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Team Members */}
               <div className="space-y-2">
-                <label className="text-xs font-terminal text-muted-foreground">TEAM MEMBERS</label>
+                <label className="text-xs font-terminal text-muted-foreground">
+                  TEAM MEMBERS ({selectedTeam.members?.length || 0})
+                </label>
                 <div className="space-y-2">
                   {selectedTeam.members && selectedTeam.members.length > 0 ? (
                     selectedTeam.members.map((member: any, index: number) => (
-                      <div key={index} className="p-3 rounded-lg bg-muted/30 border border-primary/10">
+                      <div key={member.id || index} className="p-3 rounded-lg bg-muted/30 border border-primary/10">
                         <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-terminal text-sm text-foreground">{member.name}</div>
-                            <div className="text-xs text-muted-foreground">{member.email}</div>
+                          <div className="flex-1">
+                            <div className="font-terminal text-sm text-foreground">
+                              {index + 1}. {member.member_name}
+                            </div>
+                            {member.member_email && (
+                              <div className="text-xs text-muted-foreground mt-1">📧 {member.member_email}</div>
+                            )}
                           </div>
-                          <span className={cn(
-                            "text-xs font-terminal px-2 py-1 rounded border",
-                            member.role === 'leader' 
-                              ? "bg-primary/20 text-primary border-primary/30" 
-                              : "bg-muted/20 text-muted-foreground border-muted/30"
-                          )}>
-                            {member.role?.toUpperCase() || 'MEMBER'}
-                          </span>
+                          {member.is_leader && (
+                            <span className="text-xs font-terminal px-2 py-1 rounded border bg-primary/20 text-primary border-primary/30">
+                              LEADER
+                            </span>
+                          )}
+                          {member.member_role && member.member_role !== 'member' && !member.is_leader && (
+                            <span className="text-xs font-terminal px-2 py-1 rounded border bg-muted/20 text-muted-foreground border-muted/30">
+                              {member.member_role.toUpperCase()}
+                            </span>
+                          )}
                         </div>
-                        {member.phone && (
-                          <div className="text-xs text-muted-foreground mt-1">📞 {member.phone}</div>
-                        )}
                       </div>
                     ))
                   ) : (
-                    <div className="text-sm text-muted-foreground font-terminal">No member details available</div>
+                    <div className="text-sm text-muted-foreground font-terminal p-4 text-center border border-dashed border-primary/20 rounded-lg">
+                      No member details available
+                    </div>
                   )}
                 </div>
               </div>

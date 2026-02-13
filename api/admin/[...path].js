@@ -504,6 +504,70 @@ module.exports = async function handler(req, res) {
       return res.json({ success: true, message: 'Setting updated' });
     }
 
+    // ─── GET /api/admin/team-members ───
+    if (req.method === 'GET' && path === '/team-members') {
+      // Get all teams with their members
+      const { data: teams, error: teamsErr } = await supabase
+        .from('teams')
+        .select('id, team_name, status, user_id')
+        .order('created_at', { ascending: false });
+
+      if (teamsErr) throw teamsErr;
+
+      // Get all members in one query
+      const { data: allMembers, error: membersErr } = await supabase
+        .from('team_members')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (membersErr) throw membersErr;
+
+      // Get all team leaders
+      const userIds = teams.map(t => t.user_id).filter(Boolean);
+      const { data: leaders } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .in('id', userIds);
+
+      // Create a map of leaders
+      var leaderMap = {};
+      (leaders || []).forEach(function(leader) {
+        leaderMap[leader.id] = leader;
+      });
+
+      // Group members by team
+      var membersByTeam = {};
+      (allMembers || []).forEach(function(member) {
+        if (!membersByTeam[member.team_id]) {
+          membersByTeam[member.team_id] = [];
+        }
+        membersByTeam[member.team_id].push(member);
+      });
+
+      // Combine everything
+      var result = teams.map(function(team) {
+        var leader = leaderMap[team.user_id];
+        return {
+          teamId: team.id,
+          teamName: team.team_name,
+          status: team.status,
+          leader: leader ? {
+            name: leader.name,
+            email: leader.email
+          } : null,
+          members: membersByTeam[team.id] || [],
+          totalMembers: (membersByTeam[team.id] || []).length
+        };
+      });
+
+      return res.json({
+        success: true,
+        teams: result,
+        totalTeams: result.length,
+        totalMembers: (allMembers || []).length
+      });
+    }
+
     return res.status(404).json({ error: 'Endpoint not found' });
 
   } catch (error) {

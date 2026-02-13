@@ -25,6 +25,7 @@ const LiveMonitoring = lazy(() => import("./pages/LiveMonitoring"));
 const Results = lazy(() => import("./pages/Results"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const TeamMembers = lazy(() => import("./pages/TeamMembers"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -117,6 +118,12 @@ const App = () => (
             <Route path="/admin/live-monitoring" element={
               <AdminRoute>
                 <LiveMonitoring />
+              </AdminRoute>
+            } />
+            
+            <Route path="/admin/team-members" element={
+              <AdminRoute>
+                <TeamMembers />
               </AdminRoute>
             } />
             
