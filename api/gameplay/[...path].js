@@ -133,6 +133,19 @@ module.exports = async function handler(req, res) {
       const usedHintIds = (usedHints || []).map(h => h.hint_id);
       const availableHints = (allHints || []).filter(h => !usedHintIds.includes(h.id));
 
+      // Calculate time remaining (40 minutes = 2400 seconds)
+      const TIME_LIMIT_SECONDS = 40 * 60; // 40 minutes
+      let timeRemainingSeconds = TIME_LIMIT_SECONDS;
+      let timeExpired = false;
+      
+      if (team.start_time) {
+        const startTime = new Date(team.start_time).getTime();
+        const now = Date.now();
+        const elapsedSeconds = Math.floor((now - startTime) / 1000);
+        timeRemainingSeconds = Math.max(0, TIME_LIMIT_SECONDS - elapsedSeconds);
+        timeExpired = timeRemainingSeconds <= 0;
+      }
+
       return res.json({
         success: true,
         puzzle: {
@@ -144,7 +157,9 @@ module.exports = async function handler(req, res) {
         },
         team: mapTeam(team),
         total_puzzles: puzzles.length,
-        completed_puzzles: completedPuzzleIds.size
+        completed_puzzles: completedPuzzleIds.size,
+        time_remaining_seconds: timeRemainingSeconds,
+        time_expired: timeExpired
       });
     }
 
@@ -173,7 +188,7 @@ module.exports = async function handler(req, res) {
       const isCorrect = puzzle.correct_answer.toLowerCase().trim() === answer.toLowerCase().trim();
 
       // Record submission (both correct and incorrect)
-      await supabase.from('submissions').insert({
+      const { error: subError } = await supabase.from('submissions').insert({
         id: crypto.randomUUID(),
         team_id: team.id,
         puzzle_id: puzzle_id,
@@ -181,6 +196,15 @@ module.exports = async function handler(req, res) {
         is_correct: isCorrect,
         score_awarded: isCorrect ? puzzle.points : 0
       });
+      
+      if (subError) {
+        console.error('Submission insert error:', subError);
+      }
+      
+      // Also set start_time if not already set
+      if (!team.start_time) {
+        await supabase.from('teams').update({ start_time: new Date().toISOString() }).eq('id', team.id);
+      }
 
       // Get all puzzles to find next one
       const { data: allPuzzles } = await supabase

@@ -153,8 +153,12 @@ module.exports = async function handler(req, res) {
       // ─── GET /api/game/session OR /api/game/time/session ───
       if (req.method === 'GET' && (path === '/session' || path === '/time/session')) {
         var totalTime = 0;
+        var TIME_LIMIT = 40 * 60; // 40 minutes in seconds
+        var timeRemaining = TIME_LIMIT;
+        
         if (team.start_time) {
           totalTime = Math.floor((Date.now() - new Date(team.start_time).getTime()) / 1000);
+          timeRemaining = Math.max(0, TIME_LIMIT - totalTime);
         }
         
         var hours = Math.floor(totalTime / 3600);
@@ -202,9 +206,13 @@ module.exports = async function handler(req, res) {
             questionsCompleted: successfulPuzzles.size,
             questionsSkipped: 0,
             skipsRemaining: 3,
-            totalTimeFormatted: formatted
+            totalTimeFormatted: formatted,
+            timeRemainingSeconds: timeRemaining,
+            timeLimitSeconds: TIME_LIMIT
           },
-          puzzles: puzzlesList
+          puzzles: puzzlesList,
+          time_remaining_seconds: timeRemaining,
+          time_expired: timeRemaining <= 0
         });
       }
 
@@ -305,9 +313,9 @@ module.exports = async function handler(req, res) {
         // Get all submissions for this team
         const { data: submissions } = await supabase
           .from('submissions')
-          .select('puzzle_id, submitted_answer, is_correct, created_at')
+          .select('puzzle_id, submitted_answer, is_correct, submitted_at')
           .eq('team_id', team.id)
-          .order('created_at', { ascending: false });
+          .order('submitted_at', { ascending: false });
 
         // Build question summary
         const questionSummary = (allPuzzles || []).map(function(q) {
@@ -325,7 +333,7 @@ module.exports = async function handler(req, res) {
             attempts: questionSubmissions.length,
             submittedAnswer: latestSubmission ? latestSubmission.submitted_answer : null,
             isCorrect: !!correctSubmission,
-            submittedAt: latestSubmission ? latestSubmission.created_at : null
+            submittedAt: latestSubmission ? latestSubmission.submitted_at : null
           };
         });
 
