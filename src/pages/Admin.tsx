@@ -667,7 +667,9 @@ const Admin = () => {
                               </div>
                             </td>
                             <td className="py-3 px-2">
-                              <span className="font-terminal text-sm">{team.timeElapsed || "--:--:--"}</span>
+                              <span className="font-terminal text-sm">
+                                {team.status === 'waiting' ? '--:--:--' : (team.timeElapsed || "--:--:--")}
+                              </span>
                             </td>
                             <td className="py-3 px-2">
                               <span className={cn(
