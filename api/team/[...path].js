@@ -99,6 +99,109 @@ module.exports = async function handler(req, res) {
       return res.json({ message: 'Team name updated' });
     }
 
+    // ─── GET /api/team/qualification-message ───
+    if (req.method === 'GET' && path === '/qualification-message') {
+      // Parse query parameters manually from URL
+      let unreadOnly = false;
+      const qmark = req.url.indexOf('?');
+      if (qmark !== -1) {
+        const params = new URLSearchParams(req.url.slice(qmark + 1));
+        unreadOnly = params.get('unread_only') === 'true';
+      }
+      
+      // Get team ID
+      const { data: team } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('user_id', user.userId)
+        .single();
+
+      if (!team) {
+        return res.status(404).json({ error: 'Team not found' });
+      }
+
+      // Get qualification messages
+      let query = supabase
+        .from('team_qualification_messages')
+        .select('*')
+        .eq('team_id', team.id)
+        .eq('is_dismissed', false);
+
+      if (unreadOnly) {
+        query = query.eq('is_read', false);
+      }
+
+      const { data: messages, error: msgError } = await query.order('created_at', { ascending: false });
+
+      if (msgError) throw msgError;
+
+      return res.json({
+        success: true,
+        messages: messages || [],
+        unread_count: (messages || []).filter(m => !m.is_read).length
+      });
+    }
+
+    // ─── POST /api/team/qualification-message/:id/read ───
+    const readMatch = path.match(/^\/qualification-message\/([^\/]+)\/read$/);
+    if (req.method === 'POST' && readMatch) {
+      const messageId = readMatch[1];
+
+      // Get team ID
+      const { data: team } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('user_id', user.userId)
+        .single();
+
+      if (!team) {
+        return res.status(404).json({ error: 'Team not found' });
+      }
+
+      const { error } = await supabase
+        .from('team_qualification_messages')
+        .update({
+          is_read: true,
+          read_at: new Date().toISOString()
+        })
+        .eq('id', messageId)
+        .eq('team_id', team.id);
+
+      if (error) throw error;
+
+      return res.json({ success: true, message: 'Message marked as read' });
+    }
+
+    // ─── POST /api/team/qualification-message/:id/dismiss ───
+    const dismissMatch = path.match(/^\/qualification-message\/([^\/]+)\/dismiss$/);
+    if (req.method === 'POST' && dismissMatch) {
+      const messageId = dismissMatch[1];
+
+      // Get team ID
+      const { data: team } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('user_id', user.userId)
+        .single();
+
+      if (!team) {
+        return res.status(404).json({ error: 'Team not found' });
+      }
+
+      const { error } = await supabase
+        .from('team_qualification_messages')
+        .update({
+          is_dismissed: true,
+          dismissed_at: new Date().toISOString()
+        })
+        .eq('id', messageId)
+        .eq('team_id', team.id);
+
+      if (error) throw error;
+
+      return res.json({ success: true, message: 'Message dismissed' });
+    }
+
     return res.status(404).json({ error: 'Endpoint not found' });
 
   } catch (error) {

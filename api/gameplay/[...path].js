@@ -37,8 +37,8 @@ module.exports = async function handler(req, res) {
   const user = authResult.user;
 
   try {
-    // ─── GET /api/gameplay/current ───
-    if (req.method === 'GET' && path === '/current') {
+    // ─── GET /api/gameplay/current OR /api/gameplay/puzzle/current ───
+    if (req.method === 'GET' && (path === '/current' || path === '/puzzle/current')) {
       const { data: team, error: tErr } = await supabase
         .from('teams')
         .select('*')

@@ -283,7 +283,7 @@ export async function getMyTeam() {
 
 export async function getMyProfile() {
   const { data } = await authAPI.get('/team/profile');
-  return data.user;
+  return data;
 }
 
 export async function updateTeamName(teamName: string) {

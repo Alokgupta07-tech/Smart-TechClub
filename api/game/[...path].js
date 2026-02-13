@@ -51,14 +51,14 @@ module.exports = async function handler(req, res) {
     }
 
     // ─── User-authenticated time tracking routes ───
-    var isTimeTrackingRoute = path === '/session' || 
-                              path === '/start-question' || 
-                              path === '/pause-question' || 
-                              path === '/resume-question' || 
-                              path === '/skip-question' || 
-                              path === '/complete-question' || 
-                              path === '/skipped-questions' ||
-                              path.match(/^\/timer\/[^\/]+$/);
+    var isTimeTrackingRoute = path === '/session' || path === '/time/session' ||
+                              path === '/start-question' || path === '/time/start-question' ||
+                              path === '/pause-question' || path === '/time/pause-question' ||
+                              path === '/resume-question' || path === '/time/resume-question' ||
+                              path === '/skip-question' || path === '/time/skip-question' ||
+                              path === '/complete-question' || path === '/time/complete-question' ||
+                              path === '/skipped-questions' || path === '/time/skipped-questions' ||
+                              path.match(/^/timer/[^/]+$/) || path.match(/^/time/timer/[^/]+$/);
     
     if (isTimeTrackingRoute) {
       const authResult = verifyAuth(req);
@@ -100,8 +100,8 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // ─── GET /api/game/session ───
-      if (req.method === 'GET' && path === '/session') {
+      // ─── GET /api/game/session OR /api/game/time/session ───
+      if (req.method === 'GET' && (path === '/session' || path === '/time/session')) {
         var totalTime = 0;
         if (team.start_time) {
           totalTime = Math.floor((Date.now() - new Date(team.start_time).getTime()) / 1000);
@@ -125,8 +125,8 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // ─── POST /api/game/start-question ───
-      if (req.method === 'POST' && path === '/start-question') {
+      // ─── POST /api/game/start-question OR /api/game/time/start-question ───
+      if (req.method === 'POST' && (path === '/start-question' || path === '/time/start-question')) {
         if (!team.start_time) {
           await supabase
             .from('teams')
@@ -136,30 +136,30 @@ module.exports = async function handler(req, res) {
         return res.json({ success: true, message: 'Question timer started' });
       }
 
-      // ─── POST /api/game/pause-question ───
-      if (req.method === 'POST' && path === '/pause-question') {
+      // ─── POST /api/game/pause-question OR /api/game/time/pause-question ───
+      if (req.method === 'POST' && (path === '/pause-question' || path === '/time/pause-question')) {
         await supabase.from('teams').update({ status: 'paused' }).eq('id', team.id);
         return res.json({ success: true, message: 'Question timer paused' });
       }
 
-      // ─── POST /api/game/resume-question ───
-      if (req.method === 'POST' && path === '/resume-question') {
+      // ─── POST /api/game/resume-question OR /api/game/time/resume-question ───
+      if (req.method === 'POST' && (path === '/resume-question' || path === '/time/resume-question')) {
         await supabase.from('teams').update({ status: 'active' }).eq('id', team.id);
         return res.json({ success: true, message: 'Question timer resumed' });
       }
 
-      // ─── POST /api/game/skip-question ───
-      if (req.method === 'POST' && path === '/skip-question') {
+      // ─── POST /api/game/skip-question OR /api/game/time/skip-question ───
+      if (req.method === 'POST' && (path === '/skip-question' || path === '/time/skip-question')) {
         return res.json({ success: true, message: 'Question skipped' });
       }
 
-      // ─── POST /api/game/complete-question ───
-      if (req.method === 'POST' && path === '/complete-question') {
+      // ─── POST /api/game/complete-question OR /api/game/time/complete-question ───
+      if (req.method === 'POST' && (path === '/complete-question' || path === '/time/complete-question')) {
         return res.json({ success: true, message: 'Question completed' });
       }
 
-      // ─── GET /api/game/skipped-questions ───
-      if (req.method === 'GET' && path === '/skipped-questions') {
+      // ─── GET /api/game/skipped-questions OR /api/game/time/skipped-questions ───
+      if (req.method === 'GET' && (path === '/skipped-questions' || path === '/time/skipped-questions')) {
         return res.json({ skippedQuestions: [] });
       }
 
