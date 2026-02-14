@@ -305,7 +305,7 @@ module.exports = async function handler(req, res) {
 
     // ─── GET /api/admin/monitor/live ───
     if (req.method === 'GET' && path === '/monitor/live') {
-      // Get ALL teams for stats, but filter for live display
+      // Get ALL teams for stats and display
       const { data: allTeams, error: allErr } = await supabase
         .from('teams')
         .select('id, team_name, level, status, user_id, start_time, hints_used, progress')
@@ -324,10 +324,8 @@ module.exports = async function handler(req, res) {
       });
       var avgProgress = totalTeams > 0 ? (totalProgress / totalTeams) : 0;
 
-      // Filter to active/paused teams for live display
-      var liveTeams = (allTeams || []).filter(function(t) {
-        return t.status === 'active' || t.status === 'paused';
-      });
+      // Show ALL teams in the table (not just active/paused)
+      var liveTeams = allTeams || [];
 
       var liveUserIds = [];
       liveTeams.forEach(function(t) {
@@ -419,15 +417,69 @@ module.exports = async function handler(req, res) {
 
     // ─── GET /api/admin/activity ───
     if (req.method === 'GET' && path === '/activity') {
+      // Get activity logs with team names
       const { data: logs, error } = await supabase
-        .from('audit_logs')
-        .select('*')
+        .from('activity_logs')
+        .select('id, team_id, action_type, description, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
+      
       if (error) {
-        return res.json({ logs: [] });
+        // Fallback: try with different column names
+        const { data: logs2, error: err2 } = await supabase
+          .from('activity_logs')
+          .select('id, team_id, type, message, created_at')
+          .order('created_at', { ascending: false })
+          .limit(50);
+        
+        if (err2) {
+          return res.json({ logs: [] });
+        }
+        
+        // Get team names
+        const teamIds = [...new Set((logs2 || []).map(l => l.team_id).filter(Boolean))];
+        let teamsMap = {};
+        if (teamIds.length > 0) {
+          const { data: teams } = await supabase
+            .from('teams')
+            .select('id, team_name')
+            .in('id', teamIds);
+          (teams || []).forEach(t => { teamsMap[t.id] = t.team_name; });
+        }
+        
+        // Map to expected format
+        const mappedLogs = (logs2 || []).map(l => ({
+          id: l.id,
+          team_name: teamsMap[l.team_id] || 'Unknown Team',
+          activity_type: l.type || 'system',
+          description: l.message || '',
+          timestamp: l.created_at
+        }));
+        
+        return res.json({ logs: mappedLogs });
       }
-      return res.json({ logs: logs || [] });
+      
+      // Get team names
+      const teamIds = [...new Set((logs || []).map(l => l.team_id).filter(Boolean))];
+      let teamsMap = {};
+      if (teamIds.length > 0) {
+        const { data: teams } = await supabase
+          .from('teams')
+          .select('id, team_name')
+          .in('id', teamIds);
+        (teams || []).forEach(t => { teamsMap[t.id] = t.team_name; });
+      }
+      
+      // Map to expected format
+      const mappedLogs = (logs || []).map(l => ({
+        id: l.id,
+        team_name: teamsMap[l.team_id] || 'Unknown Team',
+        activity_type: l.action_type || 'system',
+        description: l.description || '',
+        timestamp: l.created_at
+      }));
+      
+      return res.json({ logs: mappedLogs });
     }
 
     // ─── GET /api/admin/suspicious ───

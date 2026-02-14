@@ -139,6 +139,7 @@ export default function LiveMonitoring() {
       active: { color: 'bg-green-500', icon: Activity },
       completed: { color: 'bg-blue-500', icon: CheckCircle },
       paused: { color: 'bg-yellow-500', icon: Clock },
+      waiting: { color: 'bg-orange-500', icon: Clock },
       inactive: { color: 'bg-gray-500', icon: XCircle },
     };
 
@@ -156,21 +157,36 @@ export default function LiveMonitoring() {
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'puzzle_completed':
+      case 'puzzle_solve':
+      case 'level_complete':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'wrong_answer':
+      case 'puzzle_fail':
         return <XCircle className="w-4 h-4 text-red-500" />;
       case 'hint_requested':
+      case 'hint_use':
+      case 'hint_used':
         return <Lightbulb className="w-4 h-4 text-yellow-500" />;
+      case 'login':
+      case 'logout':
+        return <Users className="w-4 h-4 text-blue-500" />;
+      case 'tab_switch':
+      case 'suspicious_activity':
+        return <AlertTriangle className="w-4 h-4 text-orange-500" />;
       default:
         return <Activity className="w-4 h-4 text-blue-500" />;
     }
   };
 
-  const formatTimestamp = (timestamp: string) => {
+  const formatTimestamp = (timestamp: string | null | undefined) => {
+    if (!timestamp) return 'No activity yet';
     const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return 'No activity yet';
+    
     const now = new Date();
     const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
 
+    if (diff < 0) return 'Just now';
     if (diff < 60) return `${diff}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;

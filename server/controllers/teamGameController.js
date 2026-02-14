@@ -57,7 +57,10 @@ async function checkTeamTimeLimit(teamId) {
 async function autoEndGameForTeam(teamId) {
   if (USE_SUPABASE) {
     await supabaseAdmin.from('teams').update({ status: 'completed', end_time: new Date().toISOString() }).eq('id', teamId).eq('status', 'active');
-    await supabaseAdmin.from('activity_logs').insert({ id: uuidv4(), team_id: teamId, action_type: 'level_complete', description: 'Time limit reached - game auto-ended' });
+    await supabaseAdmin.from('activity_logs').insert({
+      id: uuidv4(), team_id: teamId, action_type: 'level_complete', type: 'level_complete',
+      description: 'Time limit reached - game auto-ended', message: 'Time limit reached - game auto-ended'
+    });
   } else {
     await db.query(`UPDATE teams SET status = 'completed', end_time = NOW() WHERE id = ? AND status = 'active'`, [teamId]);
     await db.query(`INSERT INTO activity_logs (id, team_id, action_type, description) VALUES (?, ?, 'level_complete', 'Time limit reached - game auto-ended')`, [uuidv4(), teamId]);
@@ -360,7 +363,8 @@ exports.submitAnswer = async (req, res) => {
     // Record submission
     await supabaseAdmin.from('submissions').insert({
       id: uuidv4(), team_id: teamId, puzzle_id: puzzle_id,
-      submitted_answer: answer, is_correct: isCorrect, time_taken_seconds: timeTaken
+      submitted_answer: answer, is_correct: isCorrect, time_taken_seconds: timeTaken,
+      evaluation_status: 'PENDING'
     });
 
     // Update attempts
@@ -371,8 +375,10 @@ exports.submitAnswer = async (req, res) => {
     // Log activity
     await supabaseAdmin.from('activity_logs').insert({
       id: uuidv4(), team_id: teamId, user_id: req.user.id,
-      action_type: isCorrect ? 'puzzle_correct' : 'puzzle_submit',
+      action_type: isCorrect ? 'puzzle_solve' : 'puzzle_fail',
+      type: isCorrect ? 'puzzle_solve' : 'puzzle_fail',
       description: isCorrect ? 'Correct answer submitted' : 'Answer submitted',
+      message: isCorrect ? 'Correct answer submitted' : 'Answer submitted',
       puzzle_id: puzzle_id
     });
 
@@ -511,7 +517,9 @@ exports.requestHint = async (req, res) => {
     // Log activity
     await supabaseAdmin.from('activity_logs').insert({
       id: uuidv4(), team_id: teamId, user_id: req.user.id,
-      action_type: 'hint_use', description: `Used hint ${nextHint.hint_number}`, puzzle_id: puzzle_id
+      action_type: 'hint_use', type: 'hint_used',
+      description: `Used hint ${nextHint.hint_number}`, message: `Used hint ${nextHint.hint_number}`,
+      puzzle_id: puzzle_id
     });
 
     res.json({

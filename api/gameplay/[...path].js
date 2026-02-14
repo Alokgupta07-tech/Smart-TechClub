@@ -194,11 +194,28 @@ module.exports = async function handler(req, res) {
         puzzle_id: puzzle_id,
         submitted_answer: answer,
         is_correct: isCorrect,
-        score_awarded: isCorrect ? puzzle.points : 0
+        score_awarded: isCorrect ? puzzle.points : 0,
+        evaluation_status: 'PENDING'
       });
       
       if (subError) {
         console.error('Submission insert error:', subError);
+      }
+
+      // Log activity
+      try {
+        await supabase.from('activity_logs').insert({
+          id: crypto.randomUUID(),
+          team_id: team.id,
+          user_id: user.userId,
+          action_type: isCorrect ? 'puzzle_solve' : 'puzzle_fail',
+          type: isCorrect ? 'puzzle_solve' : 'puzzle_fail',
+          description: isCorrect ? `Solved puzzle: ${puzzle.title}` : `Wrong answer for: ${puzzle.title}`,
+          message: isCorrect ? `Solved puzzle: ${puzzle.title}` : `Wrong answer for: ${puzzle.title}`,
+          puzzle_id: puzzle_id
+        });
+      } catch (logErr) {
+        console.error('Activity log error:', logErr);
       }
       
       // Also set start_time if not already set

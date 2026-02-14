@@ -84,6 +84,7 @@ interface EvaluationStatus {
   };
   actions: {
     can_close_submissions: boolean;
+    can_reopen_submissions: boolean;
     can_evaluate: boolean;
     can_publish: boolean;
   };
@@ -290,6 +291,37 @@ export default function GameControl() {
       toast({
         title: 'Submissions Reopened',
         description: `Level ${selectedLevel} submissions are now open again.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Reset Evaluation mutation
+  const resetEvaluation = useMutation({
+    mutationFn: async (levelId: number) => {
+      const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/reset-evaluation`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to reset evaluation');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      });
+      toast({
+        title: 'Evaluation Reset',
+        description: `Level ${selectedLevel} evaluation has been reset. You can now re-evaluate.`,
       });
     },
     onError: (error: Error) => {
@@ -1087,34 +1119,39 @@ export default function GameControl() {
           <div className="space-y-4">
             {/* Step 1: Close Submissions */}
             <div className={`flex items-center justify-between p-4 border rounded-lg ${
-              evaluationStatus?.actions?.can_close_submissions ? 'border-orange-500/30' : 'border-zinc-700 opacity-50'
+              evaluationStatus?.actions?.can_close_submissions || evaluationStatus?.actions?.can_reopen_submissions ? 'border-orange-500/30' : 'border-zinc-700 opacity-50'
             }`}>
               <div>
                 <h3 className="font-semibold text-orange-500 flex items-center gap-2">
                   <Lock className="w-4 h-4" />
-                  Step 1: Close Submissions
+                  Step 1: {evaluationStatus?.evaluation_state === 'IN_PROGRESS' ? 'Close' : 'Reopen'} Submissions
                 </h3>
                 <p className="text-sm text-zinc-400">
-                  Lock further answer submissions for Level {selectedLevel}
+                  {evaluationStatus?.evaluation_state === 'IN_PROGRESS' 
+                    ? `Lock further answer submissions for Level ${selectedLevel}`
+                    : `Reopen submissions for Level ${selectedLevel} (will reset evaluation if already done)`
+                  }
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button
-                  onClick={() => closeSubmissions.mutate(selectedLevel)}
-                  disabled={!evaluationStatus?.actions?.can_close_submissions || closeSubmissions.isPending}
-                  className="bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
-                >
-                  <Lock className="w-4 h-4 mr-2" />
-                  {closeSubmissions.isPending ? 'Closing...' : 'Close Submissions'}
-                </Button>
-                {evaluationStatus?.evaluation_state === 'SUBMISSIONS_CLOSED' && (
+                {evaluationStatus?.actions?.can_close_submissions && (
+                  <Button
+                    onClick={() => closeSubmissions.mutate(selectedLevel)}
+                    disabled={closeSubmissions.isPending}
+                    className="bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    <Lock className="w-4 h-4 mr-2" />
+                    {closeSubmissions.isPending ? 'Closing...' : 'Close Submissions'}
+                  </Button>
+                )}
+                {evaluationStatus?.actions?.can_reopen_submissions && (
                   <Button
                     variant="outline"
                     onClick={() => reopenSubmissions.mutate(selectedLevel)}
                     disabled={reopenSubmissions.isPending}
-                    className="border-zinc-500"
+                    className="border-green-500 text-green-400 hover:bg-green-500/20"
                   >
-                    {reopenSubmissions.isPending ? 'Reopening...' : 'Reopen'}
+                    {reopenSubmissions.isPending ? 'Reopening...' : 'Reopen Submissions'}
                   </Button>
                 )}
               </div>
@@ -1178,7 +1215,24 @@ export default function GameControl() {
           {/* Status Timeline */}
           {evaluationStatus && (
             <div className="mt-4 p-4 bg-zinc-900 rounded-lg border border-zinc-700">
-              <h4 className="text-sm font-semibold text-zinc-400 mb-2">Timeline</h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-semibold text-zinc-400">Timeline</h4>
+                {(evaluationStatus.evaluation_state === 'EVALUATING' || evaluationStatus.evaluation_state === 'RESULTS_PUBLISHED') && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => showConfirm(
+                      'Reset Evaluation',
+                      `Reset evaluation for Level ${selectedLevel}? This will allow you to re-evaluate all submissions.`,
+                      () => resetEvaluation.mutate(selectedLevel)
+                    )}
+                    disabled={resetEvaluation.isPending}
+                    className="border-red-500/50 text-red-400 hover:bg-red-500/20"
+                  >
+                    {resetEvaluation.isPending ? 'Resetting...' : 'Reset Evaluation'}
+                  </Button>
+                )}
+              </div>
               <div className="space-y-1 text-sm">
                 {evaluationStatus.timestamps?.submissions_closed_at && (
                   <p className="text-orange-400">

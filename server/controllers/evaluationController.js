@@ -143,7 +143,7 @@ exports.getEvaluationStatus = async (req, res) => {
           const teamsWithSubmissions = new Set(levelSubmissions.map(s => s.team_id));
           submissionStats = {
             total_submissions: levelSubmissions.length,
-            pending: levelSubmissions.filter(s => s.evaluation_status === 'PENDING').length,
+            pending: levelSubmissions.filter(s => s.evaluation_status === 'PENDING' || s.evaluation_status === null).length,
             evaluated: levelSubmissions.filter(s => s.evaluation_status === 'EVALUATED').length,
             teams_with_submissions: teamsWithSubmissions.size
           };
@@ -169,6 +169,7 @@ exports.getEvaluationStatus = async (req, res) => {
       }
 
       const canCloseSubmissions = levelState.evaluation_state === 'IN_PROGRESS';
+      const canReopenSubmissions = levelState.evaluation_state !== 'IN_PROGRESS';
       const canEvaluate = levelState.evaluation_state === 'SUBMISSIONS_CLOSED';
       const canPublish = levelState.evaluation_state === 'EVALUATING';
 
@@ -186,6 +187,7 @@ exports.getEvaluationStatus = async (req, res) => {
         teams: teamStats,
         actions: {
           can_close_submissions: canCloseSubmissions,
+          can_reopen_submissions: canReopenSubmissions,
           can_evaluate: canEvaluate,
           can_publish: canPublish
         }
@@ -237,13 +239,13 @@ exports.getEvaluationStatus = async (req, res) => {
       const puzzleIds = (puzzles || []).map(p => p.id);
       
       if (puzzleIds.length > 0) {
-        const [submissions] = await db.query('SELECT team_id, evaluation_status FROM submissions');
-        const levelSubmissions = (submissions || []).filter(s => puzzleIds.includes(s.puzzle_id));
+        const [submissions] = await db.query('SELECT team_id, evaluation_status, puzzle_id FROM submissions WHERE puzzle_id IN (?)', [puzzleIds]);
+        const levelSubmissions = submissions || [];
         
         const teamsWithSubmissions = new Set(levelSubmissions.map(s => s.team_id));
         submissionStats = {
           total_submissions: levelSubmissions.length,
-          pending: levelSubmissions.filter(s => s.evaluation_status === 'PENDING').length,
+          pending: levelSubmissions.filter(s => s.evaluation_status === 'PENDING' || s.evaluation_status === null).length,
           evaluated: levelSubmissions.filter(s => s.evaluation_status === 'EVALUATED').length,
           teams_with_submissions: teamsWithSubmissions.size
         };
@@ -267,6 +269,7 @@ exports.getEvaluationStatus = async (req, res) => {
     }
     
     const canCloseSubmissions = levelState.evaluation_state === 'IN_PROGRESS';
+    const canReopenSubmissions = levelState.evaluation_state !== 'IN_PROGRESS';
     const canEvaluate = levelState.evaluation_state === 'SUBMISSIONS_CLOSED';
     const canPublish = levelState.evaluation_state === 'EVALUATING';
     
@@ -284,6 +287,7 @@ exports.getEvaluationStatus = async (req, res) => {
       teams: teamStats,
       actions: {
         can_close_submissions: canCloseSubmissions,
+        can_reopen_submissions: canReopenSubmissions,
         can_evaluate: canEvaluate,
         can_publish: canPublish
       }
@@ -472,14 +476,14 @@ exports.evaluateAnswers = async (req, res) => {
         puzzleMap[p.id] = p;
       }
 
-      // Get pending submissions for those puzzle IDs
+      // Get pending submissions for those puzzle IDs (including NULL status for backwards compatibility)
       let pendingSubmissions = [];
       if (puzzleIds.length > 0) {
         try {
           const { data } = await supabaseAdmin
             .from('submissions')
-            .select('id, team_id, puzzle_id, submitted_answer, is_correct, time_taken_seconds')
-            .eq('evaluation_status', 'PENDING')
+            .select('id, team_id, puzzle_id, submitted_answer, is_correct, time_taken_seconds, evaluation_status')
+            .or('evaluation_status.eq.PENDING,evaluation_status.is.null')
             .in('puzzle_id', puzzleIds);
           pendingSubmissions = data || [];
         } catch (e) {
@@ -669,13 +673,13 @@ exports.evaluateAnswers = async (req, res) => {
       [adminId, levelId]
     );
     
-    // Get all pending submissions for this level
+    // Get all pending submissions for this level (including NULL status for backwards compatibility)
     const [pendingSubmissions] = await db.query(`
       SELECT s.id, s.team_id, s.puzzle_id, s.submitted_answer, s.is_correct, s.time_taken_seconds,
              p.correct_answer, p.points, p.level, p.puzzle_number
       FROM submissions s
       JOIN puzzles p ON s.puzzle_id = p.id
-      WHERE p.level = ? AND s.evaluation_status = 'PENDING'
+      WHERE p.level = ? AND (s.evaluation_status = 'PENDING' OR s.evaluation_status IS NULL)
       ORDER BY s.team_id, p.puzzle_number, s.submitted_at DESC
     `, [levelId]);
     
@@ -992,21 +996,72 @@ exports.reopenSubmissions = async (req, res) => {
       });
     }
     
-    if (currentState.evaluation_state !== 'SUBMISSIONS_CLOSED') {
+    // Allow reopening from any state except IN_PROGRESS (already open)
+    if (currentState.evaluation_state === 'IN_PROGRESS') {
       return res.status(400).json({
         success: false,
-        message: `Cannot reopen. Current state: ${currentState.evaluation_state}. Can only reopen from SUBMISSIONS_CLOSED state.`
+        message: 'Submissions are already open.'
       });
     }
 
     // ---- SUPABASE BRANCH ----
     if (USE_SUPABASE) {
+      // Get puzzles for this level to reset submissions if needed
+      let puzzleIds = [];
+      try {
+        const { data: puzzles } = await supabaseAdmin
+          .from('puzzles').select('id').eq('level', parseInt(levelId));
+        puzzleIds = (puzzles || []).map(p => p.id);
+      } catch (e) {
+        console.log('Error fetching puzzles:', e.message);
+      }
+
+      // If we're reopening from EVALUATING or RESULTS_PUBLISHED, reset submissions to PENDING
+      if (currentState.evaluation_state === 'EVALUATING' || currentState.evaluation_state === 'RESULTS_PUBLISHED') {
+        if (puzzleIds.length > 0) {
+          try {
+            await supabaseAdmin.from('submissions')
+              .update({
+                evaluation_status: 'PENDING',
+                is_correct: null,
+                score_awarded: null,
+                evaluated_at: null
+              })
+              .in('puzzle_id', puzzleIds);
+          } catch (e) {
+            console.log('Error resetting submissions:', e.message);
+          }
+        }
+
+        // Reset team qualification status
+        try {
+          await supabaseAdmin.from('team_level_status')
+            .update({
+              qualification_status: 'PENDING',
+              qualification_decided_at: null,
+              results_visible: false,
+              was_manually_overridden: false,
+              override_by: null,
+              override_reason: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('level_id', parseInt(levelId));
+        } catch (e) {
+          console.log('Error resetting team_level_status:', e.message);
+        }
+      }
+
       try {
         await supabaseAdmin.from('level_evaluation_state')
           .update({
             evaluation_state: 'IN_PROGRESS',
             submissions_closed_at: null,
             closed_by: null,
+            evaluation_started_at: null,
+            evaluated_at: null,
+            evaluated_by: null,
+            results_published_at: null,
+            published_by: null,
             updated_at: new Date().toISOString()
           })
           .eq('level_id', parseInt(levelId));
@@ -1023,11 +1078,47 @@ exports.reopenSubmissions = async (req, res) => {
     }
 
     // ---- MYSQL FALLBACK ----
+    // If we're reopening from EVALUATING or RESULTS_PUBLISHED, reset submissions
+    if (currentState.evaluation_state === 'EVALUATING' || currentState.evaluation_state === 'RESULTS_PUBLISHED') {
+      const [puzzles] = await db.query('SELECT id FROM puzzles WHERE level = ?', [levelId]);
+      const puzzleIds = puzzles.map(p => p.id);
+
+      if (puzzleIds.length > 0) {
+        await db.query(
+          `UPDATE submissions 
+           SET evaluation_status = 'PENDING',
+               is_correct = NULL,
+               score_awarded = NULL,
+               evaluated_at = NULL
+           WHERE puzzle_id IN (?)`,
+          [puzzleIds]
+        );
+      }
+
+      await db.query(
+        `UPDATE team_level_status 
+         SET qualification_status = 'PENDING',
+             qualification_decided_at = NULL,
+             results_visible = false,
+             was_manually_overridden = false,
+             override_by = NULL,
+             override_reason = NULL,
+             updated_at = NOW()
+         WHERE level_id = ?`,
+        [levelId]
+      );
+    }
+
     await db.query(
       `UPDATE level_evaluation_state 
        SET evaluation_state = 'IN_PROGRESS',
            submissions_closed_at = NULL,
            closed_by = NULL,
+           evaluation_started_at = NULL,
+           evaluated_at = NULL,
+           evaluated_by = NULL,
+           results_published_at = NULL,
+           published_by = NULL,
            updated_at = NOW()
        WHERE level_id = ?`,
       [levelId]
@@ -1044,6 +1135,157 @@ exports.reopenSubmissions = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to reopen submissions'
+    });
+  }
+};
+
+/**
+ * POST /api/admin/level/:levelId/reset-evaluation
+ * Reset evaluation state to allow re-evaluation
+ * Works from any state - resets submissions to PENDING and state to SUBMISSIONS_CLOSED
+ */
+exports.resetEvaluation = async (req, res) => {
+  try {
+    const { levelId } = req.params;
+    const adminId = req.user.userId || req.user.id;
+    const adminName = req.user.name || 'Admin';
+    
+    const currentState = await getLevelEvaluationState(levelId);
+    
+    if (!currentState) {
+      return res.status(400).json({
+        success: false,
+        message: 'Level evaluation state not initialized.'
+      });
+    }
+
+    // ---- SUPABASE BRANCH ----
+    if (USE_SUPABASE) {
+      // Get puzzles for this level
+      let puzzleIds = [];
+      try {
+        const { data: puzzles } = await supabaseAdmin
+          .from('puzzles').select('id').eq('level', parseInt(levelId));
+        puzzleIds = (puzzles || []).map(p => p.id);
+      } catch (e) {
+        console.log('Error fetching puzzles:', e.message);
+      }
+
+      // Reset all submissions for this level to PENDING
+      if (puzzleIds.length > 0) {
+        try {
+          await supabaseAdmin.from('submissions')
+            .update({
+              evaluation_status: 'PENDING',
+              is_correct: null,
+              score_awarded: null,
+              evaluated_at: null
+            })
+            .in('puzzle_id', puzzleIds);
+        } catch (e) {
+          console.log('Error resetting submissions:', e.message);
+        }
+      }
+
+      // Reset team_level_status qualification
+      try {
+        await supabaseAdmin.from('team_level_status')
+          .update({
+            qualification_status: 'PENDING',
+            qualification_decided_at: null,
+            results_visible: false,
+            was_manually_overridden: false,
+            override_by: null,
+            override_reason: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('level_id', parseInt(levelId));
+      } catch (e) {
+        console.log('Error resetting team_level_status:', e.message);
+      }
+
+      // Reset evaluation state to SUBMISSIONS_CLOSED
+      try {
+        await supabaseAdmin.from('level_evaluation_state')
+          .update({
+            evaluation_state: 'SUBMISSIONS_CLOSED',
+            evaluation_started_at: null,
+            evaluated_at: null,
+            evaluated_by: null,
+            results_published_at: null,
+            published_by: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('level_id', parseInt(levelId));
+      } catch (e) {
+        console.log('Error updating level_evaluation_state:', e.message);
+      }
+
+      await logEvaluationAction(levelId, 'EVALUATION_RESET', adminId, adminName);
+
+      return res.json({
+        success: true,
+        message: `Evaluation reset for Level ${levelId}. You can now re-evaluate.`
+      });
+    }
+
+    // ---- MYSQL FALLBACK ----
+    // Get puzzles for this level
+    const [puzzles] = await db.query('SELECT id FROM puzzles WHERE level = ?', [levelId]);
+    const puzzleIds = puzzles.map(p => p.id);
+
+    // Reset submissions
+    if (puzzleIds.length > 0) {
+      await db.query(
+        `UPDATE submissions 
+         SET evaluation_status = 'PENDING',
+             is_correct = NULL,
+             score_awarded = NULL,
+             evaluated_at = NULL
+         WHERE puzzle_id IN (?)`,
+        [puzzleIds]
+      );
+    }
+
+    // Reset team_level_status
+    await db.query(
+      `UPDATE team_level_status 
+       SET qualification_status = 'PENDING',
+           qualification_decided_at = NULL,
+           results_visible = false,
+           was_manually_overridden = false,
+           override_by = NULL,
+           override_reason = NULL,
+           updated_at = NOW()
+       WHERE level_id = ?`,
+      [levelId]
+    );
+
+    // Reset evaluation state
+    await db.query(
+      `UPDATE level_evaluation_state 
+       SET evaluation_state = 'SUBMISSIONS_CLOSED',
+           evaluation_started_at = NULL,
+           evaluated_at = NULL,
+           evaluated_by = NULL,
+           results_published_at = NULL,
+           published_by = NULL,
+           updated_at = NOW()
+       WHERE level_id = ?`,
+      [levelId]
+    );
+    
+    await logEvaluationAction(levelId, 'EVALUATION_RESET', adminId, adminName);
+    
+    res.json({
+      success: true,
+      message: `Evaluation reset for Level ${levelId}. You can now re-evaluate.`
+    });
+  } catch (error) {
+    console.error('Error resetting evaluation:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset evaluation'
     });
   }
 };
@@ -1390,6 +1632,7 @@ module.exports = {
   evaluateAnswers: exports.evaluateAnswers,
   publishResults: exports.publishResults,
   reopenSubmissions: exports.reopenSubmissions,
+  resetEvaluation: exports.resetEvaluation,
   // Team endpoints
   getTeamResults: exports.getTeamResults,
   getTeamLevelEvaluationStatus: exports.getTeamLevelEvaluationStatus

@@ -71,4 +71,15 @@ router.post(
   evaluationController.reopenSubmissions
 );
 
+/**
+ * POST /api/admin/evaluation/level/:levelId/reset-evaluation
+ * Reset evaluation state to allow re-evaluation
+ */
+router.post(
+  '/level/:levelId/reset-evaluation',
+  authenticateToken,
+  requireRole('admin'),
+  evaluationController.resetEvaluation
+);
+
 module.exports = router;

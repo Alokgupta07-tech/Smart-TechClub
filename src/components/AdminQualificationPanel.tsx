@@ -175,9 +175,21 @@ function TeamQualificationTable() {
     },
   });
 
+  // Sort teams by performance: correct answers (desc), then time elapsed (asc)
+  const sortedTeams = [...teams].sort((a: Team, b: Team) => {
+    // First sort by correct answers (descending)
+    if (b.correctAnswers !== a.correctAnswers) {
+      return (b.correctAnswers || 0) - (a.correctAnswers || 0);
+    }
+    // Then sort by time elapsed (ascending) - faster time ranks higher
+    const timeA = a.timeElapsedSeconds || 0;
+    const timeB = b.timeElapsedSeconds || 0;
+    return timeA - timeB;
+  });
+
   const filteredTeams = selectedLevel === 'all' 
-    ? teams 
-    : teams.filter((t: Team) => t.level === parseInt(selectedLevel));
+    ? sortedTeams 
+    : sortedTeams.filter((t: Team) => t.level === parseInt(selectedLevel));
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
