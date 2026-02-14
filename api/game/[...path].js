@@ -550,6 +550,38 @@ module.exports = async function handler(req, res) {
       return res.json({ message: 'Game reset - all progress cleared' });
     }
 
+    // ─── POST /api/game/level2/unlock ───
+    if (req.method === 'POST' && path === '/level2/unlock') {
+      const gameStateId = await getGameStateId(supabase);
+      
+      // Get current state
+      const { data: gameState } = await supabase
+        .from('game_state')
+        .select('*')
+        .eq('id', gameStateId)
+        .single();
+      
+      const now = new Date().toISOString();
+      const updates = {
+        current_level: 2,
+        level2_open: true
+      };
+      
+      // If level 1 not started, start it along with level 2
+      if (!gameState?.level1_open) {
+        updates.level1_open = true;
+        updates.game_active = true;
+        updates.game_started_at = gameState?.game_started_at || now;
+      }
+      
+      const { error } = await supabase
+        .from('game_state')
+        .update(updates)
+        .eq('id', gameStateId);
+      if (error) throw error;
+      return res.json({ success: true, message: 'Level 2 unlocked successfully!' });
+    }
+
     // ─── POST /api/game/level/unlock ───
     if (req.method === 'POST' && path === '/level/unlock') {
       const { level } = req.body;

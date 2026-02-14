@@ -922,6 +922,77 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // ─── POST /api/admin/evaluation/level/:levelId/reset-evaluation ───
+    var resetEvalMatch = path.match(/^\/evaluation\/level\/(\d+)\/reset-evaluation$/);
+    if (req.method === 'POST' && resetEvalMatch) {
+      var levelId = parseInt(resetEvalMatch[1]);
+      
+      // Get puzzles for this level
+      let puzzleIds = [];
+      try {
+        const { data: puzzles } = await supabase
+          .from('puzzles').select('id').eq('level', levelId);
+        puzzleIds = (puzzles || []).map(p => p.id);
+      } catch (e) {
+        console.log('Error fetching puzzles:', e.message);
+      }
+
+      // Reset all submissions for this level to PENDING
+      if (puzzleIds.length > 0) {
+        try {
+          await supabase.from('submissions')
+            .update({
+              evaluation_status: 'PENDING',
+              is_correct: null,
+              score_awarded: null,
+              evaluated_at: null
+            })
+            .in('puzzle_id', puzzleIds);
+        } catch (e) {
+          console.log('Error resetting submissions:', e.message);
+        }
+      }
+
+      // Reset team_level_status qualification
+      try {
+        await supabase.from('team_level_status')
+          .update({
+            qualification_status: 'PENDING',
+            qualification_decided_at: null,
+            results_visible: false,
+            was_manually_overridden: false,
+            override_by: null,
+            override_reason: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('level_id', levelId);
+      } catch (e) {
+        console.log('Error resetting team_level_status:', e.message);
+      }
+
+      // Reset evaluation state to SUBMISSIONS_CLOSED
+      try {
+        await supabase.from('level_evaluation_state')
+          .update({
+            evaluation_state: 'SUBMISSIONS_CLOSED',
+            evaluation_started_at: null,
+            evaluated_at: null,
+            evaluated_by: null,
+            results_published_at: null,
+            published_by: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('level_id', levelId);
+      } catch (e) {
+        console.log('Error updating level_evaluation_state:', e.message);
+      }
+
+      return res.json({
+        success: true,
+        message: `Evaluation reset for Level ${levelId}. You can now re-evaluate.`
+      });
+    }
+
     // ─── POST /api/admin/evaluation/level/:levelId/reopen-submissions ───
     var reopenSubMatch = path.match(/^\/evaluation\/level\/(\d+)\/reopen-submissions$/);
     if (req.method === 'POST' && reopenSubMatch) {
