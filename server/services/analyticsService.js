@@ -79,28 +79,29 @@ async function getPuzzleAnalytics(puzzleId) {
 
 /** MySQL fallback for getPuzzleAnalytics */
 async function getPuzzleAnalyticsMysql(puzzleId) {
-  const [[stats]] = await db.query(`
-    SELECT 
-      COUNT(*) as total_attempts,
-      SUM(is_correct) as successful_attempts,
-      AVG(time_taken_seconds) as avg_solve_time,
-      MIN(CASE WHEN is_correct = true THEN time_taken_seconds END) as min_solve_time,
-      MAX(CASE WHEN is_correct = true THEN time_taken_seconds END) as max_solve_time
-    FROM submissions
-    WHERE puzzle_id = ?
-  `, [puzzleId]);
-
-  const [[hintStats]] = await db.query(`
-    SELECT COUNT(DISTINCT team_id) as teams_used_hints
-    FROM hint_usage
-    WHERE puzzle_id = ?
-  `, [puzzleId]);
-
-  const [[teamStats]] = await db.query(`
-    SELECT COUNT(DISTINCT team_id) as teams_attempted
-    FROM submissions
-    WHERE puzzle_id = ?
-  `, [puzzleId]);
+  // Parallel queries for better performance
+  const [[[stats]], [[hintStats]], [[teamStats]]] = await Promise.all([
+    db.query(`
+      SELECT 
+        COUNT(*) as total_attempts,
+        SUM(is_correct) as successful_attempts,
+        AVG(time_taken_seconds) as avg_solve_time,
+        MIN(CASE WHEN is_correct = true THEN time_taken_seconds END) as min_solve_time,
+        MAX(CASE WHEN is_correct = true THEN time_taken_seconds END) as max_solve_time
+      FROM submissions
+      WHERE puzzle_id = ?
+    `, [puzzleId]),
+    db.query(`
+      SELECT COUNT(DISTINCT team_id) as teams_used_hints
+      FROM hint_usage
+      WHERE puzzle_id = ?
+    `, [puzzleId]),
+    db.query(`
+      SELECT COUNT(DISTINCT team_id) as teams_attempted
+      FROM submissions
+      WHERE puzzle_id = ?
+    `, [puzzleId])
+  ]);
 
   const totalAttempts = stats.total_attempts || 0;
   const successfulAttempts = stats.successful_attempts || 0;

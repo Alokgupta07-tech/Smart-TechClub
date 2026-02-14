@@ -44,8 +44,8 @@ export function useLeaderboard() {
       if (!response.ok) throw new Error('Failed to fetch leaderboard');
       return response.json();
     },
-    refetchInterval: 5000,
-    staleTime: 2000,
+    refetchInterval: 15000, // Reduced from 5s for better scalability
+    staleTime: 10000,
   });
 }
 
@@ -106,8 +106,8 @@ export function useNotifications() {
       }
       return response.json();
     },
-    refetchInterval: 5000,
-    staleTime: 2000,
+    refetchInterval: 15000, // Reduced from 5s for better scalability
+    staleTime: 10000,
   });
 }
 
@@ -289,7 +289,7 @@ export function usePuzzleTimer(puzzleId: string | undefined) {
       return response.json();
     },
     enabled: !!puzzleId,
-    refetchInterval: 1000, // Check every second for accurate timing
+    refetchInterval: 5000, // Check every 5 seconds (client handles countdown display)
   });
 }
 

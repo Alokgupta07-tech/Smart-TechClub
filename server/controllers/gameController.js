@@ -1,90 +1,92 @@
 const db = require('../config/db');
 const { supabaseAdmin } = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
+const { cache, cacheKeys, TTL, cached } = require('../utils/cache');
 
 const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
 
-// Get current game state
+// Get current game state (cached for 2 seconds to reduce DB load)
 exports.getGameState = async (req, res) => {
   try {
-    if (USE_SUPABASE) {
-      let { data: gameState, error } = await supabaseAdmin
-        .from('game_state')
-        .select('*')
-        .limit(1);
-
-      if (error) throw error;
-
-      // If game state doesn't exist, create a default one
-      if (!gameState || gameState.length === 0) {
-        const newId = uuidv4();
-        const { data: inserted, error: insertErr } = await supabaseAdmin
+    const gameData = await cached(cacheKeys.gameState(), async () => {
+      if (USE_SUPABASE) {
+        let { data: gameState, error } = await supabaseAdmin
           .from('game_state')
-          .insert({
-            id: newId,
-            game_active: false,
-            current_level: 1,
-            level1_open: false,
-            level2_open: false
-          })
-          .select('*');
+          .select('*')
+          .limit(1);
 
-        if (insertErr) throw insertErr;
-        gameState = inserted;
-      }
+        if (error) throw error;
 
-      // Get team stats by fetching all teams and counting in JS
-      let totalTeams = 0, activeTeams = 0, completedTeams = 0;
-      try {
-        const { data: teams } = await supabaseAdmin.from('teams').select('status');
-        if (teams) {
-          totalTeams = teams.length;
-          activeTeams = teams.filter(t => t.status === 'active').length;
-          completedTeams = teams.filter(t => t.status === 'completed').length;
+        // If game state doesn't exist, create a default one
+        if (!gameState || gameState.length === 0) {
+          const newId = uuidv4();
+          const { data: inserted, error: insertErr } = await supabaseAdmin
+            .from('game_state')
+            .insert({
+              id: newId,
+              game_active: false,
+              current_level: 1,
+              level1_open: false,
+              level2_open: false
+            })
+            .select('*');
+
+          if (insertErr) throw insertErr;
+          gameState = inserted;
         }
-      } catch (e) {
-        console.log('Could not fetch team stats:', e.message);
-      }
 
-      return res.json({
-        success: true,
-        gameState: {
+        // Get team stats by fetching all teams and counting in JS
+        let totalTeams = 0, activeTeams = 0, completedTeams = 0;
+        try {
+          const { data: teams } = await supabaseAdmin.from('teams').select('status');
+          if (teams) {
+            totalTeams = teams.length;
+            activeTeams = teams.filter(t => t.status === 'active').length;
+            completedTeams = teams.filter(t => t.status === 'completed').length;
+          }
+        } catch (e) {
+          console.log('Could not fetch team stats:', e.message);
+        }
+
+        return {
           ...gameState[0],
           total_teams: totalTeams,
           active_teams: activeTeams,
           completed_teams: completedTeams
-        }
-      });
-    }
+        };
+      }
 
-    let [gameState] = await db.query('SELECT * FROM game_state LIMIT 1');
-    
-    // If game state doesn't exist, create a default one
-    if (gameState.length === 0) {
-      const newId = uuidv4();
-      await db.query(`
-        INSERT INTO game_state (id, game_name, current_phase, level_1_unlocked, level_2_unlocked)
-        VALUES (?, 'Lockdown HQ Event', 'not_started', false, false)
-      `, [newId]);
+      let [gameState] = await db.query('SELECT * FROM game_state LIMIT 1');
       
-      [gameState] = await db.query('SELECT * FROM game_state WHERE id = ?', [newId]);
-    }
-    
-    // Get additional stats
-    const [teamStats] = await db.query(`
-      SELECT 
-        COUNT(*) as total_teams,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_teams,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_teams
-      FROM teams
-    `);
-    
-    res.json({
-      success: true,
-      gameState: {
+      // If game state doesn't exist, create a default one
+      if (gameState.length === 0) {
+        const newId = uuidv4();
+        await db.query(`
+          INSERT INTO game_state (id, game_name, current_phase, level_1_unlocked, level_2_unlocked)
+          VALUES (?, 'Lockdown HQ Event', 'not_started', false, false)
+        `, [newId]);
+        
+        [gameState] = await db.query('SELECT * FROM game_state WHERE id = ?', [newId]);
+      }
+      
+      // Get additional stats
+      const [teamStats] = await db.query(`
+        SELECT 
+          COUNT(*) as total_teams,
+          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_teams,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_teams
+        FROM teams
+      `);
+      
+      return {
         ...gameState[0],
         ...teamStats[0]
-      }
+      };
+    }, TTL.GAME_STATE);
+
+    res.json({
+      success: true,
+      gameState: gameData
     });
   } catch (error) {
     console.error('Error fetching game state:', error);
@@ -183,6 +185,10 @@ exports.startGame = async (req, res) => {
           start_time = NOW()
       WHERE status IN ('waiting', 'qualified')
     `);
+    
+    // Invalidate cached data
+    cache.delete(cacheKeys.gameState());
+    cache.deleteByPrefix('leaderboard');
     
     res.json({
       success: true,
@@ -289,6 +295,9 @@ exports.unlockLevel2 = async (req, res) => {
       `, [gameState[0].id]);
     }
     
+    // Invalidate cached game state
+    cache.delete(cacheKeys.gameState());
+    
     res.json({
       success: true,
       message: 'Level 2 unlocked successfully!'
@@ -321,6 +330,9 @@ exports.pauseGame = async (req, res) => {
 
     await db.query('UPDATE game_state SET is_paused = true WHERE id IS NOT NULL');
     
+    // Invalidate cached game state
+    cache.delete(cacheKeys.gameState());
+    
     res.json({
       success: true,
       message: 'Game paused'
@@ -352,6 +364,9 @@ exports.resumeGame = async (req, res) => {
     }
 
     await db.query('UPDATE game_state SET is_paused = false WHERE id IS NOT NULL');
+    
+    // Invalidate cached game state
+    cache.delete(cacheKeys.gameState());
     
     res.json({
       success: true,

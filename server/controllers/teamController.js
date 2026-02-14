@@ -18,27 +18,28 @@ async function getMyTeam(req, res) {
     let team, gameStateRow;
 
     if (USE_SUPABASE) {
-      // --- Supabase branch ---
-      const { data: teams, error: tErr } = await supabaseAdmin
-        .from('teams')
-        .select('*')
-        .eq('user_id', userId);
+      // --- Supabase branch (parallel queries) ---
+      const [teamResult, gameStateResult] = await Promise.all([
+        supabaseAdmin
+          .from('teams')
+          .select('*')
+          .eq('user_id', userId),
+        supabaseAdmin
+          .from('game_state')
+          .select('level1_open, level2_open, game_started_at')
+          .limit(1)
+      ]);
 
-      if (tErr) throw tErr;
-      if (!teams || teams.length === 0) {
+      if (teamResult.error) throw teamResult.error;
+      if (!teamResult.data || teamResult.data.length === 0) {
         return res.status(404).json({ error: 'Team not found' });
       }
-      team = teams[0];
+      team = teamResult.data[0];
 
-      const { data: gsRows, error: gsErr } = await supabaseAdmin
-        .from('game_state')
-        .select('level1_open, level2_open, game_started_at')
-        .limit(1);
-
-      if (gsErr) throw gsErr;
+      if (gameStateResult.error) throw gameStateResult.error;
       // Normalize Supabase column names to match MySQL names
-      if (gsRows && gsRows.length > 0) {
-        const gs = gsRows[0];
+      if (gameStateResult.data && gameStateResult.data.length > 0) {
+        const gs = gameStateResult.data[0];
         gameStateRow = {
           level_1_unlocked: gs.level1_open,
           level_2_unlocked: gs.level2_open,
@@ -48,21 +49,19 @@ async function getMyTeam(req, res) {
         gameStateRow = null;
       }
     } else {
-      // --- MySQL branch ---
-      const [teams] = await db.query(`
-        SELECT * FROM teams WHERE user_id = ?
-      `, [userId]);
+      // --- MySQL branch (parallel queries) ---
+      const [teamsResult, gameStateQueryResult] = await Promise.all([
+        db.query(`SELECT * FROM teams WHERE user_id = ?`, [userId]),
+        db.query(`SELECT level_1_unlocked, level_2_unlocked, game_started_at FROM game_state LIMIT 1`)
+      ]);
+
+      const [teams] = teamsResult;
+      const [gameState] = gameStateQueryResult;
 
       if (teams.length === 0) {
         return res.status(404).json({ error: 'Team not found' });
       }
       team = teams[0];
-
-      const [gameState] = await db.query(`
-        SELECT level_1_unlocked, level_2_unlocked, game_started_at
-        FROM game_state 
-        LIMIT 1
-      `);
       gameStateRow = gameState && gameState.length > 0 ? gameState[0] : null;
     }
 

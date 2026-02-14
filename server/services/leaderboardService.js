@@ -1,6 +1,7 @@
 // server/services/leaderboardService.js
 const db = require('../config/db');
 const { supabaseAdmin } = require('../config/supabase');
+const { cache, cacheKeys, TTL, cached } = require('../utils/cache');
 const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
 
 /**
@@ -20,14 +21,17 @@ function formatTime(seconds) {
 }
 
 /**
- * Get live leaderboard with rankings
+ * Get live leaderboard with rankings (cached for 3 seconds)
  * Ranking formula: puzzles_solved DESC, total_time ASC, hints_used ASC
  */
 async function getLiveLeaderboard() {
-  if (USE_SUPABASE) {
-    return getLiveLeaderboardSupabase();
-  }
-  return getLiveLeaderboardMySQL();
+  const cacheKey = cacheKeys.leaderboard('live');
+  return cached(cacheKey, async () => {
+    if (USE_SUPABASE) {
+      return getLiveLeaderboardSupabase();
+    }
+    return getLiveLeaderboardMySQL();
+  }, TTL.LEADERBOARD);
 }
 
 /**
@@ -183,46 +187,42 @@ async function getLiveLeaderboardMySQL() {
         t.hints_used ASC
     `);
 
-    // Get per-level times for each team
-    const leaderboardData = await Promise.all(teams.map(async (team) => {
-      let level1Time = null;
-      let level2Time = null;
-      let puzzlesSolved = 0;
+    // Get per-level times for ALL teams in a single batch query (eliminates N+1)
+    let levelTimesMap = {};
+    try {
+      const [levelTimesData] = await db.query(`
+        SELECT 
+          tqp.team_id,
+          p.level,
+          SUM(tqp.time_spent_seconds) as total_time,
+          COUNT(*) as completed_count
+        FROM team_question_progress tqp
+        JOIN puzzles p ON tqp.puzzle_id = p.id
+        WHERE tqp.status = 'completed'
+        GROUP BY tqp.team_id, p.level
+      `);
       
-      try {
-        // Get total time spent on level 1 puzzles (completed ones)
-        const [level1Data] = await db.query(`
-          SELECT 
-            SUM(tqp.time_spent_seconds) as total_time,
-            COUNT(*) as completed_count
-          FROM team_question_progress tqp
-          JOIN puzzles p ON tqp.puzzle_id = p.id
-          WHERE tqp.team_id = ? AND p.level = 1 AND tqp.status = 'completed'
-        `, [team.id]);
-        
-        if (level1Data[0]?.total_time) {
-          level1Time = level1Data[0].total_time;
-          puzzlesSolved += level1Data[0].completed_count || 0;
+      // Build lookup map: { teamId: { level1: { time, count }, level2: { time, count } } }
+      (levelTimesData || []).forEach(row => {
+        if (!levelTimesMap[row.team_id]) {
+          levelTimesMap[row.team_id] = {};
         }
-        
-        // Get total time spent on level 2 puzzles (completed ones)
-        const [level2Data] = await db.query(`
-          SELECT 
-            SUM(tqp.time_spent_seconds) as total_time,
-            COUNT(*) as completed_count
-          FROM team_question_progress tqp
-          JOIN puzzles p ON tqp.puzzle_id = p.id
-          WHERE tqp.team_id = ? AND p.level = 2 AND tqp.status = 'completed'
-        `, [team.id]);
-        
-        if (level2Data[0]?.total_time) {
-          level2Time = level2Data[0].total_time;
-          puzzlesSolved += level2Data[0].completed_count || 0;
-        }
-      } catch (err) {
-        // Tables might not exist or have different schema
-        console.log('Level time query info:', err.code || err.message);
-      }
+        levelTimesMap[row.team_id][`level${row.level}`] = {
+          time: row.total_time,
+          count: row.completed_count
+        };
+      });
+    } catch (err) {
+      // Tables might not exist or have different schema
+      console.log('Level time batch query info:', err.code || err.message);
+    }
+
+    // Map teams to leaderboard format using pre-fetched data
+    const leaderboardData = teams.map((team) => {
+      const teamLevels = levelTimesMap[team.id] || {};
+      const level1Data = teamLevels.level1 || { time: null, count: 0 };
+      const level2Data = teamLevels.level2 || { time: null, count: 0 };
+      const puzzlesSolved = (level1Data.count || 0) + (level2Data.count || 0);
       
       return {
         rank: 0,
@@ -233,14 +233,14 @@ async function getLiveLeaderboardMySQL() {
         progress: team.progress || 0,
         puzzlesSolved: puzzlesSolved,
         hintsUsed: team.hints_used || 0,
-        level1Time: formatTime(level1Time),
-        level2Time: formatTime(level2Time),
+        level1Time: formatTime(level1Data.time),
+        level2Time: formatTime(level2Data.time),
         totalTime: formatTime(team.total_time_seconds),
         totalTimeSeconds: team.total_time_seconds || 0,
         startTime: team.start_time,
         endTime: team.end_time
       };
-    }));
+    });
 
     // Sort by performance: puzzlesSolved DESC, totalTimeSeconds ASC, hintsUsed ASC
     leaderboardData.sort((a, b) => {

@@ -486,17 +486,21 @@ async function getStats(req, res) {
         avgTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
       }
     } else {
-      // MySQL fallback
-      const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM teams');
-      totalTeams = total;
-      const [[{ active }]] = await db.query('SELECT COUNT(*) as active FROM teams WHERE status = "active"');
-      activeTeams = active;
-      const [[{ completed }]] = await db.query('SELECT COUNT(*) as completed FROM teams WHERE status = "completed"');
-      completedTeams = completed;
-      const [[{ waiting }]] = await db.query('SELECT COUNT(*) as waiting FROM teams WHERE status = "waiting"');
-      waitingTeams = waiting;
-      const [[{ hints }]] = await db.query('SELECT SUM(hints_used) as hints FROM teams');
-      totalHints = hints || 0;
+      // MySQL fallback - single optimized query
+      const [[stats]] = await db.query(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+          SUM(CASE WHEN status = 'waiting' THEN 1 ELSE 0 END) as waiting,
+          COALESCE(SUM(hints_used), 0) as hints
+        FROM teams
+      `);
+      totalTeams = stats.total;
+      activeTeams = stats.active;
+      completedTeams = stats.completed;
+      waitingTeams = stats.waiting;
+      totalHints = stats.hints || 0;
     }
 
     res.json({
@@ -795,9 +799,11 @@ async function getActivityLogs(req, res) {
     // Limit results
     activityLogs = activityLogs.slice(0, limit);
     
-    // Get teams and users for joining
-    const [teams] = await db.query(`SELECT id, team_name FROM teams`);
-    const [users] = await db.query(`SELECT id, name FROM users`);
+    // Get teams and users for joining - parallel queries
+    const [[teams], [users]] = await Promise.all([
+      db.query(`SELECT id, team_name FROM teams`),
+      db.query(`SELECT id, name FROM users`)
+    ]);
     
     const teamsMap = new Map((teams || []).map(t => [t.id, t.team_name]));
     const usersMap = new Map((users || []).map(u => [u.id, u.name]));

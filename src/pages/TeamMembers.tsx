@@ -20,7 +20,7 @@ import { TerminalCard } from '@/components/TerminalCard';
 import { fetchWithAuth } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface Member {
   id: string;

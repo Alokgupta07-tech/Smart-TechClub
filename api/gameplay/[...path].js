@@ -53,14 +53,21 @@ module.exports = async function handler(req, res) {
         return res.status(404).json({ error: 'Team not found' });
       }
 
-      // Get all puzzles for team's level
-      const { data: puzzles, error: pErr } = await supabase
-        .from('puzzles')
-        .select('*')
-        .eq('level', team.level)
-        .order('puzzle_number', { ascending: true });
+      // Parallel fetch: puzzles + submissions (reduces latency by ~50%)
+      const [puzzlesResult, submissionsResult] = await Promise.all([
+        supabase
+          .from('puzzles')
+          .select('*')
+          .eq('level', team.level)
+          .order('puzzle_number', { ascending: true }),
+        supabase
+          .from('submissions')
+          .select('puzzle_id, is_correct')
+          .eq('team_id', team.id)
+      ]);
 
-      if (pErr) throw pErr;
+      if (puzzlesResult.error) throw puzzlesResult.error;
+      const puzzles = puzzlesResult.data;
 
       if (!puzzles || puzzles.length === 0) {
         return res.status(404).json({ 
@@ -69,15 +76,9 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // Get all successful submissions
-      const { data: submissions } = await supabase
-        .from('submissions')
-        .select('puzzle_id, is_correct')
-        .eq('team_id', team.id);
-      
       const completedPuzzleIds = new Set();
-      if (submissions) {
-        submissions.forEach(function(sub) {
+      if (submissionsResult.data) {
+        submissionsResult.data.forEach(function(sub) {
           if (sub.is_correct) completedPuzzleIds.add(sub.puzzle_id);
         });
       }
@@ -110,27 +111,28 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      // Get puzzle progress
-      const { data: progress } = await supabase
-        .from('team_progress')
-        .select('*')
-        .eq('team_id', team.id)
-        .eq('puzzle_id', currentPuzzle.id);
+      // Parallel fetch: progress + hints + usedHints (reduces latency)
+      const [progressResult, allHintsResult, usedHintsResult] = await Promise.all([
+        supabase
+          .from('team_progress')
+          .select('*')
+          .eq('team_id', team.id)
+          .eq('puzzle_id', currentPuzzle.id),
+        supabase
+          .from('hints')
+          .select('*')
+          .eq('puzzle_id', currentPuzzle.id)
+          .order('hint_number', { ascending: true }),
+        supabase
+          .from('team_hints_used')
+          .select('hint_id')
+          .eq('team_id', team.id)
+          .eq('puzzle_id', currentPuzzle.id)
+      ]);
 
-      // Get hints for current puzzle
-      const { data: allHints } = await supabase
-        .from('hints')
-        .select('*')
-        .eq('puzzle_id', currentPuzzle.id)
-        .order('hint_number', { ascending: true });
-
-      const { data: usedHints } = await supabase
-        .from('team_hints_used')
-        .select('hint_id')
-        .eq('team_id', team.id)
-        .eq('puzzle_id', currentPuzzle.id);
-
-      const usedHintIds = (usedHints || []).map(h => h.hint_id);
+      const progress = progressResult.data;
+      const allHints = allHintsResult.data;
+      const usedHintIds = (usedHintsResult.data || []).map(h => h.hint_id);
       const availableHints = (allHints || []).filter(h => !usedHintIds.includes(h.id));
 
       // Calculate time remaining (40 minutes = 2400 seconds)
@@ -167,23 +169,29 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && path === '/puzzle/submit') {
       const { puzzle_id, answer } = req.body;
 
-      const { data: team, error: tErr } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('user_id', user.userId)
-        .single();
-      if (tErr || !team) {
+      // Parallel fetch: team + puzzle (reduces latency)
+      const [teamResult, puzzleResult] = await Promise.all([
+        supabase
+          .from('teams')
+          .select('*')
+          .eq('user_id', user.userId)
+          .single(),
+        supabase
+          .from('puzzles')
+          .select('*')
+          .eq('id', puzzle_id)
+          .single()
+      ]);
+
+      if (teamResult.error || !teamResult.data) {
         return res.status(404).json({ error: 'Team not found' });
       }
-
-      const { data: puzzle, error: pErr } = await supabase
-        .from('puzzles')
-        .select('*')
-        .eq('id', puzzle_id)
-        .single();
-      if (pErr || !puzzle) {
+      if (puzzleResult.error || !puzzleResult.data) {
         return res.status(404).json({ error: 'Puzzle not found' });
       }
+
+      const team = teamResult.data;
+      const puzzle = puzzleResult.data;
 
       const isCorrect = puzzle.correct_answer.toLowerCase().trim() === answer.toLowerCase().trim();
 

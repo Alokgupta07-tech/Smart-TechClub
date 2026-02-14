@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
  */
 
 const WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000; // 15 minutes
-const MAX_ATTEMPTS = parseInt(process.env.RATE_LIMIT_MAX_ATTEMPTS) || 5;
+const MAX_ATTEMPTS = parseInt(process.env.RATE_LIMIT_MAX_ATTEMPTS) || 20; // Increased from 5 to support shared networks
 
 /**
  * Auth rate limiter (login, OTP verification, password reset)

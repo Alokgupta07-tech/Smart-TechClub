@@ -273,25 +273,20 @@ async function useHint(teamId, puzzleId, hintId) {
 
 /** MySQL fallback for useHint */
 async function useHintMysql(teamId, puzzleId, hintId) {
-  const [[hint]] = await db.query(`
-    SELECT * FROM hints WHERE id = ? AND puzzle_id = ?
-  `, [hintId, puzzleId]);
+  // Parallel validation queries for better performance
+  const [[[hint]], [[existing]], [[progress]]] = await Promise.all([
+    db.query(`SELECT * FROM hints WHERE id = ? AND puzzle_id = ?`, [hintId, puzzleId]),
+    db.query(`SELECT id FROM hint_usage WHERE team_id = ? AND hint_id = ?`, [teamId, hintId]),
+    db.query(`SELECT last_hint_number FROM team_progress WHERE team_id = ? AND puzzle_id = ?`, [teamId, puzzleId])
+  ]);
 
   if (!hint) {
     throw new Error('Hint not found');
   }
 
-  const [[existing]] = await db.query(`
-    SELECT id FROM hint_usage WHERE team_id = ? AND hint_id = ?
-  `, [teamId, hintId]);
-
   if (existing) {
     throw new Error('Hint already used');
   }
-
-  const [[progress]] = await db.query(`
-    SELECT last_hint_number FROM team_progress WHERE team_id = ? AND puzzle_id = ?
-  `, [teamId, puzzleId]);
 
   const lastHintNumber = progress?.last_hint_number || 0;
   if (hint.hint_number !== lastHintNumber + 1) {

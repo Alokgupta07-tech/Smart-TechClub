@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -29,6 +30,16 @@ const PORT = process.env.PORT || 5000;
 
 // Helmet - Security headers
 app.use(helmet());
+
+// Compression - Reduce response size for faster transfers
+app.use(compression({
+  level: 6, // Balanced compression level
+  threshold: 1024, // Only compress responses > 1KB
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
 
 // CORS - Allow frontend access
 const allowedOrigins = [

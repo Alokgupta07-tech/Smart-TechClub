@@ -327,7 +327,7 @@ export default function TeamGameplay() {
       if (!response.ok) throw new Error('Failed to fetch progress');
       return response.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: 15000, // Reduced from 5s for better scalability
   });
 
   // Submit answer mutation
