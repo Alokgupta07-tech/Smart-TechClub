@@ -987,6 +987,27 @@ module.exports = async function handler(req, res) {
         console.log('Error updating level_evaluation_state:', e.message);
       }
 
+      // Also update game_state to reset results_published (status endpoint reads from here)
+      try {
+        const { data: existing } = await supabase
+          .from('game_state')
+          .select('id')
+          .limit(1)
+          .single();
+        
+        if (existing) {
+          await supabase
+            .from('game_state')
+            .update({ 
+              results_published: false,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existing.id);
+        }
+      } catch (e) {
+        console.log('Error updating game_state:', e.message);
+      }
+
       return res.json({
         success: true,
         message: `Evaluation reset for Level ${levelId}. You can now re-evaluate.`

@@ -318,6 +318,8 @@ export default function GameControl() {
     onSuccess: () => {
       startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+        queryClient.invalidateQueries({ queryKey: ['gameState'] });
+        queryClient.invalidateQueries({ queryKey: ['qualification'] });
       });
       toast({
         title: 'Evaluation Reset',
