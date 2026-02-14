@@ -9,6 +9,28 @@ import { Team, AdminStats, Alert, LeaderboardEntry, ApiResponse, TeamActionPaylo
 // API Base URL - uses relative path for Vercel, localhost for dev
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second base delay
+
+/**
+ * Sleep utility for delay between retries
+ */
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Check if error is retryable (network errors, 5xx errors)
+ */
+function isRetryableError(error: Error | Response): boolean {
+  if (error instanceof Response) {
+    return error.status >= 500 && error.status < 600;
+  }
+  // Network errors are retryable
+  return error.message.includes('fetch') || 
+         error.message.includes('network') ||
+         error.message.includes('Failed to fetch');
+}
+
 /**
  * Try to refresh the access token using the refresh token
  */
@@ -37,55 +59,80 @@ async function tryRefreshToken(): Promise<string | null> {
 }
 
 /**
- * Generic fetch wrapper with error handling and automatic token refresh
+ * Generic fetch wrapper with error handling, automatic token refresh, and retry logic
  */
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  try {
-    const accessToken = localStorage.getItem('accessToken');
-    const makeRequest = (token: string | null) =>
-      fetch(`${API_BASE_URL}${endpoint}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(options?.headers || {}),
-        },
-        ...options,
-      });
+  const accessToken = localStorage.getItem('accessToken');
+  
+  const makeRequest = async (token: string | null) =>
+    fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options?.headers || {}),
+      },
+      ...options,
+    });
 
-    let response = await makeRequest(accessToken);
+  let lastError: Error | null = null;
+  
+  // Retry loop for network failures
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      let response = await makeRequest(accessToken);
 
-    // On 401, try refreshing the token once
-    if (response.status === 401) {
-      const errorData = await response.json().catch(() => ({}));
-      if (errorData.code === 'TOKEN_EXPIRED') {
-        const newToken = await tryRefreshToken();
-        if (newToken) {
-          response = await makeRequest(newToken);
-        }
-      }
-    }
-
-    if (!response.ok) {
+      // On 401, try refreshing the token once (don't count as retry)
       if (response.status === 401) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userEmail');
-        // Only redirect to login if not already there
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.code === 'TOKEN_EXPIRED') {
+          const newToken = await tryRefreshToken();
+          if (newToken) {
+            response = await makeRequest(newToken);
+          }
         }
-        throw new Error('Session expired. Please login again.');
       }
-      throw new Error(`API Error: ${response.statusText}`);
-    }
 
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`API request failed for ${endpoint}:`, error);
-    throw error;
+      // Handle non-retryable errors
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('userRole');
+          localStorage.removeItem('userEmail');
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+          }
+          throw new Error('Session expired. Please login again.');
+        }
+        
+        // Retry on 5xx errors
+        if (isRetryableError(response) && attempt < MAX_RETRIES) {
+          await sleep(RETRY_DELAY * Math.pow(2, attempt)); // Exponential backoff
+          continue;
+        }
+        
+        throw new Error(`API Error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
+      
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Retry on network errors
+      if (isRetryableError(lastError) && attempt < MAX_RETRIES) {
+        console.warn(`Request failed, retrying (${attempt + 1}/${MAX_RETRIES})...`);
+        await sleep(RETRY_DELAY * Math.pow(2, attempt));
+        continue;
+      }
+      
+      break;
+    }
   }
+  
+  console.error(`API request failed for ${endpoint}:`, lastError);
+  throw lastError;
 }
 
 /**

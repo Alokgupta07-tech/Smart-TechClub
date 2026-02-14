@@ -2,8 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
+const hpp = require('hpp');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+// Import security utilities
+const { sanitizeBody, validateInputs } = require('./utils/sanitize');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -59,8 +63,15 @@ app.use(cors({
 }));
 
 // Body parser
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10kb' })); // Limit body size
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// HTTP Parameter Pollution protection
+app.use(hpp());
+
+// Input sanitization and validation
+app.use(sanitizeBody);
+app.use(validateInputs);
 
 // Request logging (development only)
 if (process.env.NODE_ENV === 'development') {
