@@ -69,8 +69,8 @@ if (USE_SUPABASE) {
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'lockdown_hq',
     waitForConnections: true,
-    connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 50, // Increased for 150+ users
-    queueLimit: 100, // Queue requests instead of failing immediately
+    connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 150, // 1:1 pool for 150 users
+    queueLimit: 200, // Queue requests instead of failing immediately
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000 // 10 seconds
   });
