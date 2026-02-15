@@ -1,6 +1,11 @@
 /**
  * React Query Hooks for API Data Fetching
  * Uses TanStack Query (@tanstack/react-query) which is already installed
+ * 
+ * PERFORMANCE OPTIMIZED for 200+ concurrent users:
+ * - Reduced polling intervals (30-60s instead of 10s)
+ * - Longer staleTime to use cached data
+ * - Reduced retry attempts
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,35 +22,37 @@ import { toast } from 'sonner';
 
 /**
  * Hook: Fetch all teams
- * Auto-refreshes every 10 seconds
+ * Auto-refreshes every 30 seconds (optimized from 10s)
  */
 export function useTeams() {
   return useQuery<Team[]>({
     queryKey: ['teams'],
     queryFn: fetchTeams,
-    refetchInterval: 10000, // Poll every 10 seconds
-    staleTime: 5000,
-    retry: 3,
+    refetchInterval: 30000, // Poll every 30 seconds (was 10s)
+    staleTime: 20000, // Data fresh for 20s (was 5s)
+    retry: 1,
+    refetchOnMount: false,
   });
 }
 
 /**
  * Hook: Fetch admin statistics
- * Auto-refreshes every 10 seconds
+ * Auto-refreshes every 30 seconds (optimized from 10s)
  */
 export function useAdminStats() {
   return useQuery<AdminStats>({
     queryKey: ['admin-stats'],
     queryFn: fetchStats,
-    refetchInterval: 10000,
-    staleTime: 5000,
-    retry: 3,
+    refetchInterval: 30000, // Poll every 30 seconds (was 10s)
+    staleTime: 20000,
+    retry: 1,
+    refetchOnMount: false,
   });
 }
 
 /**
  * Hook: Fetch recent alerts
- * Auto-refreshes every 10 seconds
+ * Auto-refreshes every 30 seconds (optimized from 10s)
  */
 export function useAlerts() {
   return useQuery<Alert[]>({
@@ -58,23 +65,25 @@ export function useAlerts() {
         timeAgo: getTimeAgo(alert.createdAt)
       }));
     },
-    refetchInterval: 10000,
-    staleTime: 5000,
-    retry: 3,
+    refetchInterval: 30000, // Poll every 30 seconds (was 10s)
+    staleTime: 20000,
+    retry: 1,
+    refetchOnMount: false,
   });
 }
 
 /**
  * Hook: Fetch leaderboard
- * Auto-refreshes every 15 seconds
+ * Auto-refreshes every 45 seconds (optimized from 15s)
  */
 export function useLeaderboard() {
   return useQuery<LeaderboardEntry[]>({
     queryKey: ['leaderboard'],
     queryFn: fetchLeaderboard,
-    refetchInterval: 15000, // Slightly slower for public endpoint
-    staleTime: 5000,
-    retry: 3,
+    refetchInterval: 45000, // Poll every 45 seconds (was 15s)
+    staleTime: 30000, // Data fresh for 30s
+    retry: 1,
+    refetchOnMount: false,
   });
 }
 

@@ -75,7 +75,7 @@ const Dashboard = () => {
   // Pass the current team ID to check if they're in the top 3
   const celebration = useCelebration(team?.id || null);
 
-  // Fetch team data
+  // Fetch team data - optimized polling interval for 200+ users
   useEffect(() => {
     const fetchTeamData = async () => {
       try {
@@ -90,11 +90,11 @@ const Dashboard = () => {
     };
 
     fetchTeamData();
-    const interval = setInterval(fetchTeamData, 10000); // Refresh every 10s
+    const interval = setInterval(fetchTeamData, 30000); // Optimized: 30s instead of 10s
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch broadcast messages
+  // Fetch broadcast messages - optimized interval for 200+ users
   useEffect(() => {
     const fetchBroadcasts = async () => {
       try {
@@ -109,7 +109,7 @@ const Dashboard = () => {
     };
 
     fetchBroadcasts();
-    const interval = setInterval(fetchBroadcasts, 5000); // Refresh every 5s
+    const interval = setInterval(fetchBroadcasts, 30000); // Optimized: 30s instead of 5s
     return () => clearInterval(interval);
   }, []);
 

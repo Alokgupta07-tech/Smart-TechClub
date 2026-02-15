@@ -143,7 +143,7 @@ export default function TeamGameplay() {
     }
   }, []);
 
-  // Save session state periodically
+  // Save session state periodically - optimized for performance
   useEffect(() => {
     const saveSession = () => {
       const session = {
@@ -154,7 +154,7 @@ export default function TeamGameplay() {
       localStorage.setItem('examSession', JSON.stringify(session));
     };
     
-    const interval = setInterval(saveSession, 5000);
+    const interval = setInterval(saveSession, 15000); // Optimized: 15s instead of 5s
     return () => clearInterval(interval);
   }, [markedForReview, tabSwitchCount]);
 
@@ -230,8 +230,10 @@ export default function TeamGameplay() {
       }
       return response.json();
     },
-    refetchInterval: 10000, // Refresh every 10 seconds
-    retry: 3,
+    refetchInterval: 30000, // Optimized: 30s instead of 10s for 200+ users
+    retry: 1,
+    staleTime: 20000,
+    refetchOnMount: false,
   });
 
   // Sync remaining time from API response
@@ -327,7 +329,9 @@ export default function TeamGameplay() {
       if (!response.ok) throw new Error('Failed to fetch progress');
       return response.json();
     },
-    refetchInterval: 15000, // Reduced from 5s for better scalability
+    refetchInterval: 45000, // Optimized: 45s instead of 15s for 200+ users
+    staleTime: 30000,
+    refetchOnMount: false,
   });
 
   // Submit answer mutation
@@ -490,7 +494,9 @@ export default function TeamGameplay() {
       if (!response.ok) throw new Error('Failed to fetch puzzles');
       return response.json();
     },
-    refetchInterval: 10000,
+    refetchInterval: 45000, // Optimized: 45s instead of 10s for 200+ users
+    staleTime: 30000,
+    refetchOnMount: false,
   });
 
   // Skip question mutation

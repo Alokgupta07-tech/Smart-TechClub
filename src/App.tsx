@@ -38,16 +38,27 @@ const PageLoader = () => (
   </div>
 );
 
+// Optimized QueryClient for 200+ concurrent users
+// Key optimizations:
+// - Longer staleTime (30s) to reduce redundant API calls
+// - Longer gcTime (5min) to keep cached data longer
+// - Disabled refetchOnWindowFocus to prevent burst requests
+// - Reduced retry attempts for faster failure handling
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2, // Retry failed requests twice
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-      staleTime: 5000, // Data stays fresh for 5 seconds
+      retry: 1, // Reduce retries for faster failure handling
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+      staleTime: 30000, // Data stays fresh for 30 seconds (was 5s)
+      gcTime: 5 * 60 * 1000, // Keep unused data in cache for 5 minutes
       refetchOnWindowFocus: false, // Don't refetch on window focus
+      refetchOnReconnect: false, // Don't auto-refetch on reconnect
+      refetchOnMount: false, // Use cached data when component mounts
+      networkMode: 'offlineFirst', // Use cache first, then network
     },
     mutations: {
       retry: 1, // Retry mutations once
+      networkMode: 'offlineFirst',
     },
   },
 });

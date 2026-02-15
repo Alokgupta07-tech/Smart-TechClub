@@ -62,9 +62,11 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['notifications-unread'],
     queryFn: fetchUnreadNotifications,
-    refetchInterval: 15000, // Check every 15 seconds (reduced from 5 for scalability)
-    staleTime: 10000,
+    refetchInterval: 45000, // Check every 45 seconds (optimized from 15s for 200+ users)
+    staleTime: 30000, // Data fresh for 30s
     enabled: !!localStorage.getItem('accessToken'), // Don't poll when not logged in
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   // Show toast for new notifications
