@@ -40,7 +40,9 @@ const Login = () => {
   }, []);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema)
+    resolver: zodResolver(loginSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onBlur'
   });
 
   const onSubmit = async (data: LoginForm) => {
