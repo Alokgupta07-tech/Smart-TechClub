@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS puzzles (
   puzzle_file_url VARCHAR(500),
   correct_answer TEXT NOT NULL,
   points INT DEFAULT 100,
-  time_limit_minutes INT DEFAULT 30,
+  time_limit_minutes INT DEFAULT 4,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),

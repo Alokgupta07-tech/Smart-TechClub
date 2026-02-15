@@ -79,7 +79,7 @@ export default function PuzzleManagement() {
     puzzle_file_url: '',
     correct_answer: '',
     points: 100,
-    time_limit_minutes: 10,
+    time_limit_minutes: 4,
   });
 
   // Fetch puzzles
@@ -194,7 +194,7 @@ export default function PuzzleManagement() {
       puzzle_file_url: '',
       correct_answer: '',
       points: 100,
-      time_limit_minutes: 10,
+      time_limit_minutes: 4,
     });
     setHints([]);
   };

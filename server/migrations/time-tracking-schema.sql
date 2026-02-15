@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS game_settings (
   max_hints_per_question INT DEFAULT 2,
   
   -- Time settings
-  question_time_limit_seconds INT DEFAULT 1800,  -- 30 min default per question
+  question_time_limit_seconds INT DEFAULT 240,  -- 4 min default per question
   total_game_time_limit_seconds INT DEFAULT 7200, -- 2 hour total game limit
   
   -- Ranking settings

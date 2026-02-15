@@ -122,7 +122,7 @@ const AdminLevelManagement = () => {
     puzzle_content: "",
     correct_answer: "",
     points: 100,
-    time_limit_minutes: 10,
+    time_limit_minutes: 4,
   });
   const [showDeletePuzzleDialog, setShowDeletePuzzleDialog] = useState(false);
   const [puzzleToDelete, setPuzzleToDelete] = useState<Puzzle | null>(null);
@@ -265,7 +265,7 @@ const AdminLevelManagement = () => {
       puzzle_content: "",
       correct_answer: "",
       points: 100,
-      time_limit_minutes: 10,
+      time_limit_minutes: 4,
     });
   };
 
