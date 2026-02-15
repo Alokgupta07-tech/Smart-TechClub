@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
+import { useState, useEffect, useCallback, useRef, startTransition, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -600,68 +600,11 @@ export default function TeamGameplay() {
 
   const puzzle: Puzzle | null = puzzleData?.puzzle || null;
 
-  // Handle puzzle loading error with dedicated UI
-  if (puzzleError) {
-    const errorMessage = (puzzleError as Error).message || 'Failed to load puzzle';
-    return (
-      <div className="container mx-auto p-6">
-        <BackButton />
-        <Card className="bg-black/40 border-red-500/40 mt-6">
-          <CardHeader>
-            <CardTitle className="text-red-500 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5" />
-              Puzzle Loading Error
-            </CardTitle>
-            <CardDescription className="text-red-400">
-              {errorMessage}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <p className="text-sm text-muted-foreground mb-2">
-                <strong>Possible reasons:</strong>
-              </p>
-              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-                <li>The game has not started yet</li>
-                <li>Network connectivity issues</li>
-                <li>API server is temporarily unavailable</li>
-                <li>Your session may have expired</li>
-              </ul>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => startTransition(() => queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] }))}
-                className="bg-toxic-green text-black hover:bg-toxic-green/80"
-              >
-                Retry
-              </Button>
-              <Button
-                onClick={() => navigate('/dashboard')}
-                variant="outline"
-                className="border-toxic-green/40 text-toxic-green hover:bg-toxic-green/10"
-              >
-                Back to Dashboard
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-  const progress: TeamProgress | null = progressData?.progress || null;
-  const allQuestions = allPuzzlesData?.puzzles || allPuzzlesData?.session?.questions || [];
-  const sessionStats = allPuzzlesData?.session;
-
-  // Get question status counts for exam navigation
-  const getQuestionStats = () => {
-    const answered = allQuestions.filter((q: any) => q.status === 'completed').length;
-    const skipped = allQuestions.filter((q: any) => q.status === 'skipped').length;
-    const current = allQuestions.filter((q: any) => q.status === 'active').length;
-    const notVisited = allQuestions.filter((q: any) => q.status === 'not_started' || q.status === 'not_visited').length;
-    return { answered, skipped, current, notVisited, total: allQuestions.length };
-  };
-
-  const questionStats = getQuestionStats();
+  // Memoize allQuestions to prevent unnecessary re-renders and satisfy Rules of Hooks
+  const allQuestions = useMemo(
+    () => allPuzzlesData?.puzzles || allPuzzlesData?.session?.questions || [],
+    [allPuzzlesData?.puzzles, allPuzzlesData?.session?.questions]
+  );
 
   // Toggle mark for review
   const toggleMarkForReview = useCallback((puzzleId: string) => {
@@ -762,20 +705,20 @@ export default function TeamGameplay() {
       // Ctrl + Left Arrow: Previous question
       if (e.ctrlKey && e.key === 'ArrowLeft') {
         e.preventDefault();
-        const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzleData?.puzzle?.id);
+        const currentIndex = allQuestions.findIndex((q: { puzzle_id?: string; id?: string }) => (q.puzzle_id || q.id) === puzzleData?.puzzle?.id);
         if (currentIndex > 0) {
           const prevQuestion = allQuestions[currentIndex - 1];
-          goToQuestion.mutate(prevQuestion.puzzle_id || prevQuestion.id);
+          goToQuestion.mutate(prevQuestion.puzzle_id || prevQuestion.id || '');
         }
       }
       
       // Ctrl + Right Arrow: Next question
       if (e.ctrlKey && e.key === 'ArrowRight') {
         e.preventDefault();
-        const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzleData?.puzzle?.id);
+        const currentIndex = allQuestions.findIndex((q: { puzzle_id?: string; id?: string }) => (q.puzzle_id || q.id) === puzzleData?.puzzle?.id);
         if (currentIndex < allQuestions.length - 1) {
           const nextQuestion = allQuestions[currentIndex + 1];
-          goToQuestion.mutate(nextQuestion.puzzle_id || nextQuestion.id);
+          goToQuestion.mutate(nextQuestion.puzzle_id || nextQuestion.id || '');
         }
       }
     };
@@ -822,6 +765,68 @@ export default function TeamGameplay() {
       }
     }
   }, [puzzleData?.puzzle?.id, toast]);
+
+  // Handle puzzle loading error with dedicated UI
+  if (puzzleError) {
+    const errorMessage = (puzzleError as Error).message || 'Failed to load puzzle';
+    return (
+      <div className="container mx-auto p-6">
+        <BackButton />
+        <Card className="bg-black/40 border-red-500/40 mt-6">
+          <CardHeader>
+            <CardTitle className="text-red-500 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              Puzzle Loading Error
+            </CardTitle>
+            <CardDescription className="text-red-400">
+              {errorMessage}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-2">
+                <strong>Possible reasons:</strong>
+              </p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                <li>The game has not started yet</li>
+                <li>Network connectivity issues</li>
+                <li>API server is temporarily unavailable</li>
+                <li>Your session may have expired</li>
+              </ul>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => startTransition(() => queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] }))}
+                className="bg-toxic-green text-black hover:bg-toxic-green/80"
+              >
+                Retry
+              </Button>
+              <Button
+                onClick={() => navigate('/dashboard')}
+                variant="outline"
+                className="border-toxic-green/40 text-toxic-green hover:bg-toxic-green/10"
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  const progress: TeamProgress | null = progressData?.progress || null;
+  const sessionStats = allPuzzlesData?.session;
+
+  // Get question status counts for exam navigation
+  const getQuestionStats = () => {
+    const answered = allQuestions.filter((q: { status?: string }) => q.status === 'completed').length;
+    const skipped = allQuestions.filter((q: { status?: string }) => q.status === 'skipped').length;
+    const current = allQuestions.filter((q: { status?: string }) => q.status === 'active').length;
+    const notVisited = allQuestions.filter((q: { status?: string }) => q.status === 'not_started' || q.status === 'not_visited').length;
+    return { answered, skipped, current, notVisited, total: allQuestions.length };
+  };
+
+  const questionStats = getQuestionStats();
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
