@@ -3,7 +3,7 @@ const db = require('../config/db');
 const { hashPassword, comparePassword } = require('../utils/password');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { createOTP, verifyOTP, invalidateOTPs } = require('../services/otpService');
-const { sendVerificationEmail, send2FACode, sendPasswordResetEmail } = require('../services/emailService');
+const { send2FACode, sendPasswordResetEmail } = require('../services/emailService');
 const { logAudit } = require('../services/auditService');
 
 /**
@@ -61,22 +61,11 @@ async function register(req, res) {
       }
     }
 
-    // Generate OTP
-    const otp = await createOTP(userId, 'verify');
-
-    // Send verification email
-    try {
-      await sendVerificationEmail(email, name, otp);
-    } catch (emailError) {
-      console.error('Email send failed:', emailError.message);
-      // Continue even if email fails
-    }
-
     // Log audit
     await logAudit(userId, 'REGISTER', req, `Team: ${teamName}`);
 
     res.status(201).json({
-      message: 'Registration successful. Please verify your email.',
+      message: 'Registration successful.',
       userId,
       email
     });
@@ -84,39 +73,6 @@ async function register(req, res) {
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ error: 'Registration failed' });
-  }
-}
-
-/**
- * VERIFY EMAIL
- * POST /api/auth/verify-email
- */
-async function verifyEmail(req, res) {
-  try {
-    const { userId, otp } = req.body;
-
-    if (!userId || !otp) {
-      return res.status(400).json({ error: 'User ID and OTP required' });
-    }
-
-    // Verify OTP
-    const isValid = await verifyOTP(userId, otp, 'verify');
-    if (!isValid) {
-      await logAudit(userId, 'EMAIL_VERIFY_FAILED', req, 'Invalid or expired OTP');
-      return res.status(400).json({ error: 'Invalid or expired OTP' });
-    }
-
-    // Mark user as verified
-    await db.query('UPDATE users SET is_verified = TRUE WHERE id = ?', [userId]);
-
-    // Log audit
-    await logAudit(userId, 'EMAIL_VERIFIED', req);
-
-    res.json({ message: 'Email verified successfully. You can now login.' });
-
-  } catch (error) {
-    console.error('Verify email error:', error);
-    res.status(500).json({ error: 'Verification failed' });
   }
 }
 
@@ -148,9 +104,7 @@ async function resendOTP(req, res) {
 
     // Send email based on purpose
     try {
-      if (purpose === 'verify') {
-        await sendVerificationEmail(email, name, otp);
-      } else if (purpose === '2fa') {
+      if (purpose === '2fa') {
         await send2FACode(email, name, otp);
       } else if (purpose === 'reset') {
         await sendPasswordResetEmail(email, name, otp);
@@ -528,7 +482,6 @@ async function resetPassword(req, res) {
 
 module.exports = {
   register,
-  verifyEmail,
   resendOTP,
   login,
   verify2FA,

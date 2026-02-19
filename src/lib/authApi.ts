@@ -35,7 +35,7 @@ const authAPI: AxiosInstance = axios.create({
 authAPI.interceptors.request.use(
   (config) => {
     const url = config.url || '';
-    const isPublicAuth = url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/refresh') || url.includes('/auth/verify-email') || url.includes('/auth/resend-otp') || url.includes('/auth/forgot-password') || url.includes('/auth/reset-password') || url.includes('/auth/verify-2fa');
+    const isPublicAuth = url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/refresh') || url.includes('/auth/resend-otp') || url.includes('/auth/forgot-password') || url.includes('/auth/reset-password') || url.includes('/auth/verify-2fa');
     if (!isPublicAuth) {
       const accessToken = localStorage.getItem('accessToken');
       if (accessToken) {
@@ -125,11 +125,6 @@ export interface RegisterResponse {
   email: string;
 }
 
-export interface VerifyEmailPayload {
-  userId: string;
-  otp: string;
-}
-
 export interface LoginPayload {
   email: string;
   password: string;
@@ -174,17 +169,9 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
 }
 
 /**
- * Verify email with OTP
+ * Resend OTP for password reset or 2FA
  */
-export async function verifyEmail(payload: VerifyEmailPayload): Promise<{ message: string }> {
-  const { data } = await authAPI.post('/auth/verify-email', payload);
-  return data;
-}
-
-/**
- * Resend OTP
- */
-export async function resendOTP(userId: string, purpose: string = 'verify'): Promise<{ message: string }> {
+export async function resendOTP(userId: string, purpose: string): Promise<{ message: string }> {
   const { data } = await authAPI.post('/auth/resend-otp', { userId, purpose });
   return data;
 }

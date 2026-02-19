@@ -11,11 +11,10 @@ const { authLimiter, strictLimiter } = require('../middleware/rateLimiter');
 
 // Public routes (no auth required)
 router.post('/register', authLimiter, authController.register);
-router.post('/verify-email', authLimiter, authController.verifyEmail);
-router.post('/resend-otp', authLimiter, authController.resendOTP);
 router.post('/login', authLimiter, authController.login);
 router.post('/verify-2fa', authLimiter, authController.verify2FA);
 router.post('/refresh', authController.refresh);
+router.post('/resend-otp', authLimiter, authController.resendOTP);
 router.post('/forgot-password', strictLimiter, authController.forgotPassword);
 router.post('/reset-password', strictLimiter, authController.resetPassword);
 

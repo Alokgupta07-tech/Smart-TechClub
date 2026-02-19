@@ -47,15 +47,9 @@ type RegistrationForm = z.infer<typeof registrationSchema>;
 
 const Register = () => {
   const navigate = useNavigate();
-  const { register: registerUser, verifyEmail: verifyUserEmail, resendOTP, login } = useAuth();
+  const { register: registerUser, login } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isResending, setIsResending] = useState(false);
-  const [showVerification, setShowVerification] = useState(false);
-  const [userId, setUserId] = useState("");
-  const [otp, setOtp] = useState("");
-  const [userEmail, setUserEmail] = useState("");
-  const [userPassword, setUserPassword] = useState("");
 
   const { 
     register, 
@@ -93,72 +87,6 @@ const Register = () => {
     }
   };
 
-  const handleVerifyEmail = async () => {
-    if (!otp || otp.length !== 6) {
-      toast.error("Please enter a valid 6-digit OTP");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      // Verify email
-      await verifyUserEmail(userId, otp);
-      
-      toast.success("Email verified!", {
-        description: "Logging you in..."
-      });
-
-      // Automatically login the user
-      await login(userEmail, userPassword);
-      
-      toast.success("Welcome to LOCKDOWN!", {
-        description: "Your team is ready."
-      });
-      
-      // Redirect to team dashboard
-      navigate("/dashboard");
-    } catch (error: any) {
-      console.error('Verification error:', error);
-      const rawErr = error.response?.data?.error;
-      const errorMsg = typeof rawErr === 'string' ? rawErr : rawErr?.message || error.message || "Invalid or expired OTP";
-      const errorCode = error.response?.data?.code;
-      
-      if (errorCode === 'RATE_LIMIT_EXCEEDED') {
-        toast.error("Too many attempts", {
-          description: "Please wait 15 minutes before trying again"
-        });
-      } else {
-        toast.error("Verification failed", {
-          description: errorMsg
-        });
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleResendOTP = async () => {
-    if (!userId) {
-      toast.error("User ID not found");
-      return;
-    }
-
-    setIsResending(true);
-    try {
-      await resendOTP(userId, 'verify');
-      toast.success("Code resent!", {
-        description: `A new verification code has been sent to ${userEmail}`
-      });
-    } catch (error: any) {
-      console.error('Resend OTP error:', error);
-      toast.error("Failed to resend code", {
-        description: typeof error.response?.data?.error === 'string' ? error.response.data.error : error.response?.data?.error?.message || "Please try again"
-      });
-    } finally {
-      setIsResending(false);
-    }
-  };
-
   const onSubmit = async (data: RegistrationForm) => {
     setIsSubmitting(true);
     
@@ -175,14 +103,19 @@ const Register = () => {
         members: data.members
       });
 
-      setUserId(response.userId);
-      setUserEmail(leaderEmail);
-      setUserPassword(data.password); // Save password for auto-login
-      setShowVerification(true);
-
       toast.success("Registration successful!", {
-        description: `Check ${leaderEmail} for verification code.`
+        description: "Logging you in..."
       });
+
+      // Automatically login the user
+      await login(leaderEmail, data.password);
+      
+      toast.success("Welcome to LOCKDOWN!", {
+        description: "Your team is ready."
+      });
+      
+      // Redirect to team dashboard
+      navigate("/dashboard");
     } catch (error: any) {
       console.error('Registration error:', error);
       toast.error("Registration failed", {
@@ -203,85 +136,7 @@ const Register = () => {
             {/* Back Button */}
             <BackButton label="Back to Home" to="/" className="mb-6" />
             
-            {/* Show verification if registration successful */}
-            {showVerification ? (
-              <>
-                <div className="text-center mb-12">
-                  <BiohazardIcon className="w-16 h-16 text-primary mx-auto mb-6 animate-pulse" />
-                  <h1 className="text-3xl md:text-4xl font-display font-bold mb-4">
-                    VERIFY <span className="text-primary text-glow-toxic">EMAIL</span>
-                  </h1>
-                  <p className="text-muted-foreground font-terminal">
-                    Enter the 6-digit code sent to {userEmail}
-                  </p>
-                </div>
-
-                <TerminalCard title="EMAIL VERIFICATION" status="warning">
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-terminal text-muted-foreground mb-2">
-                        VERIFICATION CODE
-                      </label>
-                      <Input
-                        id="otp-code"
-                        name="otp"
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value)}
-                        placeholder="Enter 6-digit code"
-                        maxLength={6}
-                        autoComplete="one-time-code"
-                        className="h-12 bg-background/50 border-primary/20 focus:border-primary/50 font-terminal text-center text-2xl tracking-widest"
-                      />
-                    </div>
-
-                    <Button 
-                      onClick={handleVerifyEmail}
-                      variant="toxic" 
-                      size="lg"
-                      disabled={isSubmitting || otp.length !== 6}
-                      className="w-full gap-2"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          VERIFYING...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-5 h-5" />
-                          VERIFY EMAIL
-                        </>
-                      )}
-                    </Button>
-
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-2">Didn't receive the code?</p>
-                      <Button
-                        onClick={handleResendOTP}
-                        variant="ghost"
-                        size="sm"
-                        disabled={isResending || isSubmitting}
-                        className="text-primary hover:text-primary/80 gap-2"
-                      >
-                        {isResending ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Resending...
-                          </>
-                        ) : (
-                          <>
-                            <Mail className="w-4 h-4" />
-                            Resend Code
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </TerminalCard>
-              </>
-            ) : (
-              <>
-                {/* Header */}
+            {/* Header */}
                 <div className="text-center mb-12">
                   <BiohazardIcon className="w-16 h-16 text-primary mx-auto mb-6 animate-pulse" />
                   <h1 className="text-3xl md:text-4xl font-display font-bold mb-4">
@@ -570,7 +425,7 @@ const Register = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-primary">•</span>
-                  A confirmation email will be sent to team leader.
+                  You will be logged in automatically after registration.
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-primary">•</span>
@@ -578,8 +433,6 @@ const Register = () => {
                 </li>
               </ul>
             </TerminalCard>
-              </>
-            )}
           </div>
         </div>
       </main>

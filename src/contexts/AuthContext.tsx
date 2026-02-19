@@ -23,7 +23,7 @@ interface AuthContextType {
   verify2FA: (userId: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (payload: authAPI.RegisterPayload) => Promise<authAPI.RegisterResponse>;
-  verifyEmail: (userId: string, otp: string) => Promise<void>;  resendOTP: (userId: string, purpose?: string) => Promise<void>;}
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -158,20 +158,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return authAPI.register(payload);
   };
 
-  /**
-   * Verify Email
-   */
-  const verifyEmail = async (userId: string, otp: string) => {
-    await authAPI.verifyEmail({ userId, otp });
-  };
-
-  /**
-   * Resend OTP
-   */
-  const resendOTP = async (userId: string, purpose: string = 'verify') => {
-    await authAPI.resendOTP(userId, purpose);
-  };
-
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
@@ -181,8 +167,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     verify2FA,
     logout,
     register,
-    verifyEmail,
-    resendOTP,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
