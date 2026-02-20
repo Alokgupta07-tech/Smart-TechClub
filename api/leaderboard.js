@@ -9,63 +9,86 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Add caching headers for better performance with 200+ users
-  // Cache for 30 seconds on CDN, stale-while-revalidate for 60s
-  res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
-
   const supabase = getSupabase();
 
   try {
-    // Get teams (excluding disqualified)
+    // ── Check if results have been published ──────────────────────────────
+    const { data: gameState } = await supabase
+      .from('game_state')
+      .select('results_published, game_active')
+      .limit(1)
+      .single();
+
+    const resultsPublished = gameState?.results_published || false;
+
+    // ── Fetch teams ───────────────────────────────────────────────────────
     const { data: teams, error: tErr } = await supabase
       .from('teams')
-      .select('id, team_name, level, status, user_id')
+      .select('id, team_name, level, status, user_id, start_time, end_time, hints_used')
       .neq('status', 'disqualified')
       .order('level', { ascending: false })
       .limit(100);
 
     if (tErr) throw tErr;
 
-    // Early exit if no teams
     if (!teams || teams.length === 0) {
-      return res.json([]);
+      return res.json({ resultsPublished, teams: [] });
     }
 
-    // Extract unique user IDs and team IDs
-    var userIds = [];
-    var teamIds = [];
-    teams.forEach(function (t) {
-      teamIds.push(t.id);
-      if (t.user_id && userIds.indexOf(t.user_id) === -1) {
-        userIds.push(t.user_id);
-      }
-    });
+    var teamIds = teams.map(t => t.id);
 
-    // Run users and submissions queries in parallel for better performance
+    // ── Parallel: users + submissions ─────────────────────────────────────
+    var userIds = [...new Set(teams.map(t => t.user_id).filter(Boolean))];
+
     const [usersResult, submissionsResult] = await Promise.all([
       userIds.length > 0
         ? supabase.from('users').select('id, name').in('id', userIds)
         : { data: [] },
       teamIds.length > 0
-        ? supabase.from('submissions').select('team_id, score_awarded, is_correct').in('team_id', teamIds)
+        ? supabase
+          .from('submissions')
+          .select('team_id, puzzle_id, score_awarded, is_correct, evaluation_status, submitted_at')
+          .in('team_id', teamIds)
         : { data: [] }
     ]);
 
-    // Build users map
+    // ── Build lookup maps ─────────────────────────────────────────────────
     var usersMap = {};
-    (usersResult.data || []).forEach(function (u) { usersMap[u.id] = u; });
+    (usersResult.data || []).forEach(u => { usersMap[u.id] = u; });
 
-    // Calculate scores and solved counts
-    var teamScores = {};
-    var teamSolved = {};
-    (submissionsResult.data || []).forEach(function (sub) {
+    // Per-team tallies
+    var teamScores = {};    // total score from evaluated submissions
+    var teamSolved = {};    // count of correct (evaluated) submissions
+    var teamSubmitted = {}; // count of any submission (pre-evaluation tracking)
+
+    (submissionsResult.data || []).forEach(sub => {
       if (!teamScores[sub.team_id]) teamScores[sub.team_id] = 0;
       if (!teamSolved[sub.team_id]) teamSolved[sub.team_id] = 0;
-      teamScores[sub.team_id] += sub.score_awarded || 0;
-      if (sub.is_correct) teamSolved[sub.team_id]++;
+      if (!teamSubmitted[sub.team_id]) teamSubmitted[sub.team_id] = 0;
+
+      teamSubmitted[sub.team_id]++;
+
+      // Score & correct count only available after evaluation
+      if (sub.evaluation_status === 'EVALUATED') {
+        teamScores[sub.team_id] += sub.score_awarded || 0;
+        if (sub.is_correct) teamSolved[sub.team_id]++;
+      }
     });
 
-    var result = teams.map(function (t) {
+    // ── Format time helper ────────────────────────────────────────────────
+    function formatTime(startTime, endTime) {
+      if (!startTime) return '--:--:--';
+      const start = new Date(startTime).getTime();
+      const end = endTime ? new Date(endTime).getTime() : Date.now();
+      const secs = Math.floor((end - start) / 1000);
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    // ── Build result rows ─────────────────────────────────────────────────
+    var result = teams.map(t => {
       var leaderUser = usersMap[t.user_id];
       return {
         id: t.id,
@@ -73,21 +96,31 @@ module.exports = async function handler(req, res) {
         totalScore: teamScores[t.id] || 0,
         level: t.level || 1,
         puzzlesSolved: teamSolved[t.id] || 0,
+        puzzlesSubmitted: teamSubmitted[t.id] || 0,
         status: t.status,
-        leaderName: (leaderUser && leaderUser.name) ? leaderUser.name : null,
-        hintsUsed: 0,
-        totalTime: "--:--:--"
+        leaderName: leaderUser?.name || null,
+        hintsUsed: t.hints_used || 0,
+        totalTime: formatTime(t.start_time, t.end_time),
       };
-    }).sort(function (a, b) {
-      return (b.totalScore - a.totalScore) || (b.puzzlesSolved - a.puzzlesSolved);
     });
 
-    result.forEach((r, index) => {
-      r.rank = index + 1;
+    // ── Rank by: (1) score desc  (2) puzzlesSolved desc  (3) time asc ────
+    result.sort((a, b) => {
+      if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+      if (b.puzzlesSolved !== a.puzzlesSolved) return b.puzzlesSolved - a.puzzlesSolved;
+      // faster time = lower rank number (better)
+      return (a.totalTime < b.totalTime ? -1 : 1);
+    });
+
+    result.forEach((r, i) => {
+      r.rank = i + 1;
       r.change = 'none';
     });
 
-    return res.json(result);
+    // Cache for 30s on CDN
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
+
+    return res.json({ resultsPublished, teams: result });
 
   } catch (error) {
     console.error('Leaderboard API error:', error);

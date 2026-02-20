@@ -39,7 +39,7 @@ interface GameConfig {
 export function useCelebration(currentTeamId: string | null) {
   // Track if the user has dismissed the modal
   const [dismissed, setDismissed] = useState(false);
-  
+
   // Track if celebration was already shown (persisted in session)
   const [alreadySeen, setAlreadySeen] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -49,7 +49,8 @@ export function useCelebration(currentTeamId: string | null) {
   });
 
   // Fetch leaderboard data
-  const { data: leaderboard = [] } = useLeaderboard();
+  const { data: leaderboardData } = useLeaderboard();
+  const leaderboard = leaderboardData?.teams ?? [];
 
   // Fetch game configuration to check if results are published
   // TODO: Replace this with your actual admin settings endpoint
@@ -67,7 +68,7 @@ export function useCelebration(currentTeamId: string | null) {
       //
       // For now, returning a mock that checks if game has ended
       // You should replace this with actual backend check
-      
+
       try {
         const response = await fetch(`${API_BASE}/game/features`);
         if (response.ok) {
@@ -81,7 +82,7 @@ export function useCelebration(currentTeamId: string | null) {
       } catch (error) {
         console.error('Failed to fetch game config:', error);
       }
-      
+
       // Default: results not published
       return {
         resultsPublished: false,
@@ -101,12 +102,12 @@ export function useCelebration(currentTeamId: string | null) {
 
     // Sort by rank to ensure we get top 3
     const sorted = [...leaderboard].sort((a, b) => (a.rank || 0) - (b.rank || 0));
-    
+
     // Get top 3 teams
     const winner = sorted[0];
     const firstRunnerUp = sorted[1];
     const secondRunnerUp = sorted[2];
-    
+
     if (!winner || !firstRunnerUp || !secondRunnerUp) {
       return null;
     }
@@ -114,7 +115,7 @@ export function useCelebration(currentTeamId: string | null) {
     // Find current team's rank
     const currentTeam = leaderboard.find(t => t.id === currentTeamId);
     let currentUserRank: WinnerRank = null;
-    
+
     if (currentTeam) {
       if (currentTeam.rank === 1) currentUserRank = 1;
       else if (currentTeam.rank === 2) currentUserRank = 2;
@@ -131,9 +132,9 @@ export function useCelebration(currentTeamId: string | null) {
 
   // Determine if we should show the celebration
   const isResultPublished = Boolean(
-    gameConfig?.resultsPublished && 
-    resultData?.currentUserRank && 
-    !dismissed && 
+    gameConfig?.resultsPublished &&
+    resultData?.currentUserRank &&
+    !dismissed &&
     !alreadySeen
   );
 
@@ -178,7 +179,7 @@ export function useCelebration(currentTeamId: string | null) {
  */
 export function useCelebrationTest(rankToTest: WinnerRank = 1) {
   const [isResultPublished, setIsResultPublished] = useState(false);
-  
+
   // Mock result data for testing
   const resultData: ResultData = {
     currentUserRank: rankToTest,

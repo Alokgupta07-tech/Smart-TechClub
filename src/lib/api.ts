@@ -26,9 +26,9 @@ function isRetryableError(error: Error | Response): boolean {
     return error.status >= 500 && error.status < 600;
   }
   // Network errors are retryable
-  return error.message.includes('fetch') || 
-         error.message.includes('network') ||
-         error.message.includes('Failed to fetch');
+  return error.message.includes('fetch') ||
+    error.message.includes('network') ||
+    error.message.includes('Failed to fetch');
 }
 
 /**
@@ -63,7 +63,7 @@ async function tryRefreshToken(): Promise<string | null> {
  */
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const accessToken = localStorage.getItem('accessToken');
-  
+
   const makeRequest = async (token: string | null) =>
     fetch(`${API_BASE_URL}${endpoint}`, {
       headers: {
@@ -75,7 +75,7 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
     });
 
   let lastError: Error | null = null;
-  
+
   // Retry loop for network failures
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -104,33 +104,33 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
           }
           throw new Error('Session expired. Please login again.');
         }
-        
+
         // Retry on 5xx errors
         if (isRetryableError(response) && attempt < MAX_RETRIES) {
           await sleep(RETRY_DELAY * Math.pow(2, attempt)); // Exponential backoff
           continue;
         }
-        
+
         throw new Error(`API Error: ${response.statusText}`);
       }
 
       const data = await response.json();
       return data;
-      
+
     } catch (error) {
       lastError = error as Error;
-      
+
       // Retry on network errors
       if (isRetryableError(lastError) && attempt < MAX_RETRIES) {
         console.warn(`Request failed, retrying (${attempt + 1}/${MAX_RETRIES})...`);
         await sleep(RETRY_DELAY * Math.pow(2, attempt));
         continue;
       }
-      
+
       break;
     }
   }
-  
+
   console.error(`API request failed for ${endpoint}:`, lastError);
   throw lastError;
 }
@@ -179,13 +179,16 @@ export async function performTeamAction(payload: TeamActionPayload): Promise<Api
 /**
  * Get leaderboard rankings (public endpoint)
  */
-export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
-  const response = await fetchAPI<{ results_published: boolean; teams: LeaderboardEntry[] } | LeaderboardEntry[]>('/leaderboard');
+export async function fetchLeaderboard(): Promise<{ resultsPublished: boolean; teams: LeaderboardEntry[] }> {
+  const response = await fetchAPI<{ resultsPublished?: boolean; results_published?: boolean; teams?: LeaderboardEntry[] } | LeaderboardEntry[]>('/leaderboard');
   // Handle both response formats: { teams: [...] } or direct array
   if (Array.isArray(response)) {
-    return response;
+    return { resultsPublished: false, teams: response };
   }
-  return response.teams || [];
+  return {
+    resultsPublished: response.resultsPublished ?? response.results_published ?? false,
+    teams: response.teams || [],
+  };
 }
 
 /**

@@ -9,10 +9,10 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  fetchTeams, 
-  fetchStats, 
-  fetchAlerts, 
+import {
+  fetchTeams,
+  fetchStats,
+  fetchAlerts,
   fetchLeaderboard,
   performTeamAction,
   getTimeAgo
@@ -77,13 +77,13 @@ export function useAlerts() {
  * Auto-refreshes every 45 seconds (optimized from 15s)
  */
 export function useLeaderboard() {
-  return useQuery<LeaderboardEntry[]>({
+  return useQuery<{ resultsPublished: boolean; teams: LeaderboardEntry[] }>({
     queryKey: ['leaderboard'],
     queryFn: fetchLeaderboard,
-    refetchInterval: 45000, // Poll every 45 seconds (was 15s)
-    staleTime: 30000, // Data fresh for 30s
+    refetchInterval: 30000, // Poll every 30 seconds
+    staleTime: 20000,
     retry: 1,
-    refetchOnMount: false,
+    refetchOnMount: true,
   });
 }
 
@@ -99,7 +99,7 @@ export function useTeamAction() {
       // Invalidate and refetch teams data
       queryClient.invalidateQueries({ queryKey: ['teams'] });
       queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
-      
+
       toast.success(`Team action "${variables.action}" performed successfully`);
     },
     onError: (error) => {
