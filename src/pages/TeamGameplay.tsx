@@ -52,8 +52,6 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { GlitchText } from '@/components/GlitchText';
-
-import { WrongAnswerEffect, SuccessEffect } from '@/components/GlitchEffects';
 import { BackButton } from '@/components/BackButton';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -95,11 +93,9 @@ export default function TeamGameplay() {
   const [answer, setAnswer] = useState('');
   const [isHintDialogOpen, setIsHintDialogOpen] = useState(false);
   const [currentHint, setCurrentHint] = useState('');
-  const [showWrongEffect, setShowWrongEffect] = useState(false);
-  const [showSuccessEffect, setShowSuccessEffect] = useState(false);
   const [isSkipDialogOpen, setIsSkipDialogOpen] = useState(false);
   const [showNavigator, setShowNavigator] = useState(true);
-  
+
   // NEW: Enhanced exam features state
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSaving, setIsSaving] = useState(false);
@@ -112,12 +108,12 @@ export default function TeamGameplay() {
   const [sessionRestored, setSessionRestored] = useState(false);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  
+
   // Level time limit countdown (40 minutes = 2400 seconds)
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const [timeExpired, setTimeExpired] = useState(false);
   const navigate = useNavigate();
-  
+
   // Track currently selected puzzle ID for navigation
   const [selectedPuzzleId, setSelectedPuzzleId] = useState<string | null>(null);
 
@@ -153,7 +149,7 @@ export default function TeamGameplay() {
       };
       localStorage.setItem('examSession', JSON.stringify(session));
     };
-    
+
     const interval = setInterval(saveSession, 15000); // Optimized: 15s instead of 5s
     return () => clearInterval(interval);
   }, [markedForReview, tabSwitchCount]);
@@ -168,7 +164,7 @@ export default function TeamGameplay() {
         className: 'bg-green-500 text-white',
       });
     };
-    
+
     const handleOffline = () => {
       setIsOnline(false);
       toast({
@@ -177,10 +173,10 @@ export default function TeamGameplay() {
         variant: 'destructive',
       });
     };
-    
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -198,7 +194,7 @@ export default function TeamGameplay() {
           }
           return newCount;
         });
-        
+
         toast({
           title: '⚠️ Tab Switch Detected',
           description: `Warning ${tabSwitchCount + 1}/3: Please stay on this tab during the exam.`,
@@ -206,7 +202,7 @@ export default function TeamGameplay() {
         });
       }
     };
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [tabSwitchCount, toast]);
@@ -217,13 +213,13 @@ export default function TeamGameplay() {
     queryFn: async () => {
       const token = localStorage.getItem('accessToken');
       // If a specific puzzle is selected, fetch it; otherwise get current
-      const url = selectedPuzzleId 
+      const url = selectedPuzzleId
         ? `${API_BASE}/gameplay/puzzle/current?puzzle_id=${selectedPuzzleId}`
         : `${API_BASE}/gameplay/puzzle/current`;
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to fetch puzzle');
@@ -240,12 +236,12 @@ export default function TeamGameplay() {
   useEffect(() => {
     if (puzzleData?.time_remaining_seconds !== undefined) {
       setRemainingTime(puzzleData.time_remaining_seconds);
-      
+
       // Reset timeExpired if we have fresh time remaining (game was restarted)
       // Also detect if this is a fresh game by checking if time is close to full (e.g., > 2350 seconds = 39+ minutes)
       if (puzzleData.time_remaining_seconds > 0 && !puzzleData.time_expired && !puzzleData.game_completed) {
         setTimeExpired(false);
-        
+
         // If nearly full time remaining (game just started/restarted), clear old session data
         if (puzzleData.time_remaining_seconds >= 2350) {
           localStorage.removeItem('examSession');
@@ -270,7 +266,7 @@ export default function TeamGameplay() {
   // Countdown timer effect
   useEffect(() => {
     if (remainingTime === null || timeExpired) return;
-    
+
     const interval = setInterval(() => {
       setRemainingTime(prev => {
         if (prev === null || prev <= 0) {
@@ -306,7 +302,7 @@ export default function TeamGameplay() {
         return prev - 1;
       });
     }, 1000);
-    
+
     return () => clearInterval(interval);
   }, [remainingTime !== null, timeExpired, navigate, toast]);
 
@@ -325,7 +321,7 @@ export default function TeamGameplay() {
       const response = await fetch(`${API_BASE}/gameplay/progress`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (!response.ok) throw new Error('Failed to fetch progress');
       return response.json();
     },
@@ -349,7 +345,7 @@ export default function TeamGameplay() {
           answer: submittedAnswer,
         }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to submit answer');
@@ -361,14 +357,14 @@ export default function TeamGameplay() {
       if (data.awaiting_evaluation) {
         setAnswer('');
         setCurrentHint('');
-        
+
         // Invalidate queries in low-priority batch
         startTransition(() => {
           queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
           queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
           queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
         });
-        
+
         // Navigate to next question - either from backend or find it ourselves
         if (data.next_puzzle && data.next_puzzle.id) {
           goToQuestion.mutate(data.next_puzzle.id);
@@ -381,7 +377,7 @@ export default function TeamGameplay() {
         }
         return;
       }
-      
+
       // Handle submissions_closed error (shouldn't reach here but just in case)
       if (data.submissions_closed) {
         toast({
@@ -391,27 +387,27 @@ export default function TeamGameplay() {
         });
         return;
       }
-      
+
       // Handle answer submission - ALWAYS move to next question (no feedback)
       setAnswer('');
       setCurrentHint('');
-      
+
       // Invalidate queries in low-priority batch
       startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
         queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
         queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
       });
-      
+
       if (data.game_completed) {
         toast({
-          title: '🎉 Game Completed!',
-          description: 'Congratulations! You have completed all puzzles!',
+          title: '🎉 Exam Completed!',
+          description: 'You have answered all questions!',
           className: 'bg-toxic-green text-black',
         });
         return;
       }
-      
+
       // ALWAYS navigate to next question after submit
       if (data.next_puzzle && data.next_puzzle.id) {
         goToQuestion.mutate(data.next_puzzle.id);
@@ -455,7 +451,7 @@ export default function TeamGameplay() {
           puzzle_id: puzzle?.id,
         }),
       });
-      
+
       if (!response.ok) throw new Error('Failed to get hint');
       return response.json();
     },
@@ -490,7 +486,7 @@ export default function TeamGameplay() {
       const response = await fetch(`${API_BASE}/game/time/session`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (!response.ok) throw new Error('Failed to fetch puzzles');
       return response.json();
     },
@@ -513,7 +509,7 @@ export default function TeamGameplay() {
           puzzle_id: puzzle?.id,
         }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to skip question');
@@ -525,7 +521,7 @@ export default function TeamGameplay() {
       setAnswer('');
       setCurrentHint('');
       setIsSkipDialogOpen(false);
-      
+
       // Navigate to next question if available
       if (data.next_puzzle && data.next_puzzle.id) {
         goToQuestion.mutate(data.next_puzzle.id);
@@ -672,7 +668,7 @@ export default function TeamGameplay() {
           className: 'bg-blue-500 text-white',
         });
       }
-      
+
       // Ctrl + Enter: Submit answer
       if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
@@ -680,7 +676,7 @@ export default function TeamGameplay() {
           submitAnswer.mutate(answer);
         }
       }
-      
+
       // Ctrl + M: Mark for review
       if (e.ctrlKey && e.key === 'm') {
         e.preventDefault();
@@ -689,19 +685,19 @@ export default function TeamGameplay() {
           toggleMarkForReview(currentPuzzleId);
         }
       }
-      
+
       // Ctrl + D: Clear answer
       if (e.ctrlKey && e.key === 'd') {
         e.preventDefault();
         clearAnswer();
       }
-      
+
       // Ctrl + Shift + F: Final submit (show dialog)
       if (e.ctrlKey && e.shiftKey && e.key === 'F') {
         e.preventDefault();
         setIsSubmitDialogOpen(true);
       }
-      
+
       // Ctrl + Left Arrow: Previous question
       if (e.ctrlKey && e.key === 'ArrowLeft') {
         e.preventDefault();
@@ -711,7 +707,7 @@ export default function TeamGameplay() {
           goToQuestion.mutate(prevQuestion.puzzle_id || prevQuestion.id || '');
         }
       }
-      
+
       // Ctrl + Right Arrow: Next question
       if (e.ctrlKey && e.key === 'ArrowRight') {
         e.preventDefault();
@@ -722,7 +718,7 @@ export default function TeamGameplay() {
         }
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [answer, puzzleData?.puzzle?.id, toggleMarkForReview, clearAnswer, saveAnswerToLocal, submitAnswer, toast, allQuestions, goToQuestion]);
@@ -732,7 +728,7 @@ export default function TeamGameplay() {
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
     }
-    
+
     const currentPuzzleId = puzzleData?.puzzle?.id;
     if (answer && currentPuzzleId) {
       setIsSaving(true);
@@ -740,7 +736,7 @@ export default function TeamGameplay() {
         saveAnswerToLocal();
       }, 2000); // Auto-save after 2 seconds of inactivity
     }
-    
+
     return () => {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
@@ -796,7 +792,7 @@ export default function TeamGameplay() {
             </div>
             <div className="flex gap-2">
               <Button
-                onClick={() => startTransition(() => queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] }))}
+                onClick={() => startTransition(() => { queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] }); })}
                 className="bg-toxic-green text-black hover:bg-toxic-green/80"
               >
                 Retry
@@ -927,10 +923,7 @@ export default function TeamGameplay() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Visual Effects */}
-      <WrongAnswerEffect show={showWrongEffect} />
-      <SuccessEffect show={showSuccessEffect} />
-      
+
       {/* Tab Warning Dialog */}
       <Dialog open={showTabWarning} onOpenChange={setShowTabWarning}>
         <DialogContent className="bg-black/95 border-red-500">
@@ -955,13 +948,12 @@ export default function TeamGameplay() {
       {/* Network Status & Auto-save Indicator */}
       <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
         {/* Network Status */}
-        <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs ${
-          isOnline ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-        }`}>
+        <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs ${isOnline ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+          }`}>
           {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
           {isOnline ? 'Online' : 'Offline'}
         </div>
-        
+
         {/* Auto-save Status */}
         {isSaving && (
           <div className="flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400 animate-pulse">
@@ -991,12 +983,12 @@ export default function TeamGameplay() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-toxic-green">
-              {allQuestions.length > 0 
-                ? Math.round((questionStats.answered / allQuestions.length) * 100) 
+              {allQuestions.length > 0
+                ? Math.round((questionStats.answered / allQuestions.length) * 100)
                 : (progress?.progress || 0)}%
             </p>
-            <Progress value={allQuestions.length > 0 
-              ? Math.round((questionStats.answered / allQuestions.length) * 100) 
+            <Progress value={allQuestions.length > 0
+              ? Math.round((questionStats.answered / allQuestions.length) * 100)
               : (progress?.progress || 0)} className="mt-2" />
           </CardContent>
         </Card>
@@ -1038,7 +1030,7 @@ export default function TeamGameplay() {
           </CardHeader>
           <CardContent>
             <p className={`text-2xl font-bold ${remainingTime !== null && remainingTime < 300 ? 'text-red-500' : remainingTime !== null && remainingTime < 600 ? 'text-orange-500' : 'text-blue-500'}`}>
-              {remainingTime !== null 
+              {remainingTime !== null
                 ? formatCountdown(remainingTime)
                 : '40:00'}
             </p>
@@ -1053,278 +1045,278 @@ export default function TeamGameplay() {
         {/* Main Content - Current Puzzle */}
         <div className="lg:col-span-2 space-y-6">
           {/* Puzzle Card */}
-      <Card className="bg-black/60 border-toxic-green">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-toxic-green font-mono mb-2">
-                LEVEL {puzzle.level} - PUZZLE {puzzle.puzzle_number}
-              </div>
-              <CardTitle className="text-2xl">
-                <GlitchText>{puzzle.title}</GlitchText>
-              </CardTitle>
-              <CardDescription className="mt-2 text-base">
-                {puzzle.description}
-              </CardDescription>
-            </div>
-            <div className="flex flex-col gap-2 items-end">
-              <div className="flex items-center gap-2 text-yellow-500">
-                <Award className="w-5 h-5" />
-                <span className="font-bold">{puzzle.points} pts</span>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Puzzle Content */}
-          <div className="p-6 bg-black border border-toxic-green/30 rounded-lg">
-            <div className="text-xs text-toxic-green font-mono mb-2">
-              PUZZLE TYPE: {puzzle.puzzle_type.toUpperCase()}
-            </div>
-            <pre className="text-zinc-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">
-              {puzzle.puzzle_content}
-            </pre>
-          </div>
-
-          {/* Stats Bar */}
-          <div className="flex items-center justify-between text-sm text-zinc-400">
-            <div>Attempts: <span className="text-toxic-green">{puzzle.progress?.attempts || 0}</span></div>
-            <div>
-              Hints Available: 
-              <span className="text-yellow-500 ml-1">
-                {puzzle.available_hints} / {puzzle.total_hints}
-              </span>
-            </div>
-          </div>
-
-          {/* Current Hint Display */}
-          {currentHint && (
-            <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <div className="flex items-start gap-3">
-                <Lightbulb className="w-5 h-5 text-yellow-500 mt-0.5" />
+          <Card className="bg-black/60 border-toxic-green">
+            <CardHeader>
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-yellow-500 mb-1">Hint:</div>
-                  <p className="text-zinc-200">{currentHint}</p>
+                  <div className="text-sm text-toxic-green font-mono mb-2">
+                    LEVEL {puzzle.level} - PUZZLE {puzzle.puzzle_number}
+                  </div>
+                  <CardTitle className="text-2xl">
+                    <GlitchText>{puzzle.title}</GlitchText>
+                  </CardTitle>
+                  <CardDescription className="mt-2 text-base">
+                    {puzzle.description}
+                  </CardDescription>
+                </div>
+                <div className="flex flex-col gap-2 items-end">
+                  <div className="flex items-center gap-2 text-yellow-500">
+                    <Award className="w-5 h-5" />
+                    <span className="font-bold">{puzzle.points} pts</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Puzzle Content */}
+              <div className="p-6 bg-black border border-toxic-green/30 rounded-lg">
+                <div className="text-xs text-toxic-green font-mono mb-2">
+                  PUZZLE TYPE: {puzzle.puzzle_type.toUpperCase()}
+                </div>
+                <pre className="text-zinc-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">
+                  {puzzle.puzzle_content}
+                </pre>
+              </div>
 
-          {/* Answer Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="answer" className="text-toxic-green text-lg">
-                  Enter Your Answer
-                </Label>
-                {/* Mark for Review Button */}
-                <Button
-                  type="button"
-                  onClick={() => toggleMarkForReview(puzzle?.id)}
-                  variant="ghost"
-                  size="sm"
-                  className={`${isMarkedForReview ? 'text-purple-400 bg-purple-500/20' : 'text-zinc-400 hover:text-purple-400'}`}
-                >
-                  <BookmarkPlus className="w-4 h-4 mr-1" />
-                  {isMarkedForReview ? 'Marked for Review' : 'Mark for Review'}
-                </Button>
+              {/* Stats Bar */}
+              <div className="flex items-center justify-between text-sm text-zinc-400">
+                <div>Attempts: <span className="text-toxic-green">{puzzle.progress?.attempts || 0}</span></div>
+                <div>
+                  Hints Available:
+                  <span className="text-yellow-500 ml-1">
+                    {puzzle.available_hints} / {puzzle.total_hints}
+                  </span>
+                </div>
               </div>
-              
-              <div className="flex gap-2 mt-2">
-                <Input
-                  id="answer"
-                  value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  placeholder={isQuestionCompleted ? "Question already completed" : "Type your answer here..."}
-                  className="flex-1 bg-black border-toxic-green/30 focus:border-toxic-green text-lg"
-                  disabled={submitAnswer.isPending || isQuestionCompleted}
-                />
-                {/* Clear Answer Button */}
-                <Button
-                  type="button"
-                  onClick={clearAnswer}
-                  variant="outline"
-                  disabled={!answer.trim() || isQuestionCompleted}
-                  className="border-zinc-500/50 text-zinc-400 hover:bg-zinc-500/10"
-                  title="Clear answer (Ctrl+D)"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={submitAnswer.isPending || !answer.trim() || isQuestionCompleted}
-                  className="bg-green-500 text-white hover:bg-green-600 px-8 font-bold text-lg shadow-lg shadow-green-500/50 border-2 border-green-400"
-                >
-                  {submitAnswer.isPending ? (
-                    'Submitting...'
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5 mr-2" />
-                      Submit
-                    </>
-                  )}
-                </Button>
-              </div>
-              <div className="text-xs text-zinc-500 mt-1">
-                Tip: Ctrl+Enter to submit, Ctrl+M to mark for review, Ctrl+D to clear, Ctrl+← / Ctrl+→ to navigate
-              </div>
-            </div>
 
-            {/* Action Buttons Row */}
-            <div className="grid grid-cols-2 gap-2">
-              {/* Hint Button */}
-              {puzzle.available_hints > 0 && (
-                <Button
-                  type="button"
-                  onClick={() => setIsHintDialogOpen(true)}
-                  variant="outline"
-                  className="border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
-                  disabled={isQuestionCompleted}
-                >
-                  <Lightbulb className="w-4 h-4 mr-2" />
-                  Request Hint ({puzzle.available_hints})
-                </Button>
+              {/* Current Hint Display */}
+              {currentHint && (
+                <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Lightbulb className="w-5 h-5 text-yellow-500 mt-0.5" />
+                    <div>
+                      <div className="text-sm font-semibold text-yellow-500 mb-1">Hint:</div>
+                      <p className="text-zinc-200">{currentHint}</p>
+                    </div>
+                  </div>
+                </div>
               )}
 
-              {/* Skip Question Button */}
-              <Button
-                type="button"
-                onClick={() => setIsSkipDialogOpen(true)}
-                variant="outline"
-                className={`border-orange-500/50 text-orange-400 hover:bg-orange-500/10 ${puzzle.available_hints <= 0 ? 'col-span-2' : ''}`}
-                disabled={skipQuestion.isPending || isQuestionCompleted}
-              >
-                <SkipForward className="w-4 h-4 mr-2" />
-                Skip Question
-              </Button>
-            </div>
+              {/* Answer Form */}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label htmlFor="answer" className="text-toxic-green text-lg">
+                      Enter Your Answer
+                    </Label>
+                    {/* Mark for Review Button */}
+                    <Button
+                      type="button"
+                      onClick={() => toggleMarkForReview(puzzle?.id)}
+                      variant="ghost"
+                      size="sm"
+                      className={`${isMarkedForReview ? 'text-purple-400 bg-purple-500/20' : 'text-zinc-400 hover:text-purple-400'}`}
+                    >
+                      <BookmarkPlus className="w-4 h-4 mr-1" />
+                      {isMarkedForReview ? 'Marked for Review' : 'Mark for Review'}
+                    </Button>
+                  </div>
 
-            {/* Previous/Next Navigation Buttons */}
-            <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-toxic-green/20">
-              {/* Previous Question Button */}
-              <Button
-                type="button"
-                onClick={() => {
-                  const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id);
-                  if (currentIndex > 0) {
-                    const prevQuestion = allQuestions[currentIndex - 1];
-                    goToQuestion.mutate(prevQuestion.puzzle_id || prevQuestion.id);
-                  }
-                }}
-                variant="outline"
-                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
-                disabled={goToQuestion.isPending || allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id) <= 0}
-              >
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                Previous Question
-              </Button>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      id="answer"
+                      value={answer}
+                      onChange={(e) => setAnswer(e.target.value)}
+                      placeholder={isQuestionCompleted ? "Question already completed" : "Type your answer here..."}
+                      className="flex-1 bg-black border-toxic-green/30 focus:border-toxic-green text-lg"
+                      disabled={submitAnswer.isPending || isQuestionCompleted}
+                    />
+                    {/* Clear Answer Button */}
+                    <Button
+                      type="button"
+                      onClick={clearAnswer}
+                      variant="outline"
+                      disabled={!answer.trim() || isQuestionCompleted}
+                      className="border-zinc-500/50 text-zinc-400 hover:bg-zinc-500/10"
+                      title="Clear answer (Ctrl+D)"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={submitAnswer.isPending || !answer.trim() || isQuestionCompleted}
+                      className="bg-green-500 text-white hover:bg-green-600 px-8 font-bold text-lg shadow-lg shadow-green-500/50 border-2 border-green-400"
+                    >
+                      {submitAnswer.isPending ? (
+                        'Submitting...'
+                      ) : (
+                        <>
+                          <Send className="w-5 h-5 mr-2" />
+                          Submit
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    Tip: Ctrl+Enter to submit, Ctrl+M to mark for review, Ctrl+D to clear, Ctrl+← / Ctrl+→ to navigate
+                  </div>
+                </div>
 
-              {/* Next Question Button */}
-              <Button
-                type="button"
-                onClick={() => {
-                  const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id);
-                  if (currentIndex < allQuestions.length - 1) {
-                    const nextQuestion = allQuestions[currentIndex + 1];
-                    goToQuestion.mutate(nextQuestion.puzzle_id || nextQuestion.id);
-                  }
-                }}
-                variant="outline"
-                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
-                disabled={goToQuestion.isPending || allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id) >= allQuestions.length - 1}
-              >
-                Next Question
-                <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+                {/* Action Buttons Row */}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Hint Button */}
+                  {puzzle.available_hints > 0 && (
+                    <Button
+                      type="button"
+                      onClick={() => setIsHintDialogOpen(true)}
+                      variant="outline"
+                      className="border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
+                      disabled={isQuestionCompleted}
+                    >
+                      <Lightbulb className="w-4 h-4 mr-2" />
+                      Request Hint ({puzzle.available_hints})
+                    </Button>
+                  )}
 
-      {/* Hint Confirmation Dialog */}
-      <Dialog open={isHintDialogOpen} onOpenChange={setIsHintDialogOpen}>
-        <DialogContent className="bg-black border-yellow-500">
-          <DialogHeader>
-            <DialogTitle className="text-yellow-500 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5" />
-              Request Hint
-            </DialogTitle>
-            <DialogDescription>
-              Using a hint will add a time penalty to your total score. 
-              Are you sure you want to proceed?
-            </DialogDescription>
-          </DialogHeader>
+                  {/* Skip Question Button */}
+                  <Button
+                    type="button"
+                    onClick={() => setIsSkipDialogOpen(true)}
+                    variant="outline"
+                    className={`border-orange-500/50 text-orange-400 hover:bg-orange-500/10 ${puzzle.available_hints <= 0 ? 'col-span-2' : ''}`}
+                    disabled={skipQuestion.isPending || isQuestionCompleted}
+                  >
+                    <SkipForward className="w-4 h-4 mr-2" />
+                    Skip Question
+                  </Button>
+                </div>
 
-          <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-            <p className="text-sm text-zinc-300">
-              ⚠️ Time penalties apply when using hints. This will affect your final ranking.
-            </p>
-          </div>
+                {/* Previous/Next Navigation Buttons */}
+                <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-toxic-green/20">
+                  {/* Previous Question Button */}
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id);
+                      if (currentIndex > 0) {
+                        const prevQuestion = allQuestions[currentIndex - 1];
+                        goToQuestion.mutate(prevQuestion.puzzle_id || prevQuestion.id);
+                      }
+                    }}
+                    variant="outline"
+                    className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                    disabled={goToQuestion.isPending || allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id) <= 0}
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-2" />
+                    Previous Question
+                  </Button>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsHintDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                handleRequestHint();
-                setIsHintDialogOpen(false);
-              }}
-              disabled={requestHint.isPending}
-              className="bg-yellow-500 text-black hover:bg-yellow-600"
-            >
-              {requestHint.isPending ? 'Getting Hint...' : 'Get Hint'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                  {/* Next Question Button */}
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id);
+                      if (currentIndex < allQuestions.length - 1) {
+                        const nextQuestion = allQuestions[currentIndex + 1];
+                        goToQuestion.mutate(nextQuestion.puzzle_id || nextQuestion.id);
+                      }
+                    }}
+                    variant="outline"
+                    className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                    disabled={goToQuestion.isPending || allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id) >= allQuestions.length - 1}
+                  >
+                    Next Question
+                    <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
 
-      {/* Skip Question Confirmation Dialog */}
-      <Dialog open={isSkipDialogOpen} onOpenChange={setIsSkipDialogOpen}>
-        <DialogContent className="bg-black border-orange-500">
-          <DialogHeader>
-            <DialogTitle className="text-orange-400 flex items-center gap-2">
-              <SkipForward className="w-5 h-5" />
-              Skip Question?
-            </DialogTitle>
-            <DialogDescription asChild>
-              <div className="space-y-2">
-                <p>Are you sure you want to skip this question?</p>
-                <ul className="list-disc list-inside text-sm space-y-1 mt-2">
-                  <li>You will move to the next available question</li>
-                  <li>You can return to this question later</li>
-                  <li className="text-orange-400 font-medium">A time penalty may be applied</li>
-                </ul>
+          {/* Hint Confirmation Dialog */}
+          <Dialog open={isHintDialogOpen} onOpenChange={setIsHintDialogOpen}>
+            <DialogContent className="bg-black border-yellow-500">
+              <DialogHeader>
+                <DialogTitle className="text-yellow-500 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  Request Hint
+                </DialogTitle>
+                <DialogDescription>
+                  Using a hint will add a time penalty to your total score.
+                  Are you sure you want to proceed?
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                <p className="text-sm text-zinc-300">
+                  ⚠️ Time penalties apply when using hints. This will affect your final ranking.
+                </p>
               </div>
-            </DialogDescription>
-          </DialogHeader>
 
-          <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
-            <p className="text-sm text-zinc-300">
-              💡 Tip: You can return to skipped questions from the Question Navigator panel.
-            </p>
-          </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsHintDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    handleRequestHint();
+                    setIsHintDialogOpen(false);
+                  }}
+                  disabled={requestHint.isPending}
+                  className="bg-yellow-500 text-black hover:bg-yellow-600"
+                >
+                  {requestHint.isPending ? 'Getting Hint...' : 'Get Hint'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsSkipDialogOpen(false)}
-            >
-              Keep Working
-            </Button>
-            <Button
-              onClick={() => skipQuestion.mutate()}
-              disabled={skipQuestion.isPending}
-              className="bg-orange-500 text-white hover:bg-orange-600"
-            >
-              {skipQuestion.isPending ? 'Skipping...' : 'Skip & Next'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {/* Skip Question Confirmation Dialog */}
+          <Dialog open={isSkipDialogOpen} onOpenChange={setIsSkipDialogOpen}>
+            <DialogContent className="bg-black border-orange-500">
+              <DialogHeader>
+                <DialogTitle className="text-orange-400 flex items-center gap-2">
+                  <SkipForward className="w-5 h-5" />
+                  Skip Question?
+                </DialogTitle>
+                <DialogDescription asChild>
+                  <div className="space-y-2">
+                    <p>Are you sure you want to skip this question?</p>
+                    <ul className="list-disc list-inside text-sm space-y-1 mt-2">
+                      <li>You will move to the next available question</li>
+                      <li>You can return to this question later</li>
+                      <li className="text-orange-400 font-medium">A time penalty may be applied</li>
+                    </ul>
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                <p className="text-sm text-zinc-300">
+                  💡 Tip: You can return to skipped questions from the Question Navigator panel.
+                </p>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsSkipDialogOpen(false)}
+                >
+                  Keep Working
+                </Button>
+                <Button
+                  onClick={() => skipQuestion.mutate()}
+                  disabled={skipQuestion.isPending}
+                  className="bg-orange-500 text-white hover:bg-orange-600"
+                >
+                  {skipQuestion.isPending ? 'Skipping...' : 'Skip & Next'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Sidebar - Question Navigator & Inventory */}
@@ -1372,7 +1364,7 @@ export default function TeamGameplay() {
                   const isReview = markedForReview.has(qId);
                   // Allow navigation to answered questions so users can view them
                   const canNavigate = !isCurrent;
-                  
+
                   return (
                     <button
                       key={qId}
@@ -1419,7 +1411,7 @@ export default function TeamGameplay() {
                   <div className="space-y-2">
                     {allQuestions
                       .filter((q: any) => q.status === 'skipped')
-                      .map((q: any) => (
+                      .map((q: any, i: number) => (
                         <button
                           key={q.puzzle_id || q.id}
                           onClick={() => goToQuestion.mutate(q.puzzle_id || q.id)}
@@ -1428,7 +1420,7 @@ export default function TeamGameplay() {
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-orange-400 truncate">
-                              Q{q.puzzle_number || index + 1}: {q.title}
+                              Q{q.puzzle_number || i + 1}: {q.title}
                             </span>
                             <ChevronRight className="w-4 h-4 text-orange-400" />
                           </div>
@@ -1465,15 +1457,14 @@ export default function TeamGameplay() {
               {/* Current Level Badge */}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-zinc-400">Current Level</span>
-                <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-                  progress?.current_level === 2 
-                    ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
-                    : 'bg-toxic-green/20 text-toxic-green border border-toxic-green/50'
-                }`}>
+                <span className={`px-3 py-1 rounded-full text-sm font-bold ${progress?.current_level === 2
+                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
+                  : 'bg-toxic-green/20 text-toxic-green border border-toxic-green/50'
+                  }`}>
                   {progress?.current_level === 2 ? '🏆 FINALS' : 'LEVEL ' + (progress?.current_level || 1)}
                 </span>
               </div>
-              
+
               {/* Qualification Status */}
               {progress && progress.current_level >= 2 && (
                 <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
@@ -1486,12 +1477,12 @@ export default function TeamGameplay() {
                   </p>
                 </div>
               )}
-              
+
               {/* Progress Stats */}
               <div className="space-y-2 pt-2 border-t border-toxic-green/20">
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Solved</span>
-                  <span className="text-green-400">{questionStats.answered} puzzles</span>
+                  <span className="text-zinc-400">Answered</span>
+                  <span className="text-green-400">{questionStats.answered} questions</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Skipped</span>
@@ -1503,9 +1494,8 @@ export default function TeamGameplay() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Status</span>
-                  <span className={`${
-                    progress?.status === 'active' ? 'text-green-400' : 'text-zinc-400'
-                  }`}>
+                  <span className={`${progress?.status === 'active' ? 'text-green-400' : 'text-zinc-400'
+                    }`}>
                     {progress?.status?.toUpperCase() || 'N/A'}
                   </span>
                 </div>
@@ -1544,7 +1534,7 @@ export default function TeamGameplay() {
               Are you sure you want to end your quiz?
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Progress Summary - Only counts, no correct/wrong info */}
             <div className="grid grid-cols-3 gap-3 p-4 bg-zinc-900 rounded-lg">
@@ -1561,7 +1551,7 @@ export default function TeamGameplay() {
                 <div className="text-xs text-zinc-400">Not Visited</div>
               </div>
             </div>
-            
+
             {/* Warning */}
             <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm">
               <div className="flex items-start gap-2 text-red-400">
@@ -1610,7 +1600,7 @@ export default function TeamGameplay() {
               Review your progress before finishing
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Progress Summary */}
             <div className="grid grid-cols-2 gap-4 p-4 bg-zinc-900 rounded-lg">
@@ -1631,7 +1621,7 @@ export default function TeamGameplay() {
                 <div className="text-xs text-zinc-400">Not Visited</div>
               </div>
             </div>
-            
+
             {/* Warning Messages */}
             {(questionStats.skipped > 0 || markedForReview.size > 0 || questionStats.notVisited > 0) && (
               <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm">
@@ -1651,7 +1641,7 @@ export default function TeamGameplay() {
                 </div>
               </div>
             )}
-            
+
             {/* Time Elapsed */}
             <div className="text-center py-2 border-t border-zinc-700">
               <span className="text-zinc-400 text-sm">Time Elapsed: </span>
@@ -1699,7 +1689,7 @@ export default function TeamGameplay() {
               Your 40-minute session has ended.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="text-center">
               <p className="text-lg text-zinc-300 mb-4">

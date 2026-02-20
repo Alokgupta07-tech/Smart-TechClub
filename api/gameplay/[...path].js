@@ -35,7 +35,7 @@ module.exports = async function handler(req, res) {
   const supabase = getSupabase();
   const path = req.url.replace('/api/gameplay', '').split('?')[0];
   const user = authResult.user;
-  
+
   // Parse query parameters
   const urlParts = req.url.split('?');
   const queryParams = new URLSearchParams(urlParts[1] || '');
@@ -62,7 +62,7 @@ module.exports = async function handler(req, res) {
           .order('puzzle_number', { ascending: true }),
         supabase
           .from('submissions')
-          .select('puzzle_id, is_correct')
+          .select('puzzle_id')
           .eq('team_id', team.id)
       ]);
 
@@ -70,23 +70,23 @@ module.exports = async function handler(req, res) {
       const puzzles = puzzlesResult.data;
 
       if (!puzzles || puzzles.length === 0) {
-        return res.status(404).json({ 
-          success: false, 
-          error: 'No active puzzle found. Please wait for the game to start or contact admin.' 
+        return res.status(404).json({
+          success: false,
+          error: 'No active puzzle found. Please wait for the game to start or contact admin.'
         });
       }
 
       const completedPuzzleIds = new Set();
       if (submissionsResult.data) {
-        submissionsResult.data.forEach(function(sub) {
-          if (sub.is_correct) completedPuzzleIds.add(sub.puzzle_id);
+        submissionsResult.data.forEach(function (sub) {
+          completedPuzzleIds.add(sub.puzzle_id);
         });
       }
-      
+
       // Check if a specific puzzle_id is requested
       const requestedPuzzleId = queryParams.get('puzzle_id');
       let currentPuzzle = null;
-      
+
       if (requestedPuzzleId) {
         // Find the requested puzzle
         currentPuzzle = puzzles.find(p => p.id === requestedPuzzleId);
@@ -139,7 +139,7 @@ module.exports = async function handler(req, res) {
       const TIME_LIMIT_SECONDS = 40 * 60; // 40 minutes
       let timeRemainingSeconds = TIME_LIMIT_SECONDS;
       let timeExpired = false;
-      
+
       if (team.start_time) {
         const startTime = new Date(team.start_time).getTime();
         const now = Date.now();
@@ -195,17 +195,17 @@ module.exports = async function handler(req, res) {
 
       const isCorrect = puzzle.correct_answer.toLowerCase().trim() === answer.toLowerCase().trim();
 
-      // Record submission (both correct and incorrect)
+      // Record submission (without validating correctness instantly)
       const { error: subError } = await supabase.from('submissions').insert({
         id: crypto.randomUUID(),
         team_id: team.id,
         puzzle_id: puzzle_id,
         submitted_answer: answer,
-        is_correct: isCorrect,
-        score_awarded: isCorrect ? puzzle.points : 0,
+        is_correct: null,
+        score_awarded: 0,
         evaluation_status: 'PENDING'
       });
-      
+
       if (subError) {
         console.error('Submission insert error:', subError);
       }
@@ -216,16 +216,16 @@ module.exports = async function handler(req, res) {
           id: crypto.randomUUID(),
           team_id: team.id,
           user_id: user.userId,
-          action_type: isCorrect ? 'puzzle_solve' : 'puzzle_fail',
-          type: isCorrect ? 'puzzle_solve' : 'puzzle_fail',
-          description: isCorrect ? `Solved puzzle: ${puzzle.title}` : `Wrong answer for: ${puzzle.title}`,
-          message: isCorrect ? `Solved puzzle: ${puzzle.title}` : `Wrong answer for: ${puzzle.title}`,
+          action_type: 'puzzle_submit',
+          type: 'puzzle_submit',
+          description: `Submitted answer for puzzle: ${puzzle.title}`,
+          message: `Submitted answer for puzzle: ${puzzle.title}`,
           puzzle_id: puzzle_id
         });
       } catch (logErr) {
         console.error('Activity log error:', logErr);
       }
-      
+
       // Also set start_time if not already set
       if (!team.start_time) {
         await supabase.from('teams').update({ start_time: new Date().toISOString() }).eq('id', team.id);
@@ -238,19 +238,16 @@ module.exports = async function handler(req, res) {
         .eq('level', puzzle.level)
         .order('puzzle_number', { ascending: true });
 
-      // Get all correct submissions for this team
+      // Get all submissions for this team (regardless of correctness)
       const { data: correctSubs } = await supabase
         .from('submissions')
         .select('puzzle_id')
-        .eq('team_id', team.id)
-        .eq('is_correct', true);
+        .eq('team_id', team.id);
 
       const completedPuzzleIds = new Set((correctSubs || []).map(s => s.puzzle_id));
-      
-      // Add current puzzle if correct
-      if (isCorrect) {
-        completedPuzzleIds.add(puzzle_id);
-      }
+
+      // Add current puzzle because it was submitted
+      completedPuzzleIds.add(puzzle_id);
 
       // Find next incomplete puzzle
       let nextPuzzle = null;
@@ -289,9 +286,9 @@ module.exports = async function handler(req, res) {
       // Always return response that allows moving to next question
       return res.json({
         success: true,
-        is_correct: isCorrect,
-        message: isCorrect ? 'Correct answer!' : 'Incorrect answer. Try again!',
-        points_earned: isCorrect ? puzzle.points : 0,
+        is_correct: null,
+        message: 'Answer recorded.',
+        points_earned: 0,
         next_puzzle: nextPuzzle,
         game_completed: gameCompleted
       });
@@ -318,9 +315,9 @@ module.exports = async function handler(req, res) {
         .select('hint_id')
         .eq('team_id', team.id)
         .eq('puzzle_id', puzzle_id);
-      
+
       const usedCount = (usedHints || []).length;
-      
+
       // Get next available hint
       const { data: availableHints } = await supabase
         .from('hints')
@@ -328,15 +325,15 @@ module.exports = async function handler(req, res) {
         .eq('puzzle_id', puzzle_id)
         .eq('is_active', true)
         .order('hint_number', { ascending: true });
-      
+
       if (!availableHints || availableHints.length === 0) {
         return res.status(404).json({ error: 'No hints available for this puzzle' });
       }
-      
+
       // Find next unused hint
       const usedHintIds = new Set((usedHints || []).map(h => h.hint_id));
       const nextHint = availableHints.find(h => !usedHintIds.has(h.id));
-      
+
       if (!nextHint) {
         return res.status(400).json({ error: 'All hints used for this puzzle' });
       }
@@ -382,16 +379,11 @@ module.exports = async function handler(req, res) {
       // Get submission stats
       const { data: subs } = await supabase
         .from('submissions')
-        .select('is_correct')
+        .select('id')
         .eq('team_id', team.id);
 
       var total = subs ? subs.length : 0;
-      var correct = 0;
-      if (subs) {
-        for (var i = 0; i < subs.length; i++) {
-          if (subs[i].is_correct) correct++;
-        }
-      }
+      var correct = total; // Map progress equally for answered questions
 
       return res.json({
         team: mapTeam(team),

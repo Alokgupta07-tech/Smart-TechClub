@@ -7,31 +7,31 @@ let cachedGameStateId = null;
 
 async function getGameStateId(supabase) {
   if (cachedGameStateId) return cachedGameStateId;
-  
+
   const { data, error } = await supabase.from('game_state').select('id').limit(1).single();
   if (data && data.id) {
     cachedGameStateId = data.id;
     return cachedGameStateId;
   }
-  
+
   // If no game state exists, create one
   if (error || !data) {
     const { data: newState, error: insertError } = await supabase
       .from('game_state')
-      .insert({ 
-        game_active: false, 
-        current_level: 1, 
-        level1_open: true, 
-        level2_open: false 
+      .insert({
+        game_active: false,
+        current_level: 1,
+        level1_open: true,
+        level2_open: false
       })
       .select('id')
       .single();
-    
+
     if (newState && newState.id) {
       cachedGameStateId = newState.id;
       return cachedGameStateId;
     }
-    
+
     // Last resort: try to get any existing row
     const { data: anyState } = await supabase.from('game_state').select('id').limit(1);
     if (anyState && anyState.length > 0) {
@@ -39,7 +39,7 @@ async function getGameStateId(supabase) {
       return cachedGameStateId;
     }
   }
-  
+
   throw new Error('Unable to find or create game_state');
 }
 
@@ -91,7 +91,7 @@ module.exports = async function handler(req, res) {
             .from('game_state')
             .select('game_active, game_ended_at')
             .limit(1);
-          
+
           const fallbackState = fallbackStates && fallbackStates.length > 0 ? fallbackStates[0] : {};
           return res.json({
             resultsPublished: false,
@@ -104,7 +104,7 @@ module.exports = async function handler(req, res) {
         if (error) throw error;
 
         const gameState = states && states.length > 0 ? states[0] : {};
-        
+
         return res.json({
           resultsPublished: gameState.results_published || false,
           gameEnded: !!gameState.game_ended_at,
@@ -125,24 +125,24 @@ module.exports = async function handler(req, res) {
 
     // ─── User-authenticated time tracking routes ───
     var isTimeTrackingRoute = path === '/session' || path === '/time/session' ||
-                              path === '/start-question' || path === '/time/start-question' ||
-                              path === '/pause-question' || path === '/time/pause-question' ||
-                              path === '/resume-question' || path === '/time/resume-question' ||
-                              path === '/skip-question' || path === '/time/skip-question' ||
-                              path === '/complete-question' || path === '/time/complete-question' ||
-                              path === '/skipped-questions' || path === '/time/skipped-questions' ||
-                              path === '/go-to-question' || path === '/time/go-to-question' ||
-                              path === '/game-summary' || path === '/time/game-summary' ||
-                              path.match(/^\/timer\/[^\/]+$/) || path.match(/^\/time\/timer\/[^\/]+$/);
-    
+      path === '/start-question' || path === '/time/start-question' ||
+      path === '/pause-question' || path === '/time/pause-question' ||
+      path === '/resume-question' || path === '/time/resume-question' ||
+      path === '/skip-question' || path === '/time/skip-question' ||
+      path === '/complete-question' || path === '/time/complete-question' ||
+      path === '/skipped-questions' || path === '/time/skipped-questions' ||
+      path === '/go-to-question' || path === '/time/go-to-question' ||
+      path === '/game-summary' || path === '/time/game-summary' ||
+      path.match(/^\/timer\/[^\/]+$/) || path.match(/^\/time\/timer\/[^\/]+$/);
+
     if (isTimeTrackingRoute) {
       const authResult = verifyAuth(req);
       if (authResult.error) {
         return res.status(authResult.status).json({ error: authResult.error, code: authResult.code });
       }
-      
+
       var user = authResult.user;
-      
+
       // Get user's team
       const { data: team } = await supabase
         .from('teams')
@@ -161,7 +161,7 @@ module.exports = async function handler(req, res) {
         if (team.start_time) {
           timeSpent = Math.floor((Date.now() - new Date(team.start_time).getTime()) / 1000);
         }
-        
+
         return res.json({
           timerState: {
             timeSpentSeconds: timeSpent,
@@ -180,39 +180,39 @@ module.exports = async function handler(req, res) {
         var totalTime = 0;
         var TIME_LIMIT = 40 * 60; // 40 minutes in seconds
         var timeRemaining = TIME_LIMIT;
-        
+
         if (team.start_time) {
           totalTime = Math.floor((Date.now() - new Date(team.start_time).getTime()) / 1000);
           timeRemaining = Math.max(0, TIME_LIMIT - totalTime);
         }
-        
+
         var hours = Math.floor(totalTime / 3600);
         var mins = Math.floor((totalTime % 3600) / 60);
         var secs = totalTime % 60;
         var formatted = String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-        
+
         // Fetch all puzzles for team's level
         const { data: puzzles } = await supabase
           .from('puzzles')
           .select('*')
           .eq('level', team.level || 1)
           .order('puzzle_number', { ascending: true });
-        
+
         // Get submissions for this team
         const { data: submissions } = await supabase
           .from('submissions')
-          .select('puzzle_id, is_correct')
+          .select('puzzle_id')
           .eq('team_id', team.id);
-        
+
         const successfulPuzzles = new Set();
         if (submissions) {
-          submissions.forEach(function(sub) {
-            if (sub.is_correct) successfulPuzzles.add(sub.puzzle_id);
+          submissions.forEach(function (sub) {
+            successfulPuzzles.add(sub.puzzle_id);
           });
         }
-        
+
         // Map puzzles with status
-        const puzzlesList = (puzzles || []).map(function(p) {
+        const puzzlesList = (puzzles || []).map(function (p) {
           const isCompleted = successfulPuzzles.has(p.id);
           return {
             id: p.id,
@@ -222,7 +222,7 @@ module.exports = async function handler(req, res) {
             status: isCompleted ? 'completed' : 'not_visited'
           };
         });
-        
+
         return res.json({
           session: {
             totalTimeSeconds: totalTime,
@@ -272,44 +272,44 @@ module.exports = async function handler(req, res) {
           .select('*')
           .eq('level', team.level || 1)
           .order('puzzle_number', { ascending: true });
-        
+
         if (puzzles && puzzles.length > 0) {
           // Find current puzzle and next puzzle
           const currentPuzzleId = req.body.puzzle_id;
-          const currentIndex = puzzles.findIndex(function(p) { return p.id === currentPuzzleId; });
+          const currentIndex = puzzles.findIndex(function (p) { return p.id === currentPuzzleId; });
           const nextIndex = currentIndex >= 0 && currentIndex < puzzles.length - 1 ? currentIndex + 1 : 0;
-          
-          return res.json({ 
-            success: true, 
+
+          return res.json({
+            success: true,
             message: 'Question skipped',
             next_puzzle: puzzles[nextIndex]
           });
         }
-        
+
         return res.json({ success: true, message: 'Question skipped' });
       }
 
       // ─── POST /api/game/go-to-question OR /api/game/time/go-to-question ───
       if (req.method === 'POST' && (path === '/go-to-question' || path === '/time/go-to-question')) {
         const puzzleId = req.body.puzzle_id;
-        
+
         if (!puzzleId) {
           return res.status(400).json({ error: 'puzzle_id required' });
         }
-        
+
         // Verify puzzle exists
         const { data: puzzle } = await supabase
           .from('puzzles')
           .select('*')
           .eq('id', puzzleId)
           .single();
-        
+
         if (!puzzle) {
           return res.status(404).json({ error: 'Puzzle not found' });
         }
-        
-        return res.json({ 
-          success: true, 
+
+        return res.json({
+          success: true,
           message: 'Navigated to question',
           puzzle: puzzle
         });
@@ -343,9 +343,9 @@ module.exports = async function handler(req, res) {
           .order('submitted_at', { ascending: false });
 
         // Build question summary
-        const questionSummary = (allPuzzles || []).map(function(q) {
-          const questionSubmissions = (submissions || []).filter(function(s) { return s.puzzle_id === q.id; });
-          const correctSubmission = questionSubmissions.find(function(s) { return s.is_correct; });
+        const questionSummary = (allPuzzles || []).map(function (q) {
+          const questionSubmissions = (submissions || []).filter(function (s) { return s.puzzle_id === q.id; });
+          const correctSubmission = questionSubmissions.find(function (s) { return s.is_correct; });
           const latestSubmission = questionSubmissions[0];
 
           return {
@@ -363,8 +363,8 @@ module.exports = async function handler(req, res) {
         });
 
         const totalQuestions = (allPuzzles || []).length;
-        const attemptedQuestions = questionSummary.filter(function(q) { return q.attempted; }).length;
-        const correctAnswers = questionSummary.filter(function(q) { return q.isCorrect; }).length;
+        const attemptedQuestions = questionSummary.filter(function (q) { return q.attempted; }).length;
+        const correctAnswers = questionSummary.filter(function (q) { return q.isCorrect; }).length;
         const wrongAnswers = attemptedQuestions - correctAnswers;
         const notAttempted = totalQuestions - attemptedQuestions;
 
@@ -417,7 +417,7 @@ module.exports = async function handler(req, res) {
 
       // Filter out expired messages
       const now = new Date();
-      const activeMessages = (broadcasts || []).filter(function(b) {
+      const activeMessages = (broadcasts || []).filter(function (b) {
         if (!b.expires_at) return true;
         return new Date(b.expires_at) > now;
       });
@@ -439,21 +439,21 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && path === '/start') {
       const gameStateId = await getGameStateId(supabase);
       const now = new Date().toISOString();
-      
+
       // Update game state
       const { error } = await supabase
         .from('game_state')
         .update({ game_active: true, game_started_at: now })
         .eq('id', gameStateId);
       if (error) throw error;
-      
+
       // Update all waiting and qualified teams to active status
       const { error: teamError } = await supabase
         .from('teams')
         .update({ status: 'active', start_time: now })
         .in('status', ['waiting', 'qualified']);
       if (teamError) throw teamError;
-      
+
       return res.json({ message: 'Game started' });
     }
 
@@ -495,13 +495,13 @@ module.exports = async function handler(req, res) {
       const gameStateId = await getGameStateId(supabase);
       const { error: gsErr } = await supabase
         .from('game_state')
-        .update({ 
-          game_active: false, 
-          current_level: 1, 
-          level1_open: true, 
+        .update({
+          game_active: false,
+          current_level: 1,
+          level1_open: true,
           level2_open: false,
-          game_started_at: null, 
-          game_ended_at: null 
+          game_started_at: null,
+          game_ended_at: null
         })
         .eq('id', gameStateId);
       if (gsErr) {
@@ -513,8 +513,8 @@ module.exports = async function handler(req, res) {
       // Note: teams table has: level, status, progress, hints_used, start_time, end_time
       const { error: tErr } = await supabase
         .from('teams')
-        .update({ 
-          level: 1, 
+        .update({
+          level: 1,
           status: 'waiting',
           progress: 0,
           hints_used: 0,
@@ -553,27 +553,27 @@ module.exports = async function handler(req, res) {
     // ─── POST /api/game/level2/unlock ───
     if (req.method === 'POST' && path === '/level2/unlock') {
       const gameStateId = await getGameStateId(supabase);
-      
+
       // Get current state
       const { data: gameState } = await supabase
         .from('game_state')
         .select('*')
         .eq('id', gameStateId)
         .single();
-      
+
       const now = new Date().toISOString();
       const updates = {
         current_level: 2,
         level2_open: true
       };
-      
+
       // If level 1 not started, start it along with level 2
       if (!gameState?.level1_open) {
         updates.level1_open = true;
         updates.game_active = true;
         updates.game_started_at = gameState?.game_started_at || now;
       }
-      
+
       const { error } = await supabase
         .from('game_state')
         .update(updates)
@@ -588,7 +588,7 @@ module.exports = async function handler(req, res) {
       const updates = { current_level: level };
       if (level === 1) updates.level1_open = true;
       if (level === 2) updates.level2_open = true;
-      
+
       const gameStateId = await getGameStateId(supabase);
       const { error } = await supabase
         .from('game_state')
