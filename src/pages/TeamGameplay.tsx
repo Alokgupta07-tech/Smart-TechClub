@@ -355,15 +355,30 @@ export default function TeamGameplay() {
       }
       return response.json();
     },
-    onSuccess: async (data) => {
+    onSuccess: async (data, submittedAnswer) => {
       // Handle "awaiting evaluation" response - silently move to next question
       if (data.awaiting_evaluation) {
+        // ✅ Persist answer in the query cache BEFORE clearing state
+        // so navigating back shows the answer the user just submitted
+        if (puzzle?.id) {
+          queryClient.setQueryData(['currentPuzzle', puzzle.id], (old: any) => {
+            if (!old) return old;
+            return {
+              ...old,
+              puzzle: {
+                ...old.puzzle,
+                is_completed: true,
+                submitted_answer: submittedAnswer,
+              },
+            };
+          });
+        }
+
         setAnswer('');
         setCurrentHint('');
 
         // Invalidate queries in low-priority batch
         startTransition(() => {
-          queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
           queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
           queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
         });
@@ -392,12 +407,27 @@ export default function TeamGameplay() {
       }
 
       // Handle answer submission - ALWAYS move to next question (no feedback)
+
+      // ✅ Persist answer in the query cache for this puzzle BEFORE clearing state
+      if (puzzle?.id) {
+        queryClient.setQueryData(['currentPuzzle', puzzle.id], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            puzzle: {
+              ...old.puzzle,
+              is_completed: true,
+              submitted_answer: answer, // Store the answer that was just submitted
+            },
+          };
+        });
+      }
+
       setAnswer('');
       setCurrentHint('');
 
-      // Invalidate queries in low-priority batch
+      // Invalidate in low-priority (do NOT invalidate currentPuzzle as we've manually set the cache)
       startTransition(() => {
-        queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
         queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
         queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
       });
