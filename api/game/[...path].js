@@ -201,25 +201,27 @@ module.exports = async function handler(req, res) {
         // Get submissions for this team
         const { data: submissions } = await supabase
           .from('submissions')
-          .select('puzzle_id')
+          .select('puzzle_id, submitted_answer')
           .eq('team_id', team.id);
 
-        const successfulPuzzles = new Set();
+        const successfulPuzzles = new Map();
         if (submissions) {
           submissions.forEach(function (sub) {
-            successfulPuzzles.add(sub.puzzle_id);
+            successfulPuzzles.set(sub.puzzle_id, sub.submitted_answer);
           });
         }
 
         // Map puzzles with status
         const puzzlesList = (puzzles || []).map(function (p) {
           const isCompleted = successfulPuzzles.has(p.id);
+          const submission = successfulPuzzles.get(p.id);
           return {
             id: p.id,
             puzzle_number: p.puzzle_number,
             title: p.title,
             points: p.points,
-            status: isCompleted ? 'completed' : 'not_visited'
+            status: isCompleted ? 'completed' : 'not_visited',
+            submitted_answer: submission || null
           };
         });
 

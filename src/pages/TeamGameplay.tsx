@@ -102,6 +102,7 @@ export default function TeamGameplay() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set());
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [skippedQuestions, setSkippedQuestions] = useState<Set<string>>(new Set());
   const [showTabWarning, setShowTabWarning] = useState(false);
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [isEndQuizDialogOpen, setIsEndQuizDialogOpen] = useState(false);
@@ -124,6 +125,7 @@ export default function TeamGameplay() {
       try {
         const session = JSON.parse(savedSession);
         setMarkedForReview(new Set(session.markedForReview || []));
+        setSkippedQuestions(new Set(session.skippedQuestions || []));
         setTabSwitchCount(session.tabSwitchCount || 0);
         if (!sessionRestored) {
           toast({
@@ -144,6 +146,7 @@ export default function TeamGameplay() {
     const saveSession = () => {
       const session = {
         markedForReview: Array.from(markedForReview),
+        skippedQuestions: Array.from(skippedQuestions),
         tabSwitchCount,
         lastActive: new Date().toISOString(),
       };
@@ -517,6 +520,11 @@ export default function TeamGameplay() {
       return response.json();
     },
     onSuccess: (data) => {
+      // Mark as skipped in frontend set
+      if (puzzle?.id) {
+        setSkippedQuestions(prev => new Set(prev).add(puzzle.id));
+      }
+
       // Silently skip and move to next question - no feedback toast
       setAnswer('');
       setCurrentHint('');
@@ -748,6 +756,14 @@ export default function TeamGameplay() {
   useEffect(() => {
     const currentPuzzleId = puzzleData?.puzzle?.id;
     if (currentPuzzleId) {
+      // Priority to authentic backend submitted answers
+      const serverAnswer = puzzleData?.puzzle?.submitted_answer;
+      if (serverAnswer) {
+        setAnswer(serverAnswer);
+        return;
+      }
+
+      // Fallback to local draft
       const savedAnswers = JSON.parse(localStorage.getItem('savedAnswers') || '{}');
       if (savedAnswers[currentPuzzleId]) {
         setAnswer(savedAnswers[currentPuzzleId].answer);
@@ -760,7 +776,7 @@ export default function TeamGameplay() {
         setAnswer('');
       }
     }
-  }, [puzzleData?.puzzle?.id, toast]);
+  }, [puzzleData?.puzzle?.id, puzzleData?.puzzle?.submitted_answer, toast]);
 
   // Handle puzzle loading error with dedicated UI
   if (puzzleError) {
@@ -816,10 +832,11 @@ export default function TeamGameplay() {
   // Get question status counts for exam navigation
   const getQuestionStats = () => {
     const answered = allQuestions.filter((q: { status?: string }) => q.status === 'completed').length;
-    const skipped = allQuestions.filter((q: { status?: string }) => q.status === 'skipped').length;
-    const current = allQuestions.filter((q: { status?: string }) => q.status === 'active').length;
-    const notVisited = allQuestions.filter((q: { status?: string }) => q.status === 'not_started' || q.status === 'not_visited').length;
-    return { answered, skipped, current, notVisited, total: allQuestions.length };
+    const current = 1; // Exam UX only shows 1 current at a time structurally
+    // Filter skipped questions that aren't also successfully answered yet
+    const skipped = Array.from(skippedQuestions).filter(id => !allQuestions.find((q: any) => (q.puzzle_id || q.id) === id)?.status?.includes('completed')).length;
+    const notVisited = allQuestions.length - answered - skipped - current;
+    return { answered, skipped, current, notVisited: notVisited > 0 ? notVisited : 0, total: allQuestions.length };
   };
 
   const questionStats = getQuestionStats();
@@ -920,6 +937,7 @@ export default function TeamGameplay() {
   // Check if question is completed (lock input)
   const isQuestionCompleted = allQuestions.find((q: any) => (q.puzzle_id || q.id) === puzzle?.id)?.status === 'completed';
   const isMarkedForReview = markedForReview.has(puzzle?.id || '');
+  const isCurrentlySkipped = skippedQuestions.has(puzzle?.id || '') && !isQuestionCompleted;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -1115,10 +1133,10 @@ export default function TeamGameplay() {
                       onClick={() => toggleMarkForReview(puzzle?.id)}
                       variant="ghost"
                       size="sm"
-                      className={`${isMarkedForReview ? 'text-purple-400 bg-purple-500/20' : 'text-zinc-400 hover:text-purple-400'}`}
+                      className={`${isMarkedForReview ? 'text-purple-400 bg-purple-500/20 ring-1 ring-purple-500' : 'text-zinc-400 hover:text-purple-400'}`}
                     >
-                      <BookmarkPlus className="w-4 h-4 mr-1" />
-                      {isMarkedForReview ? 'Marked for Review' : 'Mark for Review'}
+                      {isMarkedForReview ? <CheckCircle2 className="w-4 h-4 mr-1" /> : <BookmarkPlus className="w-4 h-4 mr-1" />}
+                      {isMarkedForReview ? 'Review Marked' : 'Mark for Review'}
                     </Button>
                   </div>
 
@@ -1145,9 +1163,17 @@ export default function TeamGameplay() {
                     <Button
                       type="submit"
                       disabled={submitAnswer.isPending || !answer.trim() || isQuestionCompleted}
-                      className="bg-green-500 text-white hover:bg-green-600 px-8 font-bold text-lg shadow-lg shadow-green-500/50 border-2 border-green-400"
+                      className={`px-8 font-bold text-lg border-2 shadow-lg transition-all ${isQuestionCompleted
+                        ? 'bg-blue-600/20 text-blue-400 border-blue-500 shadow-blue-500/20 cursor-default opacity-100'
+                        : 'bg-green-500 text-white hover:bg-green-600 shadow-green-500/50 border-green-400'
+                        }`}
                     >
-                      {submitAnswer.isPending ? (
+                      {isQuestionCompleted ? (
+                        <>
+                          <CheckCircle2 className="w-5 h-5 mr-2 text-blue-400" />
+                          Answered
+                        </>
+                      ) : submitAnswer.isPending ? (
                         'Submitting...'
                       ) : (
                         <>
@@ -1183,11 +1209,11 @@ export default function TeamGameplay() {
                     type="button"
                     onClick={() => setIsSkipDialogOpen(true)}
                     variant="outline"
-                    className={`border-orange-500/50 text-orange-400 hover:bg-orange-500/10 ${puzzle.available_hints <= 0 ? 'col-span-2' : ''}`}
+                    className={`${isCurrentlySkipped ? 'border-orange-500 text-orange-400 bg-orange-500/20' : 'border-orange-500/50 text-orange-400 hover:bg-orange-500/10'} ${puzzle.available_hints <= 0 ? 'col-span-2' : ''}`}
                     disabled={skipQuestion.isPending || isQuestionCompleted}
                   >
-                    <SkipForward className="w-4 h-4 mr-2" />
-                    Skip Question
+                    {isCurrentlySkipped ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <SkipForward className="w-4 h-4 mr-2" />}
+                    {isCurrentlySkipped ? 'Skipped' : 'Skip Question'}
                   </Button>
                 </div>
 
@@ -1336,7 +1362,7 @@ export default function TeamGameplay() {
               {/* Question Status Legend */}
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                   <span className="text-zinc-400">Answered ({questionStats.answered})</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1344,11 +1370,11 @@ export default function TeamGameplay() {
                   <span className="text-zinc-400">Skipped ({questionStats.skipped})</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></div>
+                  <div className="w-3 h-3 rounded-full bg-cyan-500 animate-pulse"></div>
                   <span className="text-zinc-400">Current ({questionStats.current})</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-purple-500 shadow-[0_0_4px_rgba(168,85,247,0.8)]"></div>
                   <span className="text-zinc-400">Review ({markedForReview.size})</span>
                 </div>
               </div>
@@ -1377,9 +1403,9 @@ export default function TeamGameplay() {
                       className={`
                         w-10 h-10 rounded-lg font-bold text-sm transition-all
                         flex items-center justify-center relative
-                        ${isAnswered ? 'bg-green-500/20 text-green-400 border border-green-500/50 hover:bg-green-500/30 cursor-pointer' : ''}
+                        ${isAnswered ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50 hover:bg-blue-500/30 cursor-pointer' : ''}
                         ${isSkipped ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 hover:bg-orange-500/30 cursor-pointer' : ''}
-                        ${isCurrent && !isAnswered && !isSkipped ? 'bg-blue-500/20 text-blue-400 border-2 border-blue-500 animate-pulse cursor-default' : ''}
+                        ${isCurrent && !isAnswered && !isSkipped ? 'bg-cyan-500/20 text-cyan-400 border-2 border-cyan-500 animate-pulse cursor-default' : ''}
                         ${isNotStarted && !isCurrent ? 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:bg-zinc-700/50 hover:text-zinc-300 cursor-pointer' : ''}
                         ${isReview && !isCurrent ? 'ring-2 ring-purple-500 ring-offset-1 ring-offset-black' : ''}
                       `}
@@ -1387,10 +1413,10 @@ export default function TeamGameplay() {
                     >
                       {/* Review marker */}
                       {isReview && (
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full shadow-[0_0_4px_rgba(168,85,247,0.8)]"></div>
                       )}
                       {isAnswered ? (
-                        <CheckCircle2 className="w-4 h-4" />
+                        <CheckCircle2 className="w-5 h-5 text-blue-500 drop-shadow-[0_0_2px_rgba(59,130,246,0.8)]" />
                       ) : isSkipped ? (
                         <SkipForward className="w-4 h-4" />
                       ) : (

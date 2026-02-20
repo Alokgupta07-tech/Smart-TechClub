@@ -62,7 +62,7 @@ module.exports = async function handler(req, res) {
           .order('puzzle_number', { ascending: true }),
         supabase
           .from('submissions')
-          .select('puzzle_id')
+          .select('puzzle_id, submitted_answer')
           .eq('team_id', team.id)
       ]);
 
@@ -77,9 +77,11 @@ module.exports = async function handler(req, res) {
       }
 
       const completedPuzzleIds = new Set();
+      const submittedAnswers = {};
       if (submissionsResult.data) {
         submissionsResult.data.forEach(function (sub) {
           completedPuzzleIds.add(sub.puzzle_id);
+          submittedAnswers[sub.puzzle_id] = sub.submitted_answer;
         });
       }
 
@@ -155,7 +157,8 @@ module.exports = async function handler(req, res) {
           progress: (progress && progress[0]) || { attempts: 0, hints_used: 0 },
           available_hints: availableHints.length,
           total_hints: (allHints || []).length,
-          is_completed: completedPuzzleIds.has(currentPuzzle.id)
+          is_completed: completedPuzzleIds.has(currentPuzzle.id),
+          submitted_answer: submittedAnswers[currentPuzzle.id] || null
         },
         team: mapTeam(team),
         total_puzzles: puzzles.length,
