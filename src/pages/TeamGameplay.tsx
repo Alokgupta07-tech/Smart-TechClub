@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, startTransition, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -155,7 +155,8 @@ export default function TeamGameplay() {
 
     const interval = setInterval(saveSession, 15000); // Optimized: 15s instead of 5s
     return () => clearInterval(interval);
-  }, [markedForReview, tabSwitchCount]);
+    // FIX 1: include skippedQuestions so the interval recreates when it changes
+  }, [markedForReview, skippedQuestions, tabSwitchCount]);
 
   // Network status monitoring
   useEffect(() => {
@@ -361,7 +362,8 @@ export default function TeamGameplay() {
         // ✅ Persist answer in the query cache BEFORE clearing state
         // so navigating back shows the answer the user just submitted
         if (puzzle?.id) {
-          queryClient.setQueryData(['currentPuzzle', puzzle.id], (old: any) => {
+          // FIX 3: use selectedPuzzleId as the cache key to match the useQuery key
+          queryClient.setQueryData(['currentPuzzle', selectedPuzzleId], (old: any) => {
             if (!old) return old;
             return {
               ...old,
@@ -377,11 +379,9 @@ export default function TeamGameplay() {
         setAnswer('');
         setCurrentHint('');
 
-        // Invalidate queries in low-priority batch
-        startTransition(() => {
-          queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
-          queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
-        });
+        // FIX 4: invalidate immediately (not deferred) so answered count updates right away
+        queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
+        queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
 
         // Navigate to next question - either from backend or find it ourselves
         if (data.next_puzzle && data.next_puzzle.id) {
@@ -410,14 +410,16 @@ export default function TeamGameplay() {
 
       // ✅ Persist answer in the query cache for this puzzle BEFORE clearing state
       if (puzzle?.id) {
-        queryClient.setQueryData(['currentPuzzle', puzzle.id], (old: any) => {
+        // FIX 2: use submittedAnswer param (not stale answer closure) so the right value is cached
+        // FIX 3: use selectedPuzzleId as the cache key to match the useQuery queryKey
+        queryClient.setQueryData(['currentPuzzle', selectedPuzzleId], (old: any) => {
           if (!old) return old;
           return {
             ...old,
             puzzle: {
               ...old.puzzle,
               is_completed: true,
-              submitted_answer: answer, // Store the answer that was just submitted
+              submitted_answer: submittedAnswer, // FIX 2: was using stale `answer` closure
             },
           };
         });
@@ -426,11 +428,9 @@ export default function TeamGameplay() {
       setAnswer('');
       setCurrentHint('');
 
-      // Invalidate in low-priority (do NOT invalidate currentPuzzle as we've manually set the cache)
-      startTransition(() => {
-        queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
-        queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
-      });
+      // FIX 4: invalidate immediately so the answered count is up-to-date when End Quiz is opened
+      queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
+      queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
 
       if (data.game_completed) {
         toast({
@@ -863,8 +863,11 @@ export default function TeamGameplay() {
   const getQuestionStats = () => {
     const answered = allQuestions.filter((q: { status?: string }) => q.status === 'completed').length;
     const current = 1; // Exam UX only shows 1 current at a time structurally
-    // Filter skipped questions that aren't also successfully answered yet
-    const skipped = Array.from(skippedQuestions).filter(id => !allQuestions.find((q: any) => (q.puzzle_id || q.id) === id)?.status?.includes('completed')).length;
+    // FIX 5: merge backend status with frontend skippedQuestions set (backend never returns 'skipped')
+    const skipped = allQuestions.filter((q: any) => {
+      const qId = q.puzzle_id || q.id;
+      return q.status === 'skipped' || (skippedQuestions.has(qId) && q.status !== 'completed');
+    }).length;
     const notVisited = allQuestions.length - answered - skipped - current;
     return { answered, skipped, current, notVisited: notVisited > 0 ? notVisited : 0, total: allQuestions.length };
   };
@@ -1414,9 +1417,10 @@ export default function TeamGameplay() {
                 {allQuestions.map((q: any, index: number) => {
                   const qId = q.puzzle_id || q.id;
                   const isAnswered = q.status === 'completed';
-                  const isSkipped = q.status === 'skipped';
+                  // FIX 5: merge frontend skippedQuestions set since backend never returns 'skipped'
+                  const isSkipped = q.status === 'skipped' || (skippedQuestions.has(qId) && q.status !== 'completed');
                   const isCurrent = qId === puzzle?.id;
-                  const isNotStarted = q.status === 'not_started' || q.status === 'not_visited';
+                  const isNotStarted = !isAnswered && !isSkipped && (q.status === 'not_started' || q.status === 'not_visited');
                   const isReview = markedForReview.has(qId);
                   // Allow navigation to answered questions so users can view them
                   const canNavigate = !isCurrent;
