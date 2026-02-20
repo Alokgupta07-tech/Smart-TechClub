@@ -105,7 +105,7 @@ export default function GameControl() {
   const [selectedLevel, setSelectedLevel] = useState<number>(1); // NEW: Track selected level for evaluation
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
-  
+
   // Generic confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -113,8 +113,8 @@ export default function GameControl() {
     description: string;
     action: () => void;
     variant?: 'default' | 'destructive';
-  }>({ open: false, title: '', description: '', action: () => {} });
-  
+  }>({ open: false, title: '', description: '', action: () => { } });
+
   const showConfirm = (title: string, description: string, action: () => void, variant: 'default' | 'destructive' = 'default') => {
     setConfirmDialog({ open: true, title, description, action, variant });
   };
@@ -124,7 +124,7 @@ export default function GameControl() {
     queryKey: ['gameState'],
     queryFn: async () => {
       const response = await fetchWithAuth(`${API_BASE}/game/state`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch game state');
       }
@@ -158,7 +158,7 @@ export default function GameControl() {
     queryFn: async () => {
       try {
         const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${selectedLevel}/status`);
-        
+
         if (!response.ok) {
           // Evaluation endpoints not implemented yet - return null silently
           return null;
@@ -182,7 +182,7 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/close-submissions`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to close submissions');
@@ -213,7 +213,7 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/evaluate`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to evaluate answers');
@@ -226,7 +226,7 @@ export default function GameControl() {
       });
       toast({
         title: 'Evaluation Complete',
-        description: `${data.stats.submissions_evaluated} submissions evaluated. ${data.stats.correct_answers || 0} correct.`,
+        description: `${data?.stats?.submissions_evaluated || 0} submissions evaluated. ${data?.stats?.correct_answers || 0} correct.`,
       });
     },
     onError: (error: Error) => {
@@ -244,7 +244,7 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/publish-results`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to publish results');
@@ -258,7 +258,7 @@ export default function GameControl() {
       });
       toast({
         title: 'Results Published!',
-        description: `Level ${selectedLevel} results are now visible. ${data.stats.qualified} qualified, ${data.stats.disqualified} disqualified.`,
+        description: `Level ${selectedLevel} results are now visible. ${data?.stats?.qualified || 0} qualified, ${data?.stats?.disqualified || 0} disqualified.`,
         className: 'bg-green-500 text-white',
       });
     },
@@ -277,7 +277,7 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/reopen-submissions`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to reopen submissions');
@@ -308,7 +308,7 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/reset-evaluation`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to reset evaluation');
@@ -341,21 +341,21 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/game/start`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) throw new Error('Failed to start game');
       return response.json();
     },
     onMutate: () => {
       // Optimistic update (non-blocking)
       const previousState = queryClient.getQueryData(['gameState']);
-      
+
       queryClient.setQueryData(['gameState'], (old: any) => ({
         ...old,
         game_active: true,
         level1_open: true,
         game_started_at: new Date().toISOString(),
       }));
-      
+
       return { previousState };
     },
     onSuccess: () => {
@@ -363,7 +363,7 @@ export default function GameControl() {
       startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
-      
+
       toast({
         title: 'Success',
         description: 'Game started! Level 1 unlocked.',
@@ -390,20 +390,20 @@ export default function GameControl() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ level: 2 }),
       });
-      
+
       if (!response.ok) throw new Error('Failed to unlock Level 2');
       return response.json();
     },
     onMutate: () => {
       // Optimistic update (non-blocking)
       const previousState = queryClient.getQueryData(['gameState']);
-      
+
       queryClient.setQueryData(['gameState'], (old: any) => ({
         ...old,
         level2_open: true,
         current_level: 2,
       }));
-      
+
       return { previousState };
     },
     onSuccess: () => {
@@ -411,7 +411,7 @@ export default function GameControl() {
       startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
-      
+
       toast({
         title: 'Success',
         description: 'Level 2 unlocked!',
@@ -436,7 +436,7 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/game/pause`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) throw new Error('Failed to pause game');
       return response.json();
     },
@@ -445,7 +445,7 @@ export default function GameControl() {
       startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
-      
+
       toast({
         title: 'Game Paused',
         description: 'All teams have been paused',
@@ -459,7 +459,7 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/game/resume`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) throw new Error('Failed to resume game');
       return response.json();
     },
@@ -468,7 +468,7 @@ export default function GameControl() {
       startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
-      
+
       toast({
         title: 'Game Resumed',
         description: 'All teams have been resumed',
@@ -482,7 +482,7 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/game/end`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) throw new Error('Failed to end game');
       return response.json();
     },
@@ -491,7 +491,7 @@ export default function GameControl() {
       startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
-      
+
       toast({
         title: 'Game Ended',
         description: 'All teams have been marked as completed',
@@ -505,7 +505,7 @@ export default function GameControl() {
       const response = await fetchWithAuth(`${API_BASE}/game/restart`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) throw new Error('Failed to restart game');
       return response.json();
     },
@@ -514,7 +514,7 @@ export default function GameControl() {
       startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
-      
+
       toast({
         title: 'Game Restarted',
         description: 'Game has been reset to initial state',
@@ -543,7 +543,7 @@ export default function GameControl() {
           expires_in_minutes: 30,
         }),
       });
-      
+
       if (!response.ok) throw new Error('Failed to broadcast message');
       return response.json();
     },
@@ -556,7 +556,7 @@ export default function GameControl() {
       });
     },
   });
-  
+
   // Derive phase from game_active and game_ended_at for display
   const getCurrentPhase = (): string => {
     if (!gameState) return 'not_started';
@@ -565,7 +565,7 @@ export default function GameControl() {
     if (!gameState.game_active) return 'paused';
     return `level_${gameState.current_level}`;
   };
-  
+
   const currentPhase = getCurrentPhase();
 
   const getPhaseDisplay = (phase: string | undefined | null) => {
@@ -604,7 +604,7 @@ export default function GameControl() {
     <div className="container mx-auto p-6 space-y-6">
       {/* Back Button */}
       <BackButton label="Back to Admin" to="/admin" />
-      
+
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-toxic-green">Game Control</h1>
@@ -745,15 +745,13 @@ export default function GameControl() {
 
           {/* Pause/Resume Game - Only shown when game is active or paused */}
           {currentPhase !== 'not_started' && currentPhase !== 'completed' && (
-            <div className={`flex items-center justify-between p-4 border-2 rounded-lg ${
-              currentPhase === 'paused' 
-                ? 'border-green-500/40 bg-green-500/10' 
+            <div className={`flex items-center justify-between p-4 border-2 rounded-lg ${currentPhase === 'paused'
+                ? 'border-green-500/40 bg-green-500/10'
                 : 'border-yellow-500/40 bg-yellow-500/10'
-            }`}>
+              }`}>
               <div className="flex-1">
-                <h3 className={`font-semibold flex items-center gap-2 ${
-                  currentPhase === 'paused' ? 'text-green-500' : 'text-yellow-500'
-                }`}>
+                <h3 className={`font-semibold flex items-center gap-2 ${currentPhase === 'paused' ? 'text-green-500' : 'text-yellow-500'
+                  }`}>
                   {currentPhase === 'paused' ? (
                     <>
                       <Play className="w-5 h-5" />
@@ -834,42 +832,42 @@ export default function GameControl() {
 
       {/* Level Management */}
       {!!gameState?.game_active && (
-      <Card className="bg-black/40 border-purple-500/20">
-        <CardHeader>
-          <CardTitle className="text-purple-500 flex items-center gap-2">
-            <Layers className="w-5 h-5" />
-            Level Management
-          </CardTitle>
-          <CardDescription>
-            Control access to different game levels
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Unlock Level 2 */}
-          {!gameState?.level2_open && (
-            <div className="flex items-center justify-between p-4 border border-purple-500/20 rounded-lg">
-              <div className="flex-1">
-                <h3 className="font-semibold text-purple-500">Unlock Level 2</h3>
-                <p className="text-sm text-zinc-400">
-                  Allow teams to progress to Level 2 puzzles
-                </p>
+        <Card className="bg-black/40 border-purple-500/20">
+          <CardHeader>
+            <CardTitle className="text-purple-500 flex items-center gap-2">
+              <Layers className="w-5 h-5" />
+              Level Management
+            </CardTitle>
+            <CardDescription>
+              Control access to different game levels
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Unlock Level 2 */}
+            {!gameState?.level2_open && (
+              <div className="flex items-center justify-between p-4 border border-purple-500/20 rounded-lg">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-purple-500">Unlock Level 2</h3>
+                  <p className="text-sm text-zinc-400">
+                    Allow teams to progress to Level 2 puzzles
+                  </p>
+                </div>
+                <Button
+                  onClick={() => showConfirm(
+                    'Unlock Level 2',
+                    'Unlock Level 2 for all teams?',
+                    () => startTransition(() => unlockLevel2.mutate())
+                  )}
+                  disabled={unlockLevel2.isPending}
+                  className="bg-purple-500 text-white hover:bg-purple-600"
+                >
+                  <Unlock className="w-4 h-4 mr-2" />
+                  {unlockLevel2.isPending ? 'Unlocking...' : 'Unlock Level 2'}
+                </Button>
               </div>
-              <Button
-                onClick={() => showConfirm(
-                  'Unlock Level 2',
-                  'Unlock Level 2 for all teams?',
-                  () => startTransition(() => unlockLevel2.mutate())
-                )}
-                disabled={unlockLevel2.isPending}
-                className="bg-purple-500 text-white hover:bg-purple-600"
-              >
-                <Unlock className="w-4 h-4 mr-2" />
-                {unlockLevel2.isPending ? 'Unlocking...' : 'Unlock Level 2'}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Communication & Utilities */}
@@ -1065,12 +1063,11 @@ export default function GameControl() {
                 <CardTitle className="text-sm text-zinc-400">Current State</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className={`text-lg font-bold ${
-                  evaluationStatus?.evaluation_state === 'RESULTS_PUBLISHED' ? 'text-green-500' :
-                  evaluationStatus?.evaluation_state === 'EVALUATING' ? 'text-yellow-500' :
-                  evaluationStatus?.evaluation_state === 'SUBMISSIONS_CLOSED' ? 'text-orange-500' :
-                  'text-cyan-500'
-                }`}>
+                <p className={`text-lg font-bold ${evaluationStatus?.evaluation_state === 'RESULTS_PUBLISHED' ? 'text-green-500' :
+                    evaluationStatus?.evaluation_state === 'EVALUATING' ? 'text-yellow-500' :
+                      evaluationStatus?.evaluation_state === 'SUBMISSIONS_CLOSED' ? 'text-orange-500' :
+                        'text-cyan-500'
+                  }`}>
                   {evaluationStatus?.evaluation_state?.replace(/_/g, ' ') || 'IN PROGRESS'}
                 </p>
               </CardContent>
@@ -1120,16 +1117,15 @@ export default function GameControl() {
           {/* Sequential Action Buttons */}
           <div className="space-y-4">
             {/* Step 1: Close Submissions */}
-            <div className={`flex items-center justify-between p-4 border rounded-lg ${
-              evaluationStatus?.actions?.can_close_submissions || evaluationStatus?.actions?.can_reopen_submissions ? 'border-orange-500/30' : 'border-zinc-700 opacity-50'
-            }`}>
+            <div className={`flex items-center justify-between p-4 border rounded-lg ${evaluationStatus?.actions?.can_close_submissions || evaluationStatus?.actions?.can_reopen_submissions ? 'border-orange-500/30' : 'border-zinc-700 opacity-50'
+              }`}>
               <div>
                 <h3 className="font-semibold text-orange-500 flex items-center gap-2">
                   <Lock className="w-4 h-4" />
                   Step 1: {evaluationStatus?.evaluation_state === 'IN_PROGRESS' ? 'Close' : 'Reopen'} Submissions
                 </h3>
                 <p className="text-sm text-zinc-400">
-                  {evaluationStatus?.evaluation_state === 'IN_PROGRESS' 
+                  {evaluationStatus?.evaluation_state === 'IN_PROGRESS'
                     ? `Lock further answer submissions for Level ${selectedLevel}`
                     : `Reopen submissions for Level ${selectedLevel} (will reset evaluation if already done)`
                   }
@@ -1160,9 +1156,8 @@ export default function GameControl() {
             </div>
 
             {/* Step 2: Evaluate Answers */}
-            <div className={`flex items-center justify-between p-4 border rounded-lg ${
-              evaluationStatus?.actions?.can_evaluate ? 'border-yellow-500/30' : 'border-zinc-700 opacity-50'
-            }`}>
+            <div className={`flex items-center justify-between p-4 border rounded-lg ${evaluationStatus?.actions?.can_evaluate ? 'border-yellow-500/30' : 'border-zinc-700 opacity-50'
+              }`}>
               <div>
                 <h3 className="font-semibold text-yellow-500 flex items-center gap-2">
                   <ClipboardCheck className="w-4 h-4" />
@@ -1187,9 +1182,8 @@ export default function GameControl() {
             </div>
 
             {/* Step 3: Publish Results */}
-            <div className={`flex items-center justify-between p-4 border rounded-lg ${
-              evaluationStatus?.actions?.can_publish ? 'border-green-500/30' : 'border-zinc-700 opacity-50'
-            }`}>
+            <div className={`flex items-center justify-between p-4 border rounded-lg ${evaluationStatus?.actions?.can_publish ? 'border-green-500/30' : 'border-zinc-700 opacity-50'
+              }`}>
               <div>
                 <h3 className="font-semibold text-green-500 flex items-center gap-2">
                   <Eye className="w-4 h-4" />

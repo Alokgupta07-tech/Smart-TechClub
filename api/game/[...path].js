@@ -547,6 +547,51 @@ module.exports = async function handler(req, res) {
         console.log('Team puzzles clear (may be empty):', e);
       }
 
+      // Clear level evaluation states
+      try {
+        await supabase
+          .from('level_evaluation_state')
+          .update({
+            evaluation_state: 'IN_PROGRESS',
+            evaluation_started_at: null,
+            evaluated_at: null,
+            results_published_at: null
+          })
+          .not('id', 'is', null);
+      } catch (e) {
+        console.log('Level evaluation flush:', e);
+      }
+
+      // Clear team level status records
+      try {
+        await supabase
+          .from('team_level_status')
+          .delete()
+          .not('id', 'is', null);
+      } catch (e) {
+        console.log('Team level status wipe:', e);
+      }
+
+      // Clear activity logs 
+      try {
+        await supabase
+          .from('activity_logs')
+          .delete()
+          .not('id', 'is', null);
+      } catch (e) {
+        console.log('Activity logs wipe:', e);
+      }
+
+      // Update game state for overall results flag
+      try {
+        await supabase
+          .from('game_state')
+          .update({ results_published: false })
+          .eq('id', gameStateId);
+      } catch (e) {
+        console.log('Game state results flush:', e);
+      }
+
       return res.json({ message: 'Game reset - all progress cleared' });
     }
 

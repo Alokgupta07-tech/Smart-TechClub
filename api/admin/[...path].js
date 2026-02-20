@@ -953,21 +953,13 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      // Reset team_level_status qualification
+      // Reset team_level_status qualification (delete records for fresh start)
       try {
         await supabase.from('team_level_status')
-          .update({
-            qualification_status: 'PENDING',
-            qualification_decided_at: null,
-            results_visible: false,
-            was_manually_overridden: false,
-            override_by: null,
-            override_reason: null,
-            updated_at: new Date().toISOString()
-          })
+          .delete()
           .eq('level_id', levelId);
       } catch (e) {
-        console.log('Error resetting team_level_status:', e.message);
+        console.log('Error deleting team_level_status:', e.message);
       }
 
       // Reset evaluation state to SUBMISSIONS_CLOSED
