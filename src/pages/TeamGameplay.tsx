@@ -1370,8 +1370,8 @@ export default function TeamGameplay() {
                   const isCurrent = qId === puzzle?.id;
                   const isNotStarted = q.status === 'not_started' || q.status === 'not_visited';
                   const isReview = markedForReview.has(qId);
-                  // Block navigation to answered questions - users cannot view answers during quiz
-                  const canNavigate = !isCurrent && !isAnswered;
+                  // Allow navigation to answered questions so users can view them
+                  const canNavigate = !isCurrent;
                   
                   return (
                     <button
@@ -1385,13 +1385,13 @@ export default function TeamGameplay() {
                       className={`
                         w-10 h-10 rounded-lg font-bold text-sm transition-all
                         flex items-center justify-center relative
-                        ${isAnswered ? 'bg-green-500/20 text-green-400 border border-green-500/50 cursor-not-allowed opacity-60' : ''}
+                        ${isAnswered ? 'bg-green-500/20 text-green-400 border border-green-500/50 hover:bg-green-500/30 cursor-pointer' : ''}
                         ${isSkipped ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 hover:bg-orange-500/30 cursor-pointer' : ''}
                         ${isCurrent && !isAnswered && !isSkipped ? 'bg-blue-500/20 text-blue-400 border-2 border-blue-500 animate-pulse cursor-default' : ''}
                         ${isNotStarted && !isCurrent ? 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:bg-zinc-700/50 hover:text-zinc-300 cursor-pointer' : ''}
                         ${isReview && !isCurrent ? 'ring-2 ring-purple-500 ring-offset-1 ring-offset-black' : ''}
                       `}
-                      title={`Q${index + 1}: ${q.title} (${q.status})${isReview ? ' [Marked for Review]' : ''}${isAnswered ? ' - Answered (locked)' : canNavigate ? ' - Click to navigate' : ' (current)'}`}
+                      title={`Q${index + 1}: ${q.title} (${q.status})${isReview ? ' [Marked for Review]' : ''}${isAnswered ? ' - Answered (click to view)' : canNavigate ? ' - Click to navigate' : ' (current)'}`}
                     >
                       {/* Review marker */}
                       {isReview && (
@@ -1438,7 +1438,7 @@ export default function TeamGameplay() {
                 </div>
               )}
 
-              {/* Answered Questions Count - Users cannot view answered questions during quiz */}
+              {/* Answered Questions Count - Users can view answered questions during quiz */}
               {questionStats.answered > 0 && (
                 <div className="mt-4 pt-4 border-t border-toxic-green/20">
                   <p className="text-xs text-green-400 flex items-center gap-1">
@@ -1446,7 +1446,7 @@ export default function TeamGameplay() {
                     {questionStats.answered} question(s) answered
                   </p>
                   <p className="text-xs text-zinc-500 mt-1">
-                    You cannot view answered questions during the quiz.
+                    You can view answered questions to check your responses.
                   </p>
                 </div>
               )}

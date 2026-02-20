@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Users, 
-  Search, 
-  Download, 
-  Filter,
+import {
+  Users,
+  Search,
+  Download,
   ArrowLeft,
   Mail,
   CheckCircle,
@@ -65,17 +64,17 @@ const TeamMembers = () => {
 
   // Filter teams
   const filteredTeams = teams.filter(team => {
-    const matchesSearch = 
+    const matchesSearch =
       team.teamName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       team.leader?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       team.leader?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      team.members.some(m => 
+      team.members.some(m =>
         m.member_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.member_email?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-    
+
     const matchesStatus = statusFilter === 'all' || team.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -83,7 +82,7 @@ const TeamMembers = () => {
   const handleExport = () => {
     const csvRows = [];
     csvRows.push(['Team Name', 'Team Status', 'Member Name', 'Member Email', 'Role', 'Is Leader']);
-    
+
     filteredTeams.forEach(team => {
       // Add leader
       if (team.leader) {
@@ -96,7 +95,7 @@ const TeamMembers = () => {
           'Yes'
         ]);
       }
-      
+
       // Add members
       team.members.forEach(member => {
         csvRows.push([
@@ -110,7 +109,7 @@ const TeamMembers = () => {
       });
     });
 
-    const csvContent = csvRows.map(row => 
+    const csvContent = csvRows.map(row =>
       row.map(cell => `"${cell}"`).join(',')
     ).join('\n');
 
@@ -176,7 +175,7 @@ const TeamMembers = () => {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Button
                 variant="terminal"
@@ -207,7 +206,7 @@ const TeamMembers = () => {
               className="pl-10 font-terminal"
             />
           </div>
-          
+
           <div className="flex gap-2">
             <Button
               variant={statusFilter === 'all' ? 'default' : 'outline'}
@@ -309,7 +308,7 @@ const TeamMembers = () => {
                           </td>
                         </tr>
                       )}
-                      
+
                       {/* Member Rows */}
                       {team.members.map((member, index) => (
                         <tr key={member.id} className="border-b border-primary/10 hover:bg-muted/10">

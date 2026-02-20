@@ -60,7 +60,7 @@ module.exports = async function handler(req, res) {
       if (tErr) throw tErr;
 
       var userIds = [];
-      (teams || []).forEach(function(t) {
+      (teams || []).forEach(function (t) {
         if (t.user_id && userIds.indexOf(t.user_id) === -1) userIds.push(t.user_id);
       });
       var usersMap = {};
@@ -69,10 +69,10 @@ module.exports = async function handler(req, res) {
           .from('users')
           .select('id, name, email')
           .in('id', userIds);
-        (users || []).forEach(function(u) { usersMap[u.id] = u; });
+        (users || []).forEach(function (u) { usersMap[u.id] = u; });
       }
 
-      var result = (teams || []).map(function(t) { return mapTeam(t, usersMap); });
+      var result = (teams || []).map(function (t) { return mapTeam(t, usersMap); });
       return res.json(result);
     }
 
@@ -111,10 +111,10 @@ module.exports = async function handler(req, res) {
       if (leader) usMap[team.user_id] = leader;
       var mapped = mapTeam(team, usMap);
       mapped.members = members || [];
-      
+
       // Add debug logging
       console.log('Team details for', teamId, '- Members count:', (members || []).length);
-      
+
       return res.json(mapped);
     }
 
@@ -150,7 +150,7 @@ module.exports = async function handler(req, res) {
       var avgTime = '00:00:00';
       if (completedTeams && completedTeams.length > 0) {
         var totalSec = 0;
-        completedTeams.forEach(function(t) {
+        completedTeams.forEach(function (t) {
           totalSec += Math.floor((new Date(t.end_time) - new Date(t.start_time)) / 1000);
         });
         var avgSec = Math.floor(totalSec / completedTeams.length);
@@ -165,7 +165,7 @@ module.exports = async function handler(req, res) {
         .from('teams')
         .select('hints_used');
       var totalHints = 0;
-      (hintData || []).forEach(function(t) { totalHints += (t.hints_used || 0); });
+      (hintData || []).forEach(function (t) { totalHints += (t.hints_used || 0); });
 
       return res.json({
         totalTeams: totalTeams || 0,
@@ -191,7 +191,7 @@ module.exports = async function handler(req, res) {
         return res.json([]);
       }
 
-      var alerts = (logs || []).map(function(log, idx) {
+      var alerts = (logs || []).map(function (log, idx) {
         var timeAgo = '';
         if (log.created_at) {
           var diffMs = Date.now() - new Date(log.created_at).getTime();
@@ -277,10 +277,10 @@ module.exports = async function handler(req, res) {
     // ─── POST /api/admin/teams/:id/qualify-level2 ───
     if (req.method === 'POST' && path.match(/^\/teams\/[^\/]+\/qualify-level2$/)) {
       var qualifyTeamId = path.split('/')[2];
-      
+
       const { error } = await supabase
         .from('teams')
-        .update({ 
+        .update({
           status: 'qualified',
           level: 2
         })
@@ -293,7 +293,7 @@ module.exports = async function handler(req, res) {
     // ─── POST /api/admin/teams/:id/disqualify ───
     if (req.method === 'POST' && path.match(/^\/teams\/[^\/]+\/disqualify$/)) {
       var disqualifyTeamId = path.split('/')[2];
-      
+
       const { error } = await supabase
         .from('teams')
         .update({ status: 'disqualified' })
@@ -317,7 +317,7 @@ module.exports = async function handler(req, res) {
       var activeTeams = 0;
       var completedTeams = 0;
       var totalProgress = 0;
-      (allTeams || []).forEach(function(t) {
+      (allTeams || []).forEach(function (t) {
         if (t.status === 'active' || t.status === 'paused') activeTeams++;
         if (t.status === 'completed') completedTeams++;
         totalProgress += t.progress || 0;
@@ -328,7 +328,7 @@ module.exports = async function handler(req, res) {
       var liveTeams = allTeams || [];
 
       var liveUserIds = [];
-      liveTeams.forEach(function(t) {
+      liveTeams.forEach(function (t) {
         if (t.user_id && liveUserIds.indexOf(t.user_id) === -1) liveUserIds.push(t.user_id);
       });
       var liveUsersMap = {};
@@ -337,7 +337,7 @@ module.exports = async function handler(req, res) {
           .from('users')
           .select('id, name')
           .in('id', liveUserIds);
-        (users || []).forEach(function(u) { liveUsersMap[u.id] = u; });
+        (users || []).forEach(function (u) { liveUsersMap[u.id] = u; });
       }
 
       // Calculate scores and progress from submissions
@@ -346,19 +346,19 @@ module.exports = async function handler(req, res) {
         .from('submissions')
         .select('team_id, puzzle_id, is_correct, score_awarded, submitted_at')
         .in('team_id', teamIds) : { data: [] };
-      
+
       // Get puzzles for progress calculation
       const { data: puzzles } = await supabase
         .from('puzzles')
         .select('id')
         .eq('is_active', true);
       var totalPuzzles = (puzzles || []).length || 10;
-      
+
       var scoreMap = {};
       var correctMap = {};
       var attemptMap = {};
       var lastActivityMap = {};
-      (submissions || []).forEach(function(s) {
+      (submissions || []).forEach(function (s) {
         if (!scoreMap[s.team_id]) scoreMap[s.team_id] = 0;
         if (!correctMap[s.team_id]) correctMap[s.team_id] = 0;
         if (!attemptMap[s.team_id]) attemptMap[s.team_id] = 0;
@@ -372,7 +372,7 @@ module.exports = async function handler(req, res) {
         }
       });
 
-      var liveResult = liveTeams.map(function(t) {
+      var liveResult = liveTeams.map(function (t) {
         // Calculate elapsed time
         var elapsedSec = 0;
         if (t.start_time) {
@@ -382,10 +382,10 @@ module.exports = async function handler(req, res) {
         var mins = Math.floor((elapsedSec % 3600) / 60);
         var secs = elapsedSec % 60;
         var elapsed = hrs.toString().padStart(2, '0') + ':' + mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
-        
+
         var correctCount = correctMap[t.id] || 0;
         var progressPct = totalPuzzles > 0 ? Math.round((correctCount / totalPuzzles) * 100) : 0;
-        
+
         return {
           id: t.id,
           team_name: t.team_name,
@@ -423,7 +423,7 @@ module.exports = async function handler(req, res) {
         .select('id, team_id, action_type, description, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
-      
+
       if (error) {
         // Fallback: try with different column names
         const { data: logs2, error: err2 } = await supabase
@@ -431,11 +431,11 @@ module.exports = async function handler(req, res) {
           .select('id, team_id, type, message, created_at')
           .order('created_at', { ascending: false })
           .limit(50);
-        
+
         if (err2) {
           return res.json({ logs: [] });
         }
-        
+
         // Get team names
         const teamIds = [...new Set((logs2 || []).map(l => l.team_id).filter(Boolean))];
         let teamsMap = {};
@@ -446,7 +446,7 @@ module.exports = async function handler(req, res) {
             .in('id', teamIds);
           (teams || []).forEach(t => { teamsMap[t.id] = t.team_name; });
         }
-        
+
         // Map to expected format
         const mappedLogs = (logs2 || []).map(l => ({
           id: l.id,
@@ -455,10 +455,10 @@ module.exports = async function handler(req, res) {
           description: l.message || '',
           timestamp: l.created_at
         }));
-        
+
         return res.json({ logs: mappedLogs });
       }
-      
+
       // Get team names
       const teamIds = [...new Set((logs || []).map(l => l.team_id).filter(Boolean))];
       let teamsMap = {};
@@ -469,7 +469,7 @@ module.exports = async function handler(req, res) {
           .in('id', teamIds);
         (teams || []).forEach(t => { teamsMap[t.id] = t.team_name; });
       }
-      
+
       // Map to expected format
       const mappedLogs = (logs || []).map(l => ({
         id: l.id,
@@ -478,7 +478,7 @@ module.exports = async function handler(req, res) {
         description: l.description || '',
         timestamp: l.created_at
       }));
-      
+
       return res.json({ logs: mappedLogs });
     }
 
@@ -507,12 +507,12 @@ module.exports = async function handler(req, res) {
         .from('teams')
         .select('id, team_name, status, start_time, end_time, hints_used')
         .order('created_at', { ascending: false });
-      
+
       if (teamsResult.error) {
         return res.json({ success: true, teams: [] });
       }
       var teams = teamsResult.data || [];
-      
+
       // Get puzzle count
       var puzzlesResult = await supabase
         .from('puzzles')
@@ -522,42 +522,42 @@ module.exports = async function handler(req, res) {
         .order('puzzle_number');
       var puzzles = puzzlesResult.data || [];
       var totalQuestions = puzzles.length > 0 ? puzzles.length : 10;
-      
+
       // Get all progress records
       var progressResult = await supabase
         .from('team_question_progress')
         .select('team_id, puzzle_id, status, attempts, correct, time_spent_seconds, started_at, completed_at');
       var allProgress = progressResult.data || [];
-      
+
       // Build team info with actual progress data
-      var teamsWithDetails = teams.map(function(team) {
+      var teamsWithDetails = teams.map(function (team) {
         var totalTimeSeconds = 0;
         if (team.start_time && team.end_time) {
           totalTimeSeconds = Math.floor((new Date(team.end_time) - new Date(team.start_time)) / 1000);
         } else if (team.start_time && team.status === 'active') {
           totalTimeSeconds = Math.floor((new Date() - new Date(team.start_time)) / 1000);
         }
-        
+
         // Filter progress for this team
-        var teamProgress = allProgress.filter(function(p) { return p.team_id === team.id; });
-        var completedCount = teamProgress.filter(function(p) { return p.status === 'COMPLETED'; }).length;
-        var skippedCount = teamProgress.filter(function(p) { return p.status === 'SKIPPED'; }).length;
-        var correctCount = teamProgress.filter(function(p) { return p.correct === true; }).length;
-        var wrongCount = teamProgress.filter(function(p) { return p.attempts > 0 && p.correct !== true; }).length;
+        var teamProgress = allProgress.filter(function (p) { return p.team_id === team.id; });
+        var completedCount = teamProgress.filter(function (p) { return p.status === 'COMPLETED'; }).length;
+        var skippedCount = teamProgress.filter(function (p) { return p.status === 'SKIPPED'; }).length;
+        var correctCount = teamProgress.filter(function (p) { return p.correct === true; }).length;
+        var wrongCount = teamProgress.filter(function (p) { return p.attempts > 0 && p.correct !== true; }).length;
         var currentQ = completedCount + skippedCount + 1;
-        
+
         // Get current status
         var currentStatus = team.status || 'waiting';
-        var inProgressQ = teamProgress.find(function(p) { return p.status === 'IN_PROGRESS'; });
+        var inProgressQ = teamProgress.find(function (p) { return p.status === 'IN_PROGRESS'; });
         if (inProgressQ) {
           currentStatus = 'playing';
         } else if (completedCount >= totalQuestions) {
           currentStatus = 'completed';
         }
-        
+
         // Build question times array
-        var questionTimes = puzzles.map(function(puzzle, idx) {
-          var progress = teamProgress.find(function(p) { return p.puzzle_id === puzzle.id; });
+        var questionTimes = puzzles.map(function (puzzle, idx) {
+          var progress = teamProgress.find(function (p) { return p.puzzle_id === puzzle.id; });
           return {
             questionNumber: idx + 1,
             questionId: puzzle.id,
@@ -568,7 +568,7 @@ module.exports = async function handler(req, res) {
             correct: progress ? progress.correct : null
           };
         });
-        
+
         return {
           teamId: team.id,
           teamName: team.team_name,
@@ -585,7 +585,7 @@ module.exports = async function handler(req, res) {
           questionTimes: questionTimes
         };
       });
-      
+
       return res.json({ success: true, teams: teamsWithDetails });
     }
 
@@ -596,34 +596,34 @@ module.exports = async function handler(req, res) {
         .select('id, title, level, puzzle_number')
         .order('level')
         .order('puzzle_number');
-      
+
       if (puzzlesResult.error) {
         return res.json({ success: true, questions: [], overallAvgTime: 600 });
       }
       var puzzles = puzzlesResult.data || [];
-      
+
       // Get all progress data
       var progressResult = await supabase
         .from('team_question_progress')
         .select('puzzle_id, status, attempts, time_spent_seconds, correct');
       var allProgress = progressResult.data || [];
-      
+
       // Calculate overall average time
-      var allTimes = allProgress.filter(function(p) { return p.time_spent_seconds > 0; }).map(function(p) { return p.time_spent_seconds; });
-      var overallAvgTime = allTimes.length > 0 ? Math.floor(allTimes.reduce(function(a, b) { return a + b; }, 0) / allTimes.length) : 600;
-      
+      var allTimes = allProgress.filter(function (p) { return p.time_spent_seconds > 0; }).map(function (p) { return p.time_spent_seconds; });
+      var overallAvgTime = allTimes.length > 0 ? Math.floor(allTimes.reduce(function (a, b) { return a + b; }, 0) / allTimes.length) : 600;
+
       return res.json({
         success: true,
-        questions: puzzles.map(function(p) {
-          var puzzleProgress = allProgress.filter(function(pr) { return pr.puzzle_id === p.id; });
-          var completedCount = puzzleProgress.filter(function(pr) { return pr.status === 'COMPLETED'; }).length;
-          var skippedCount = puzzleProgress.filter(function(pr) { return pr.status === 'SKIPPED'; }).length;
-          var totalAttempts = puzzleProgress.reduce(function(sum, pr) { return sum + (pr.attempts || 0); }, 0);
-          var times = puzzleProgress.filter(function(pr) { return pr.time_spent_seconds > 0; }).map(function(pr) { return pr.time_spent_seconds; });
-          var avgTime = times.length > 0 ? Math.floor(times.reduce(function(a, b) { return a + b; }, 0) / times.length) : 0;
+        questions: puzzles.map(function (p) {
+          var puzzleProgress = allProgress.filter(function (pr) { return pr.puzzle_id === p.id; });
+          var completedCount = puzzleProgress.filter(function (pr) { return pr.status === 'COMPLETED'; }).length;
+          var skippedCount = puzzleProgress.filter(function (pr) { return pr.status === 'SKIPPED'; }).length;
+          var totalAttempts = puzzleProgress.reduce(function (sum, pr) { return sum + (pr.attempts || 0); }, 0);
+          var times = puzzleProgress.filter(function (pr) { return pr.time_spent_seconds > 0; }).map(function (pr) { return pr.time_spent_seconds; });
+          var avgTime = times.length > 0 ? Math.floor(times.reduce(function (a, b) { return a + b; }, 0) / times.length) : 0;
           var minTime = times.length > 0 ? Math.min.apply(null, times) : 0;
           var maxTime = times.length > 0 ? Math.max.apply(null, times) : 0;
-          
+
           return {
             id: p.id,
             title: p.title,
@@ -693,13 +693,13 @@ module.exports = async function handler(req, res) {
 
       // Create a map of leaders
       var leaderMap = {};
-      (leaders || []).forEach(function(leader) {
+      (leaders || []).forEach(function (leader) {
         leaderMap[leader.id] = leader;
       });
 
       // Group members by team
       var membersByTeam = {};
-      (allMembers || []).forEach(function(member) {
+      (allMembers || []).forEach(function (member) {
         if (!membersByTeam[member.team_id]) {
           membersByTeam[member.team_id] = [];
         }
@@ -707,7 +707,7 @@ module.exports = async function handler(req, res) {
       });
 
       // Combine everything
-      var result = teams.map(function(team) {
+      var result = teams.map(function (team) {
         var leader = leaderMap[team.user_id];
         return {
           teamId: team.id,
@@ -750,7 +750,7 @@ module.exports = async function handler(req, res) {
       // Update results_published flag
       const { error: updateError } = await supabase
         .from('game_state')
-        .update({ 
+        .update({
           results_published: shouldPublish,
           updated_at: new Date().toISOString()
         })
@@ -759,7 +759,7 @@ module.exports = async function handler(req, res) {
       if (updateError) {
         // If column doesn't exist, inform admin to run migration
         if (updateError.message && updateError.message.includes('results_published')) {
-          return res.status(400).json({ 
+          return res.status(400).json({
             error: 'Column "results_published" not found. Please run the migration: server/migrations/add-results-published.sql',
             migrationRequired: true
           });
@@ -768,8 +768,8 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to update results status' });
       }
 
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         resultsPublished: shouldPublish,
         message: shouldPublish ? 'Results published! Top 3 teams will see celebration.' : 'Results unpublished.'
       });
@@ -786,7 +786,7 @@ module.exports = async function handler(req, res) {
 
         // Handle case where column doesn't exist
         if (error && error.message && error.message.includes('results_published')) {
-          return res.json({ 
+          return res.json({
             resultsPublished: false,
             gameEnded: false
           });
@@ -796,7 +796,7 @@ module.exports = async function handler(req, res) {
           return res.status(500).json({ error: 'Failed to fetch results status' });
         }
 
-        return res.json({ 
+        return res.json({
           resultsPublished: gameState?.results_published || false,
           gameEnded: !!gameState?.game_ended_at
         });
@@ -810,47 +810,47 @@ module.exports = async function handler(req, res) {
     var evalStatusMatch = path.match(/^\/evaluation\/level\/(\d+)\/status$/);
     if (req.method === 'GET' && evalStatusMatch) {
       var levelId = parseInt(evalStatusMatch[1]);
-      
+
       // Get game state
       const { data: gameState } = await supabase
         .from('game_state')
         .select('*')
         .limit(1)
         .single();
-      
+
       // Get submissions count for this level
       const { data: puzzles } = await supabase
         .from('puzzles')
         .select('id')
         .eq('level', levelId);
-      
-      var puzzleIds = (puzzles || []).map(function(p) { return p.id; });
+
+      var puzzleIds = (puzzles || []).map(function (p) { return p.id; });
       var totalSubmissions = 0;
       var pendingSubmissions = 0;
       var teamsWithSubmissions = 0;
-      
+
       if (puzzleIds.length > 0) {
         const { count } = await supabase
           .from('submissions')
           .select('*', { count: 'exact', head: true })
           .in('puzzle_id', puzzleIds);
         totalSubmissions = count || 0;
-        
+
         const { data: teamSubs } = await supabase
           .from('submissions')
           .select('team_id')
           .in('puzzle_id', puzzleIds);
         var uniqueTeams = {};
-        (teamSubs || []).forEach(function(s) { uniqueTeams[s.team_id] = true; });
+        (teamSubs || []).forEach(function (s) { uniqueTeams[s.team_id] = true; });
         teamsWithSubmissions = Object.keys(uniqueTeams).length;
       }
-      
+
       // Get teams count
       const { count: totalTeams } = await supabase
         .from('teams')
         .select('id', { count: 'exact', head: true })
         .eq('level', levelId);
-      
+
       // Determine evaluation state from game_state
       var evalState = 'IN_PROGRESS';
       if (gameState) {
@@ -860,7 +860,7 @@ module.exports = async function handler(req, res) {
           evalState = 'SUBMISSIONS_CLOSED';
         }
       }
-      
+
       return res.json({
         level: levelId,
         evaluation_state: evalState,
@@ -890,30 +890,30 @@ module.exports = async function handler(req, res) {
     var closeSubMatch = path.match(/^\/evaluation\/level\/(\d+)\/close-submissions$/);
     if (req.method === 'POST' && closeSubMatch) {
       var levelId = parseInt(closeSubMatch[1]);
-      
+
       // Update game_state to mark submissions closed
       const { data: existing } = await supabase
         .from('game_state')
         .select('id')
         .limit(1)
         .single();
-      
+
       if (existing) {
         await supabase
           .from('game_state')
-          .update({ 
+          .update({
             game_ended_at: new Date().toISOString(),
-            game_active: false 
+            game_active: false
           })
           .eq('id', existing.id);
       }
-      
+
       // Count affected teams
       const { count: teamsAffected } = await supabase
         .from('teams')
         .select('id', { count: 'exact', head: true })
         .eq('level', levelId);
-      
+
       return res.json({
         success: true,
         message: 'Submissions closed successfully',
@@ -926,7 +926,7 @@ module.exports = async function handler(req, res) {
     var resetEvalMatch = path.match(/^\/evaluation\/level\/(\d+)\/reset-evaluation$/);
     if (req.method === 'POST' && resetEvalMatch) {
       var levelId = parseInt(resetEvalMatch[1]);
-      
+
       // Get puzzles for this level
       let puzzleIds = [];
       try {
@@ -994,11 +994,11 @@ module.exports = async function handler(req, res) {
           .select('id')
           .limit(1)
           .single();
-        
+
         if (existing) {
           await supabase
             .from('game_state')
-            .update({ 
+            .update({
               results_published: false,
               updated_at: new Date().toISOString()
             })
@@ -1018,24 +1018,24 @@ module.exports = async function handler(req, res) {
     var reopenSubMatch = path.match(/^\/evaluation\/level\/(\d+)\/reopen-submissions$/);
     if (req.method === 'POST' && reopenSubMatch) {
       var levelId = parseInt(reopenSubMatch[1]);
-      
+
       // Update game_state to reopen submissions
       const { data: existing } = await supabase
         .from('game_state')
         .select('id')
         .limit(1)
         .single();
-      
+
       if (existing) {
         await supabase
           .from('game_state')
-          .update({ 
+          .update({
             game_ended_at: null,
-            game_active: true 
+            game_active: true
           })
           .eq('id', existing.id);
       }
-      
+
       return res.json({
         success: true,
         message: 'Submissions reopened successfully',
@@ -1047,13 +1047,48 @@ module.exports = async function handler(req, res) {
     var evaluateMatch = path.match(/^\/evaluation\/level\/(\d+)\/evaluate$/);
     if (req.method === 'POST' && evaluateMatch) {
       var levelId = parseInt(evaluateMatch[1]);
-      
-      // Auto-evaluate all submissions - mark as evaluated
+
+      let puzzleIds = [];
+      try {
+        const { data: puzzles } = await supabase.from('puzzles').select('id').eq('level', levelId);
+        puzzleIds = (puzzles || []).map(p => p.id);
+      } catch (e) { }
+
+      let evalCount = 0;
+      let correctCount = 0;
+
+      if (puzzleIds.length > 0) {
+        try {
+          // Count how many we are evaluating
+          const { data: subs } = await supabase.from('submissions')
+            .select('is_correct')
+            .in('puzzle_id', puzzleIds)
+            .eq('evaluation_status', 'PENDING');
+
+          evalCount = (subs || []).length;
+          correctCount = (subs || []).filter(s => s.is_correct).length;
+
+          // Update them
+          await supabase.from('submissions')
+            .update({ evaluation_status: 'EVALUATED', evaluated_at: new Date().toISOString() })
+            .in('puzzle_id', puzzleIds)
+            .eq('evaluation_status', 'PENDING');
+
+          // Try updating level_evaluation_state if exists
+          await supabase.from('level_evaluation_state')
+            .update({ evaluation_state: 'EVALUATING' })
+            .eq('level_id', levelId);
+        } catch (e) { }
+      }
+
       return res.json({
         success: true,
         message: 'Evaluation completed',
         level: levelId,
-        evaluated_count: 0
+        stats: {
+          submissions_evaluated: evalCount,
+          correct_answers: correctCount
+        }
       });
     }
 
@@ -1061,24 +1096,26 @@ module.exports = async function handler(req, res) {
     var publishMatch = path.match(/^\/evaluation\/level\/(\d+)\/publish-results$/);
     if (req.method === 'POST' && publishMatch) {
       var levelId = parseInt(publishMatch[1]);
-      
-      // Update game_state to publish results
-      const { data: existing } = await supabase
-        .from('game_state')
-        .select('id')
-        .limit(1)
-        .single();
-      
+
+      const { data: existing } = await supabase.from('game_state').select('id').limit(1).single();
       if (existing) {
-        await supabase
-          .from('game_state')
-          .update({ 
-            results_published: true,
-            updated_at: new Date().toISOString()
-          })
+        const { error } = await supabase.from('game_state')
+          .update({ results_published: true, updated_at: new Date().toISOString() })
           .eq('id', existing.id);
+
+        if (error) {
+          // fallback if column missing
+          console.log('game_state results_published update error:', error);
+          await supabase.from('level_evaluation_state')
+            .update({ evaluation_state: 'RESULTS_PUBLISHED', results_published_at: new Date().toISOString() })
+            .eq('level_id', levelId);
+        }
+      } else {
+        await supabase.from('level_evaluation_state')
+          .update({ evaluation_state: 'RESULTS_PUBLISHED', results_published_at: new Date().toISOString() })
+          .eq('level_id', levelId);
       }
-      
+
       return res.json({
         success: true,
         message: 'Results published successfully',
