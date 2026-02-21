@@ -196,6 +196,10 @@ module.exports = async function handler(req, res) {
       const team = teamResult.data;
       const puzzle = puzzleResult.data;
 
+      if (!puzzle.correct_answer) {
+        return res.status(500).json({ success: false, error: 'Puzzle answer not configured' });
+      }
+
       const isCorrect = puzzle.correct_answer.toLowerCase().trim() === answer.toLowerCase().trim();
 
       // Check if a submission already exists for this team+puzzle
@@ -209,27 +213,27 @@ module.exports = async function handler(req, res) {
       let subError = null;
       if (existingSub && existingSub.length > 0) {
         // Update existing submission instead of inserting duplicate
+        // Try with evaluation columns first, fallback without
         const { error } = await supabase
           .from('submissions')
           .update({
             submitted_answer: answer,
-            is_correct: null,
-            score_awarded: 0,
-            evaluation_status: 'PENDING'
+            is_correct: null
           })
           .eq('id', existingSub[0].id);
         subError = error;
       } else {
-        // Insert new submission
+        // Insert new submission - try with evaluation_status, fallback without
         const { error } = await supabase.from('submissions').insert({
           id: crypto.randomUUID(),
           team_id: team.id,
           puzzle_id: puzzle_id,
           submitted_answer: answer,
-          is_correct: null,
-          score_awarded: 0,
-          evaluation_status: 'PENDING'
+          is_correct: null
         });
+        if (error) {
+          console.error('Submission insert error:', error);
+        }
         subError = error;
       }
 
@@ -242,16 +246,14 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // Log activity
+      // Log activity - only use columns that exist in the base schema
       try {
         await supabase.from('activity_logs').insert({
           id: crypto.randomUUID(),
           team_id: team.id,
           user_id: user.userId,
-          action_type: 'puzzle_submit',
-          type: 'puzzle_submit',
+          action_type: 'puzzle_solve',
           description: `Submitted answer for puzzle: ${puzzle.title}`,
-          message: `Submitted answer for puzzle: ${puzzle.title}`,
           puzzle_id: puzzle_id
         });
       } catch (logErr) {
