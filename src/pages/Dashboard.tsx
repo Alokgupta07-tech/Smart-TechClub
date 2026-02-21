@@ -92,6 +92,15 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Clear stale game data from localStorage when team is in 'waiting' state
+  // This handles the case where admin resets the game - all old answers/session data must go
+  useEffect(() => {
+    if (team?.status === 'waiting') {
+      localStorage.removeItem('examSession');
+      localStorage.removeItem('savedAnswers');
+    }
+  }, [team?.status]);
+
   // Fetch broadcast messages - optimized interval for 200+ users
   useEffect(() => {
     const fetchBroadcasts = async () => {

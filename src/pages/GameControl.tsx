@@ -510,14 +510,21 @@ export default function GameControl() {
       return response.json();
     },
     onSuccess: () => {
-      // Defer invalidation to prevent blocking
+      // Invalidate all game-related queries so everything refreshes
       startTransition(() => {
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
+        queryClient.invalidateQueries({ queryKey: ['adminStats'] });
+        queryClient.invalidateQueries({ queryKey: ['teams'] });
+        queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+        queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] });
+        queryClient.invalidateQueries({ queryKey: ['teamProgress'] });
+        queryClient.invalidateQueries({ queryKey: ['allPuzzles'] });
       });
 
       toast({
         title: 'Game Restarted',
-        description: 'Game has been reset to initial state',
+        description: 'Game has been reset to initial state. All team progress, submissions, and saved answers have been cleared.',
       });
     },
     onError: () => {
@@ -970,8 +977,9 @@ export default function GameControl() {
                 <strong>This will:</strong>
               </p>
               <ul className="text-sm text-orange-300 list-disc list-inside mt-2">
-                <li>Delete all team progress</li>
-                <li>Clear all submissions</li>
+                <li>Delete all team progress and submissions</li>
+                <li>Clear all saved answers from user browsers</li>
+                <li>Reset all teams to waiting status</li>
                 <li>Reset game state to beginning</li>
               </ul>
             </div>

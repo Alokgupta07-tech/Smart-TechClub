@@ -450,10 +450,11 @@ exports.restartGame = async (req, res) => {
         .update({
           game_active: false,
           current_level: 1,
-          level1_open: true,
+          level1_open: false,
           level2_open: false,
           game_started_at: null,
-          game_ended_at: null
+          game_ended_at: null,
+          is_paused: false
         })
         .not('id', 'is', null);
 
@@ -506,6 +507,24 @@ exports.restartGame = async (req, res) => {
       } catch (e) {
         console.log('activity_logs table may not exist:', e.message);
       }
+
+      // Clear hint_usage
+      try {
+        await supabaseAdmin.from('hint_usage').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('hint_usage table may not exist:', e.message);
+      }
+
+      // Clear broadcast_messages
+      try {
+        await supabaseAdmin.from('broadcast_messages').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('broadcast_messages table may not exist:', e.message);
+      }
+
+      // Invalidate all cached data
+      cache.delete(cacheKeys.gameState());
+      cache.deleteByPrefix('leaderboard');
 
       return res.json({
         success: true,
@@ -562,7 +581,11 @@ exports.restartGame = async (req, res) => {
     
     // Clear audit logs (optional - keep for security)
     // await db.query('DELETE FROM audit_logs');
-    
+
+    // Invalidate all cached data
+    cache.delete(cacheKeys.gameState());
+    cache.deleteByPrefix('leaderboard');
+
     res.json({
       success: true,
       message: 'Game restarted successfully. All progress, submissions, and attempt data cleared.'

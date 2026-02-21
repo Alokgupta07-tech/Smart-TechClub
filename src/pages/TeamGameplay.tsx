@@ -118,6 +118,15 @@ export default function TeamGameplay() {
   // Track currently selected puzzle ID for navigation
   const [selectedPuzzleId, setSelectedPuzzleId] = useState<string | null>(null);
 
+  // Helper to clear all game-related localStorage data
+  const clearGameLocalStorage = useCallback(() => {
+    localStorage.removeItem('examSession');
+    localStorage.removeItem('savedAnswers');
+    setMarkedForReview(new Set());
+    setSkippedQuestions(new Set());
+    setTabSwitchCount(0);
+  }, []);
+
   // Load saved answers and session state on mount
   useEffect(() => {
     const savedSession = localStorage.getItem('examSession');
@@ -246,11 +255,9 @@ export default function TeamGameplay() {
       if (puzzleData.time_remaining_seconds > 0 && !puzzleData.time_expired && !puzzleData.game_completed) {
         setTimeExpired(false);
 
-        // If nearly full time remaining (game just started/restarted), clear old session data
+        // If nearly full time remaining (game just started/restarted), clear ALL old session data
         if (puzzleData.time_remaining_seconds >= 2350) {
-          localStorage.removeItem('examSession');
-          setMarkedForReview(new Set());
-          setTabSwitchCount(0);
+          clearGameLocalStorage();
         }
       }
     }
@@ -265,7 +272,7 @@ export default function TeamGameplay() {
         });
       }
     }
-  }, [puzzleData, toast]);
+  }, [puzzleData, toast, clearGameLocalStorage]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -841,6 +848,12 @@ export default function TeamGameplay() {
   // Handle puzzle loading error with dedicated UI
   if (puzzleError) {
     const errorMessage = (puzzleError as Error).message || 'Failed to load puzzle';
+
+    // If puzzle fails to load, clear stale game data from localStorage
+    // This covers the case where admin resets game while user is on gameplay page
+    localStorage.removeItem('examSession');
+    localStorage.removeItem('savedAnswers');
+
     return (
       <div className="container mx-auto p-6">
         <BackButton />
@@ -861,6 +874,7 @@ export default function TeamGameplay() {
               </p>
               <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
                 <li>The game has not started yet</li>
+                <li>The game was reset by the admin</li>
                 <li>Network connectivity issues</li>
                 <li>API server is temporarily unavailable</li>
                 <li>Your session may have expired</li>
