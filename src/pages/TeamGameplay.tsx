@@ -400,13 +400,14 @@ export default function TeamGameplay() {
         // so navigating back shows the answer the user just submitted
         if (puzzle?.id) {
           // FIX 3: use selectedPuzzleId as the cache key to match the useQuery key
+          // FIX: Only mark is_completed based on actual server response
           queryClient.setQueryData(['currentPuzzle', selectedPuzzleId], (old: any) => {
             if (!old) return old;
             return {
               ...old,
               puzzle: {
                 ...old.puzzle,
-                is_completed: true,
+                is_completed: data.is_correct === true,
                 submitted_answer: submittedAnswer,
               },
             };
@@ -449,14 +450,15 @@ export default function TeamGameplay() {
       if (puzzle?.id) {
         // FIX 2: use submittedAnswer param (not stale answer closure) so the right value is cached
         // FIX 3: use selectedPuzzleId as the cache key to match the useQuery queryKey
+        // FIX: Only mark as completed if the answer was actually correct
         queryClient.setQueryData(['currentPuzzle', selectedPuzzleId], (old: any) => {
           if (!old) return old;
           return {
             ...old,
             puzzle: {
               ...old.puzzle,
-              is_completed: true,
-              submitted_answer: submittedAnswer, // FIX 2: was using stale `answer` closure
+              is_completed: data.is_correct === true,
+              submitted_answer: submittedAnswer,
             },
           };
         });
@@ -1012,7 +1014,8 @@ export default function TeamGameplay() {
   }
 
   // Check if question is completed (lock input)
-  const isQuestionCompleted = allQuestions.find((q: any) => (q.puzzle_id || q.id) === puzzle?.id)?.status === 'completed';
+  // FIX: Also check server-side is_completed flag for reliability
+  const isQuestionCompleted = allQuestions.find((q: any) => (q.puzzle_id || q.id) === puzzle?.id)?.status === 'completed' || puzzleData?.puzzle?.is_completed === true;
   const isMarkedForReview = markedForReview.has(puzzle?.id || '');
   const isCurrentlySkipped = skippedQuestions.has(puzzle?.id || '') && !isQuestionCompleted;
 

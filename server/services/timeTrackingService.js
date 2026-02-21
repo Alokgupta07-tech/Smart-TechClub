@@ -819,9 +819,149 @@ async function getTimerState(teamId, puzzleId) {
  * Returns the complete session state for a team
  */
 async function getSessionState(teamId) {
+  const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
+
+  // FIX: Use Supabase directly when USE_SUPABASE is true,
+  // instead of going through the fragile MySQL-to-Supabase SQL adapter.
+  if (USE_SUPABASE) {
+    try {
+      const { supabaseAdmin } = require('../config/supabase');
+
+      // Get all puzzles for the question list
+      const { data: allPuzzles } = await supabaseAdmin
+        .from('puzzles')
+        .select('id, title, puzzle_number, level')
+        .eq('is_active', true)
+        .order('level', { ascending: true })
+        .order('puzzle_number', { ascending: true });
+
+      // Get team question progress
+      let progressRows = [];
+      try {
+        const { data } = await supabaseAdmin
+          .from('team_question_progress')
+          .select('puzzle_id, status, time_spent_seconds, started_at, skip_count, time_penalty_seconds')
+          .eq('team_id', teamId);
+        progressRows = data || [];
+      } catch (e) {
+        console.log('team_question_progress not available:', e.message);
+      }
+
+      // Get submissions to determine correct answers (for completed status)
+      let submissions = [];
+      try {
+        const { data } = await supabaseAdmin
+          .from('submissions')
+          .select('puzzle_id, is_correct')
+          .eq('team_id', teamId)
+          .eq('is_correct', true);
+        submissions = data || [];
+      } catch (e) {}
+
+      const correctPuzzleIds = new Set((submissions || []).map(s => s.puzzle_id));
+      const progressMap = {};
+      for (const p of progressRows) {
+        progressMap[p.puzzle_id] = p;
+      }
+
+      // Get team info for session data
+      let teamData = null;
+      try {
+        const { data } = await supabaseAdmin
+          .from('teams')
+          .select('id, start_time, end_time, hints_used, status')
+          .eq('id', teamId)
+          .single();
+        teamData = data;
+      } catch (e) {}
+
+      // Get hints used count
+      let totalHintsUsed = 0;
+      try {
+        const { data: hintUsage } = await supabaseAdmin
+          .from('hint_usage')
+          .select('id')
+          .eq('team_id', teamId);
+        totalHintsUsed = (hintUsage || []).length;
+      } catch (e) {}
+
+      const now = new Date();
+      let currentActiveTime = 0;
+
+      // Build questions from ALL puzzles (not just ones with progress records)
+      const questions = (allPuzzles || []).map(puzzle => {
+        const progress = progressMap[puzzle.id];
+        const hasCorrectSubmission = correctPuzzleIds.has(puzzle.id);
+
+        // Determine status: COMPLETED from progress table OR from correct submissions
+        let rawStatus = progress?.status || 'NOT_STARTED';
+        if (hasCorrectSubmission && rawStatus !== 'COMPLETED') {
+          rawStatus = 'COMPLETED';
+        }
+
+        // Normalize status for frontend
+        let normalizedStatus = rawStatus.toLowerCase();
+        if (normalizedStatus === 'in_progress') normalizedStatus = 'active';
+
+        const timeSpent = progress?.time_spent_seconds || 0;
+        if (normalizedStatus === 'active' && progress?.started_at) {
+          currentActiveTime += Math.floor((now - new Date(progress.started_at)) / 1000);
+        }
+        currentActiveTime += timeSpent;
+
+        return {
+          puzzle_id: puzzle.id,
+          title: puzzle.title,
+          level: puzzle.level,
+          puzzle_number: puzzle.puzzle_number,
+          status: normalizedStatus,
+          time_spent_seconds: timeSpent +
+            ((normalizedStatus === 'active') && progress?.started_at ? Math.floor((now - new Date(progress.started_at)) / 1000) : 0),
+          skip_count: progress?.skip_count || 0,
+          time_penalty_seconds: progress?.time_penalty_seconds || 0
+        };
+      });
+
+      const questionsCompleted = questions.filter(q => q.status === 'completed').length;
+      const questionsSkipped = questions.filter(q => q.status === 'skipped').length;
+
+      return {
+        session_id: teamId,
+        status: teamData?.status === 'active' || teamData?.start_time ? 'active' : 'not_started',
+        session_start: teamData?.start_time || null,
+        session_end: teamData?.end_time || null,
+        total_time_seconds: 0,
+        active_time_seconds: currentActiveTime,
+        questions_completed: questionsCompleted,
+        questions_skipped: questionsSkipped,
+        total_penalty_seconds: 0,
+        total_hints_used: totalHintsUsed,
+        effective_time_seconds: currentActiveTime,
+        questions
+      };
+    } catch (error) {
+      console.log('Supabase getSessionState error:', error.message);
+      return {
+        session_id: null,
+        status: 'not_started',
+        session_start: null,
+        session_end: null,
+        total_time_seconds: 0,
+        active_time_seconds: 0,
+        questions_completed: 0,
+        questions_skipped: 0,
+        total_penalty_seconds: 0,
+        total_hints_used: 0,
+        effective_time_seconds: 0,
+        questions: []
+      };
+    }
+  }
+
+  // MySQL path (original logic)
   try {
     const session = await getOrCreateTeamSession(teamId);
-    
+
     // Get all question progress for this team (separate query, no JOIN)
     let questions = [];
     try {
@@ -829,19 +969,19 @@ async function getSessionState(teamId) {
         'SELECT * FROM team_question_progress WHERE team_id = ?',
         [teamId]
       );
-      
+
       // Get puzzle details separately
       const [puzzleRows] = await db.query(
         'SELECT id, title, puzzle_number, level FROM puzzles WHERE is_active = true',
         []
       );
-      
+
       // Create a lookup map for puzzles
       const puzzleMap = {};
       for (const p of puzzleRows) {
         puzzleMap[p.id] = p;
       }
-      
+
       // Join progress with puzzle data in JS
       questions = (progressRows || [])
         .map(tqp => {
@@ -866,11 +1006,11 @@ async function getSessionState(teamId) {
         throw qErr;
       }
     }
-    
+
     // Calculate current active time if any question is running
     let currentActiveTime = 0;
     const now = new Date();
-    
+
     for (const q of questions) {
       if (q.status === 'active' && q.started_at) {
         const startedAt = new Date(q.started_at);
@@ -878,7 +1018,7 @@ async function getSessionState(teamId) {
       }
       currentActiveTime += q.time_spent_seconds || 0;
     }
-    
+
     return {
       session_id: session.id,
       status: session.status || session.is_active ? 'active' : 'not_started',
@@ -896,14 +1036,14 @@ async function getSessionState(teamId) {
         // DB 'IN_PROGRESS' → frontend 'active'
         let normalizedStatus = (q.status || 'not_started').toLowerCase();
         if (normalizedStatus === 'in_progress') normalizedStatus = 'active';
-        
+
         return {
           puzzle_id: q.puzzle_id,
           title: q.title,
           level: q.level,
           puzzle_number: q.puzzle_number,
           status: normalizedStatus,
-          time_spent_seconds: (q.time_spent_seconds || 0) + 
+          time_spent_seconds: (q.time_spent_seconds || 0) +
             ((normalizedStatus === 'active') && q.started_at ? Math.floor((now - new Date(q.started_at)) / 1000) : 0),
           skip_count: q.skip_count || 0,
           time_penalty_seconds: q.time_penalty_seconds || 0

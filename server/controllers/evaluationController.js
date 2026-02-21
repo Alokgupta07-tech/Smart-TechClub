@@ -1020,10 +1020,11 @@ exports.reopenSubmissions = async (req, res) => {
       if (currentState.evaluation_state === 'EVALUATING' || currentState.evaluation_state === 'RESULTS_PUBLISHED') {
         if (puzzleIds.length > 0) {
           try {
+            // FIX: Don't set is_correct to null - column is BOOLEAN NOT NULL
+            // Keep the original is_correct value from submission time
             await supabaseAdmin.from('submissions')
               .update({
                 evaluation_status: 'PENDING',
-                is_correct: null,
                 score_awarded: null,
                 evaluated_at: null
               })
@@ -1085,9 +1086,8 @@ exports.reopenSubmissions = async (req, res) => {
 
       if (puzzleIds.length > 0) {
         await db.query(
-          `UPDATE submissions 
+          `UPDATE submissions
            SET evaluation_status = 'PENDING',
-               is_correct = NULL,
                score_awarded = NULL,
                evaluated_at = NULL
            WHERE puzzle_id IN (?)`,
@@ -1096,7 +1096,7 @@ exports.reopenSubmissions = async (req, res) => {
       }
 
       await db.query(
-        `UPDATE team_level_status 
+        `UPDATE team_level_status
          SET qualification_status = 'PENDING',
              qualification_decided_at = NULL,
              results_visible = false,
@@ -1174,10 +1174,11 @@ exports.resetEvaluation = async (req, res) => {
       // Reset all submissions for this level to PENDING
       if (puzzleIds.length > 0) {
         try {
+          // FIX: Don't set is_correct to null - column is BOOLEAN NOT NULL
+          // Keep the original is_correct value from submission time
           await supabaseAdmin.from('submissions')
             .update({
               evaluation_status: 'PENDING',
-              is_correct: null,
               score_awarded: null,
               evaluated_at: null
             })
@@ -1237,9 +1238,8 @@ exports.resetEvaluation = async (req, res) => {
     // Reset submissions
     if (puzzleIds.length > 0) {
       await db.query(
-        `UPDATE submissions 
+        `UPDATE submissions
          SET evaluation_status = 'PENDING',
-             is_correct = NULL,
              score_awarded = NULL,
              evaluated_at = NULL
          WHERE puzzle_id IN (?)`,

@@ -95,21 +95,6 @@ exports.getCurrentPuzzle = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Team not found' });
     }
 
-    // Try to find the currently IN_PROGRESS puzzle from team_question_progress
-    let currentPuzzleId = null;
-    try {
-      const { data: inProgressRecords } = await supabaseAdmin
-        .from('team_question_progress')
-        .select('puzzle_id')
-        .eq('team_id', teamId)
-        .eq('status', 'IN_PROGRESS')
-        .order('updated_at', { ascending: false })
-        .limit(1);
-      currentPuzzleId = inProgressRecords?.[0]?.puzzle_id || null;
-    } catch (e) {
-      console.log('team_question_progress lookup error:', e.message);
-    }
-
     if (teamData.status === 'disqualified') {
       return res.json({ success: true, message: 'Team has been disqualified', puzzle: null, team_status: 'disqualified' });
     }
@@ -131,57 +116,18 @@ exports.getCurrentPuzzle = async (req, res) => {
     const currentLevel = teamData.level || 1;
     let puzzle = null;
 
-    // If team has a current_puzzle_id, use it
-    if (currentPuzzleId) {
-      const { data: cp } = await supabaseAdmin
+    // FIX: If a specific puzzle_id is requested via query param, use it directly
+    const requestedPuzzleId = req.query.puzzle_id;
+    if (requestedPuzzleId) {
+      const { data: requestedPuzzle } = await supabaseAdmin
         .from('puzzles')
         .select('id, level, puzzle_number, title, description, puzzle_type, puzzle_content, puzzle_file_url, points, time_limit_minutes')
-        .eq('id', currentPuzzleId)
+        .eq('id', requestedPuzzleId)
         .eq('is_active', true)
         .single();
-      if (cp) puzzle = cp;
-    }
-
-    // Fallback: calculate from completed puzzles
-    if (!puzzle) {
-      // Get completed puzzle IDs from both team_question_progress and team_progress
-      let completedPuzzleIds = [];
-      try {
-        const { data: completedTQP } = await supabaseAdmin
-          .from('team_question_progress')
-          .select('puzzle_id')
-          .eq('team_id', teamId)
-          .eq('status', 'COMPLETED');
-        completedPuzzleIds.push(...(completedTQP || []).map(p => p.puzzle_id));
-      } catch (e) {}
-      try {
-        const { data: completedTP } = await supabaseAdmin
-          .from('team_progress')
-          .select('puzzle_id')
-          .eq('team_id', teamId)
-          .eq('is_completed', true);
-        completedPuzzleIds.push(...(completedTP || []).map(p => p.puzzle_id));
-      } catch (e) {}
-
-      const completedSet = new Set(completedPuzzleIds);
-
-      // Get next uncompleted puzzle at current level
-      let query = supabaseAdmin
-        .from('puzzles')
-        .select('id, level, puzzle_number, title, description, puzzle_type, puzzle_content, puzzle_file_url, points, time_limit_minutes')
-        .eq('level', currentLevel)
-        .eq('is_active', true)
-        .order('puzzle_number', { ascending: true });
-
-      const { data: levelPuzzles } = await query;
-
-      // Find first uncompleted puzzle
-      if (levelPuzzles) {
-        puzzle = levelPuzzles.find(p => !completedSet.has(p.id)) || null;
-      }
-
-      // If found a fallback puzzle, mark it as IN_PROGRESS so navigation persists
-      if (puzzle) {
+      if (requestedPuzzle) {
+        puzzle = requestedPuzzle;
+        // Update team_question_progress to track navigation
         try {
           // Clear any stale IN_PROGRESS records first
           await supabaseAdmin
@@ -190,26 +136,128 @@ exports.getCurrentPuzzle = async (req, res) => {
             .eq('team_id', teamId)
             .eq('status', 'IN_PROGRESS');
 
-          // Mark this puzzle as IN_PROGRESS
+          // Check if this puzzle already has a progress record
           const { data: existingProgress } = await supabaseAdmin
             .from('team_question_progress')
-            .select('id')
+            .select('id, status')
             .eq('team_id', teamId)
-            .eq('puzzle_id', puzzle.id);
+            .eq('puzzle_id', requestedPuzzleId);
 
           if (!existingProgress || existingProgress.length === 0) {
             await supabaseAdmin.from('team_question_progress').insert({
-              id: uuidv4(), team_id: teamId, puzzle_id: puzzle.id,
+              id: uuidv4(), team_id: teamId, puzzle_id: requestedPuzzleId,
               status: 'IN_PROGRESS', started_at: new Date().toISOString()
             });
-          } else {
+          } else if (existingProgress[0].status !== 'COMPLETED') {
+            // Only set to IN_PROGRESS if not already completed
             await supabaseAdmin.from('team_question_progress')
               .update({ status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
               .eq('team_id', teamId)
-              .eq('puzzle_id', puzzle.id);
+              .eq('puzzle_id', requestedPuzzleId);
           }
         } catch (e) {
-          console.log('Error setting initial IN_PROGRESS:', e.message);
+          console.log('Error updating progress for requested puzzle:', e.message);
+        }
+      }
+    }
+
+    // If no specific puzzle requested (or requested puzzle not found), find current puzzle
+    if (!puzzle) {
+      // Try to find the currently IN_PROGRESS puzzle from team_question_progress
+      let currentPuzzleId = null;
+      try {
+        const { data: inProgressRecords } = await supabaseAdmin
+          .from('team_question_progress')
+          .select('puzzle_id')
+          .eq('team_id', teamId)
+          .eq('status', 'IN_PROGRESS')
+          .order('updated_at', { ascending: false })
+          .limit(1);
+        currentPuzzleId = inProgressRecords?.[0]?.puzzle_id || null;
+      } catch (e) {
+        console.log('team_question_progress lookup error:', e.message);
+      }
+
+      // If team has a current_puzzle_id, use it
+      if (currentPuzzleId) {
+        const { data: cp } = await supabaseAdmin
+          .from('puzzles')
+          .select('id, level, puzzle_number, title, description, puzzle_type, puzzle_content, puzzle_file_url, points, time_limit_minutes')
+          .eq('id', currentPuzzleId)
+          .eq('is_active', true)
+          .single();
+        if (cp) puzzle = cp;
+      }
+
+      // Fallback: calculate from completed puzzles
+      if (!puzzle) {
+        // Get completed puzzle IDs from both team_question_progress and team_progress
+        let completedPuzzleIds = [];
+        try {
+          const { data: completedTQP } = await supabaseAdmin
+            .from('team_question_progress')
+            .select('puzzle_id')
+            .eq('team_id', teamId)
+            .eq('status', 'COMPLETED');
+          completedPuzzleIds.push(...(completedTQP || []).map(p => p.puzzle_id));
+        } catch (e) {}
+        try {
+          const { data: completedTP } = await supabaseAdmin
+            .from('team_progress')
+            .select('puzzle_id')
+            .eq('team_id', teamId)
+            .eq('is_completed', true);
+          completedPuzzleIds.push(...(completedTP || []).map(p => p.puzzle_id));
+        } catch (e) {}
+
+        const completedSet = new Set(completedPuzzleIds);
+
+        // Get next uncompleted puzzle at current level
+        let query = supabaseAdmin
+          .from('puzzles')
+          .select('id, level, puzzle_number, title, description, puzzle_type, puzzle_content, puzzle_file_url, points, time_limit_minutes')
+          .eq('level', currentLevel)
+          .eq('is_active', true)
+          .order('puzzle_number', { ascending: true });
+
+        const { data: levelPuzzles } = await query;
+
+        // Find first uncompleted puzzle
+        if (levelPuzzles) {
+          puzzle = levelPuzzles.find(p => !completedSet.has(p.id)) || null;
+        }
+
+        // If found a fallback puzzle, mark it as IN_PROGRESS so navigation persists
+        if (puzzle) {
+          try {
+            // Clear any stale IN_PROGRESS records first
+            await supabaseAdmin
+              .from('team_question_progress')
+              .update({ status: 'NOT_STARTED', updated_at: new Date().toISOString() })
+              .eq('team_id', teamId)
+              .eq('status', 'IN_PROGRESS');
+
+            // Mark this puzzle as IN_PROGRESS
+            const { data: existingProgress } = await supabaseAdmin
+              .from('team_question_progress')
+              .select('id')
+              .eq('team_id', teamId)
+              .eq('puzzle_id', puzzle.id);
+
+            if (!existingProgress || existingProgress.length === 0) {
+              await supabaseAdmin.from('team_question_progress').insert({
+                id: uuidv4(), team_id: teamId, puzzle_id: puzzle.id,
+                status: 'IN_PROGRESS', started_at: new Date().toISOString()
+              });
+            } else {
+              await supabaseAdmin.from('team_question_progress')
+                .update({ status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
+                .eq('team_id', teamId)
+                .eq('puzzle_id', puzzle.id);
+            }
+          } catch (e) {
+            console.log('Error setting initial IN_PROGRESS:', e.message);
+          }
         }
       }
     }
@@ -281,6 +329,40 @@ exports.getCurrentPuzzle = async (req, res) => {
     const usedHintIds = (usedHints || []).map(h => h.hint_id);
     const availableHints = (allHints || []).filter(h => !usedHintIds.includes(h.id));
 
+    // FIX: Get submitted answer for this puzzle (so navigating back shows previous answer)
+    let submittedAnswer = null;
+    let isCompleted = false;
+    try {
+      const { data: latestSub } = await supabaseAdmin
+        .from('submissions')
+        .select('submitted_answer, is_correct')
+        .eq('team_id', teamId)
+        .eq('puzzle_id', puzzle.id)
+        .order('submitted_at', { ascending: false })
+        .limit(1);
+      if (latestSub && latestSub.length > 0) {
+        submittedAnswer = latestSub[0].submitted_answer;
+        isCompleted = latestSub[0].is_correct === true;
+      }
+    } catch (e) {
+      console.log('Error fetching submitted answer:', e.message);
+    }
+
+    // Also check team_question_progress for completion status
+    if (!isCompleted) {
+      try {
+        const { data: tqp } = await supabaseAdmin
+          .from('team_question_progress')
+          .select('status')
+          .eq('team_id', teamId)
+          .eq('puzzle_id', puzzle.id)
+          .limit(1);
+        if (tqp && tqp.length > 0 && tqp[0].status === 'COMPLETED') {
+          isCompleted = true;
+        }
+      } catch (e) {}
+    }
+
     const currentTimeCheck = await checkTeamTimeLimit(teamId);
 
     res.json({
@@ -289,7 +371,9 @@ exports.getCurrentPuzzle = async (req, res) => {
         ...puzzle,
         progress: (progress && progress[0]) || { attempts: 0, hints_used: 0 },
         available_hints: availableHints.length,
-        total_hints: (allHints || []).length
+        total_hints: (allHints || []).length,
+        submitted_answer: submittedAnswer,
+        is_completed: isCompleted
       },
       time_remaining_seconds: currentTimeCheck.remainingSeconds,
       time_elapsed_seconds: currentTimeCheck.elapsedSeconds,
@@ -803,17 +887,22 @@ exports.getGameSummary = async (req, res) => {
     // Build question summary
     const questionSummary = (allQuestions || []).map(q => {
       const questionSubmissions = (submissions || []).filter(s => s.puzzle_id === q.id);
-      const correctSubmission = questionSubmissions.find(s => s.is_correct);
+      const correctSubmission = questionSubmissions.find(s => s.is_correct === true);
       const latestSubmission = questionSubmissions[0];
       const questionProgress = progressMap[q.id];
 
+      // FIX: Also check team_question_progress for COMPLETED status as additional signal
+      // This handles edge cases where is_correct might have been reset by evaluation
+      const isCompletedInProgress = questionProgress?.status === 'COMPLETED';
+      const hasCorrectAnswer = !!correctSubmission || isCompletedInProgress;
+
       return {
         questionNumber: q.puzzle_number, title: q.title, level: q.level, points: q.points,
-        attempted: questionSubmissions.length > 0,
-        status: correctSubmission ? 'correct' : (latestSubmission ? 'wrong' : 'not_attempted'),
+        attempted: questionSubmissions.length > 0 || isCompletedInProgress,
+        status: hasCorrectAnswer ? 'correct' : (latestSubmission ? 'wrong' : 'not_attempted'),
         attempts: questionProgress?.attempts || questionSubmissions.length,
-        submittedAnswer: latestSubmission?.submitted_answer || null,
-        isCorrect: !!correctSubmission,
+        submittedAnswer: correctSubmission?.submitted_answer || latestSubmission?.submitted_answer || null,
+        isCorrect: hasCorrectAnswer,
         timeTaken: latestSubmission?.time_taken_seconds || null,
         submittedAt: latestSubmission?.submitted_at || null
       };
