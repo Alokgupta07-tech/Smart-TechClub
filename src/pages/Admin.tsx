@@ -99,8 +99,8 @@ const Admin = () => {
   // ============================================
   // DERIVED STATE - NO HARDCODED VALUES
   // ============================================
-  const filteredTeams = Array.isArray(teams) ? teams.filter(team => 
-    team.teamName.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTeams = Array.isArray(teams) ? teams.filter(team =>
+    (team.teamName || '').toLowerCase().includes(searchQuery.toLowerCase())
   ) : [];
 
   // ============================================
@@ -332,7 +332,7 @@ const Admin = () => {
 
   const handleExportResults = async () => {
     try {
-      const response = await fetchWithAuth('${API_BASE}/admin/export/results');
+      const response = await fetchWithAuth(`${API_BASE}/admin/export/results`);
 
       if (!response.ok) throw new Error('Failed to export results');
 
@@ -552,7 +552,7 @@ const Admin = () => {
             ) : (
               // Empty state or error
               <div className="col-span-6 text-center py-8 !text-white !bg-gray-800 rounded-lg">
-                {statsError ? `Error: ${statsError.message}` : 'No statistics available'}
+                {statsError ? `Error: ${(statsError as Error)?.message || 'Unknown error'}` : 'No statistics available'}
               </div>
             )}
           </div>

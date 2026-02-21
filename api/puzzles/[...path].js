@@ -74,6 +74,10 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && (path === '' || path === '/')) {
       const { title, description, type, level, puzzle_number, points, answer, correct_answer, puzzle_content, puzzle_file_url } = req.body;
 
+      if (!title || !level) {
+        return res.status(400).json({ error: 'title and level are required' });
+      }
+
       const newId = crypto.randomUUID();
       const { error } = await supabase.from('puzzles').insert({
         id: newId,

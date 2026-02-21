@@ -476,18 +476,17 @@ exports.evaluateAnswers = async (req, res) => {
         puzzleMap[p.id] = p;
       }
 
-      // Get pending submissions for those puzzle IDs (including NULL status for backwards compatibility)
+      // Get all submissions for those puzzle IDs
       let pendingSubmissions = [];
       if (puzzleIds.length > 0) {
         try {
           const { data } = await supabaseAdmin
             .from('submissions')
             .select('id, team_id, puzzle_id, submitted_answer, is_correct, time_taken_seconds, evaluation_status')
-            .or('evaluation_status.eq.PENDING,evaluation_status.is.null')
             .in('puzzle_id', puzzleIds);
           pendingSubmissions = data || [];
         } catch (e) {
-          console.log('Error fetching pending submissions:', e.message);
+          console.log('Error fetching submissions:', e.message);
         }
       }
 
@@ -549,11 +548,34 @@ exports.evaluateAnswers = async (req, res) => {
         evaluatedCount++;
       }
 
+      // Get all teams that have started this level
+      let allTeamIds = [];
+      try {
+        const { data: teamLevelStatus } = await supabaseAdmin
+          .from('team_level_status')
+          .select('team_id')
+          .eq('level_id', parseInt(levelId));
+        allTeamIds = (teamLevelStatus || []).map(t => t.team_id);
+      } catch (e) {
+        console.log('Error fetching team_level_status:', e.message);
+      }
+
+      // Add teams from submissions that might not have a team_level_status yet
+      for (const teamId of Object.keys(teamScores)) {
+        if (!allTeamIds.includes(teamId)) {
+          allTeamIds.push(teamId);
+        }
+      }
+
       // Update team_level_status for each team
-      const teamIds = Object.keys(teamScores);
-      for (const teamId of teamIds) {
-        const stats = teamStats[teamId];
-        const score = teamScores[teamId];
+      for (const teamId of allTeamIds) {
+        const stats = teamStats[teamId] || {
+          questionsAnswered: 0,
+          questionsCorrect: 0,
+          hintsUsed: 0,
+          timeTaken: 0
+        };
+        const score = teamScores[teamId] || 0;
         const accuracy = stats.questionsAnswered > 0
           ? ((stats.questionsCorrect / stats.questionsAnswered) * 100).toFixed(2)
           : 0;
@@ -643,7 +665,7 @@ exports.evaluateAnswers = async (req, res) => {
 
       // Log action
       await logEvaluationAction(levelId, 'EVALUATION_COMPLETED', adminId, adminName, {
-        teamsEvaluated: teamIds.length,
+        teamsEvaluated: allTeamIds.length,
         submissionsEvaluated: evaluatedCount
       }, {
         correct_submissions: correctCount,
@@ -654,7 +676,7 @@ exports.evaluateAnswers = async (req, res) => {
         success: true,
         message: `Evaluation completed for Level ${levelId}`,
         stats: {
-          teams_evaluated: teamIds.length,
+          teams_evaluated: allTeamIds.length,
           submissions_evaluated: evaluatedCount,
           correct_answers: correctCount
         }
@@ -673,13 +695,13 @@ exports.evaluateAnswers = async (req, res) => {
       [adminId, levelId]
     );
     
-    // Get all pending submissions for this level (including NULL status for backwards compatibility)
+    // Get all submissions for this level
     const [pendingSubmissions] = await db.query(`
       SELECT s.id, s.team_id, s.puzzle_id, s.submitted_answer, s.is_correct, s.time_taken_seconds,
              p.correct_answer, p.points, p.level, p.puzzle_number
       FROM submissions s
       JOIN puzzles p ON s.puzzle_id = p.id
-      WHERE p.level = ? AND (s.evaluation_status = 'PENDING' OR s.evaluation_status IS NULL)
+      WHERE p.level = ?
       ORDER BY s.team_id, p.puzzle_number, s.submitted_at DESC
     `, [levelId]);
     
@@ -727,10 +749,25 @@ exports.evaluateAnswers = async (req, res) => {
       evaluatedCount++;
     }
     
-    const teamIds = Object.keys(teamScores);
-    for (const teamId of teamIds) {
-      const stats = teamStats[teamId];
-      const score = teamScores[teamId];
+    // Get all teams that have started this level
+    const [teamLevelStatus] = await db.query('SELECT team_id FROM team_level_status WHERE level_id = ?', [levelId]);
+    let allTeamIds = teamLevelStatus.map(t => t.team_id);
+
+    // Add teams from submissions that might not have a team_level_status yet
+    for (const teamId of Object.keys(teamScores)) {
+      if (!allTeamIds.includes(teamId)) {
+        allTeamIds.push(teamId);
+      }
+    }
+
+    for (const teamId of allTeamIds) {
+      const stats = teamStats[teamId] || {
+        questionsAnswered: 0,
+        questionsCorrect: 0,
+        hintsUsed: 0,
+        timeTaken: 0
+      };
+      const score = teamScores[teamId] || 0;
       const accuracy = stats.questionsAnswered > 0 
         ? ((stats.questionsCorrect / stats.questionsAnswered) * 100).toFixed(2)
         : 0;
@@ -800,7 +837,7 @@ exports.evaluateAnswers = async (req, res) => {
     );
     
     await logEvaluationAction(levelId, 'EVALUATION_COMPLETED', adminId, adminName, {
-      teamsEvaluated: teamIds.length,
+      teamsEvaluated: allTeamIds.length,
       submissionsEvaluated: evaluatedCount
     }, {
       correct_submissions: correctCount,
@@ -811,7 +848,7 @@ exports.evaluateAnswers = async (req, res) => {
       success: true,
       message: `Evaluation completed for Level ${levelId}`,
       stats: {
-        teams_evaluated: teamIds.length,
+        teams_evaluated: allTeamIds.length,
         submissions_evaluated: evaluatedCount,
         correct_answers: correctCount
       }

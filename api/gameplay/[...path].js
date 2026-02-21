@@ -22,6 +22,116 @@ function mapTeam(team) {
   };
 }
 
+/**
+ * Check if a team can access a specific level (Supabase version of levelAccess middleware)
+ * Level 1: Always accessible
+ * Level 2+: Requires qualification from previous level + admin unlock + results published
+ */
+async function checkLevelAccess(supabase, teamId, levelId) {
+  // Level 1 is always accessible
+  if (levelId <= 1) {
+    return { allowed: true, reason: 'Level 1 accessible' };
+  }
+
+  const previousLevel = levelId - 1;
+
+  // Gate 1: Check if previous level results are published
+  try {
+    const { data: evalState } = await supabase
+      .from('level_evaluation_state')
+      .select('evaluation_state')
+      .eq('level_id', previousLevel)
+      .limit(1);
+
+    if (!evalState || evalState.length === 0 || evalState[0].evaluation_state !== 'RESULTS_PUBLISHED') {
+      return {
+        allowed: false,
+        reason: 'Level ' + previousLevel + ' results have not been published yet. Please wait for admin evaluation.',
+        qualification_status: 'AWAITING_RESULTS',
+        results_published: false
+      };
+    }
+  } catch (e) {
+    // If table doesn't exist, results not published
+    return {
+      allowed: false,
+      reason: 'Level ' + previousLevel + ' results have not been published yet.',
+      qualification_status: 'AWAITING_RESULTS',
+      results_published: false
+    };
+  }
+
+  // Gate 2: Check if team qualified previous level
+  try {
+    const { data: levelStatus } = await supabase
+      .from('team_level_status')
+      .select('qualification_status, status')
+      .eq('team_id', teamId)
+      .eq('level_id', previousLevel)
+      .limit(1);
+
+    if (!levelStatus || levelStatus.length === 0) {
+      return {
+        allowed: false,
+        reason: 'You must complete Level ' + previousLevel + ' before accessing Level ' + levelId,
+        qualification_status: 'NOT_STARTED'
+      };
+    }
+
+    const qualStatus = levelStatus[0].qualification_status;
+    const completionStatus = levelStatus[0].status;
+
+    if (completionStatus !== 'COMPLETED') {
+      return {
+        allowed: false,
+        reason: 'You must complete Level ' + previousLevel + ' before accessing Level ' + levelId,
+        qualification_status: qualStatus
+      };
+    }
+
+    if (qualStatus !== 'QUALIFIED') {
+      return {
+        allowed: false,
+        reason: qualStatus === 'DISQUALIFIED'
+          ? 'Your team did not qualify from Level ' + previousLevel + '. You cannot access Level ' + levelId + '.'
+          : 'Your qualification for Level ' + previousLevel + ' is still pending evaluation.',
+        qualification_status: qualStatus
+      };
+    }
+  } catch (e) {
+    // If table doesn't exist, check team.level as fallback
+    // (for setups without the qualification system)
+  }
+
+  // Gate 3: Check if admin unlocked Level 2
+  if (levelId === 2) {
+    try {
+      const { data: gsRows } = await supabase
+        .from('game_state')
+        .select('level2_open')
+        .limit(1);
+
+      const level2Open = gsRows?.[0]?.level2_open || false;
+      if (!level2Open) {
+        return {
+          allowed: false,
+          reason: 'Level 2 has not been unlocked by the admin yet. Please wait.',
+          qualification_status: 'QUALIFIED'
+        };
+      }
+    } catch (e) {
+      // If game_state table doesn't exist, allow access
+    }
+  }
+
+  return {
+    allowed: true,
+    reason: 'Level ' + levelId + ' accessible',
+    qualification_status: 'QUALIFIED',
+    results_published: true
+  };
+}
+
 module.exports = async function handler(req, res) {
   setCorsHeaders(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -51,6 +161,18 @@ module.exports = async function handler(req, res) {
 
       if (tErr || !team) {
         return res.status(404).json({ error: 'Team not found' });
+      }
+
+      // Check if team can access their current level (Level 2+ requires qualification + admin unlock)
+      const levelCheck = await checkLevelAccess(supabase, team.id, team.level);
+      if (!levelCheck.allowed) {
+        return res.status(403).json({
+          success: false,
+          error: levelCheck.reason,
+          code: 'LEVEL_ACCESS_DENIED',
+          qualification_status: levelCheck.qualification_status,
+          results_published: levelCheck.results_published !== undefined ? levelCheck.results_published : null
+        });
       }
 
       // Parallel fetch: puzzles + submissions (reduces latency by ~50%)
@@ -203,6 +325,17 @@ module.exports = async function handler(req, res) {
       const team = teamResult.data;
       const puzzle = puzzleResult.data;
 
+      // Check if team can access this puzzle's level
+      const submitLevelCheck = await checkLevelAccess(supabase, team.id, puzzle.level);
+      if (!submitLevelCheck.allowed) {
+        return res.status(403).json({
+          success: false,
+          error: submitLevelCheck.reason,
+          code: 'LEVEL_ACCESS_DENIED',
+          qualification_status: submitLevelCheck.qualification_status
+        });
+      }
+
       // Validate answer against correct answer
       const isCorrect = puzzle.correct_answer
         ? answer.trim().toLowerCase() === puzzle.correct_answer.trim().toLowerCase()
@@ -260,7 +393,7 @@ module.exports = async function handler(req, res) {
         await supabase.from('teams').update({ start_time: new Date().toISOString() }).eq('id', team.id);
       }
 
-      // Get all puzzles to find next one
+      // Get all puzzles in current level to find next one
       const { data: allPuzzles } = await supabase
         .from('puzzles')
         .select('id, level, puzzle_number, title, points')
@@ -326,26 +459,81 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      // Check if game is completed (all puzzles done)
-      const totalPuzzles = allPuzzles ? allPuzzles.length : 0;
-      const gameCompleted = completedPuzzleIds.size >= totalPuzzles && totalPuzzles > 0;
+      // Check if all puzzles in current level are completed
+      const currentLevelCompleted = !nextPuzzle && isCorrect;
+      let levelCompleted = false;
 
-      if (gameCompleted) {
-        // Update team status to completed
+      if (currentLevelCompleted) {
+        levelCompleted = true;
+
+        // Update team progress to 100% for this level
         await supabase
           .from('teams')
-          .update({ status: 'completed', end_time: new Date().toISOString(), progress: 100 })
+          .update({ progress: 100 })
           .eq('id', team.id);
+
+        // Mark team_level_status as COMPLETED for this level (if table exists)
+        try {
+          const { data: existingStatus } = await supabase
+            .from('team_level_status')
+            .select('id')
+            .eq('team_id', team.id)
+            .eq('level_id', puzzle.level)
+            .limit(1);
+
+          if (existingStatus && existingStatus.length > 0) {
+            await supabase.from('team_level_status')
+              .update({ status: 'COMPLETED', completed_at: new Date().toISOString() })
+              .eq('team_id', team.id)
+              .eq('level_id', puzzle.level);
+          } else {
+            await supabase.from('team_level_status').insert({
+              id: crypto.randomUUID(),
+              team_id: team.id,
+              level_id: puzzle.level,
+              status: 'COMPLETED',
+              completed_at: new Date().toISOString(),
+              qualification_status: 'PENDING'
+            });
+          }
+        } catch (e) {
+          console.log('team_level_status update error:', e.message);
+        }
+
+        // Check if there are puzzles in a next level
+        const { data: nextLevelPuzzles } = await supabase
+          .from('puzzles')
+          .select('id')
+          .gt('level', puzzle.level)
+          .limit(1);
+
+        const hasNextLevel = nextLevelPuzzles && nextLevelPuzzles.length > 0;
+
+        if (!hasNextLevel) {
+          // No more levels - game truly completed
+          await supabase
+            .from('teams')
+            .update({ status: 'completed', end_time: new Date().toISOString(), progress: 100 })
+            .eq('id', team.id);
+        }
+
+        // Note: team.level is NOT auto-advanced here.
+        // The admin must: 1) evaluate, 2) publish results, 3) unlock Level 2
+        // Then the admin qualifies teams (or auto-qualification runs)
+        // Only then does the qualified team's level get updated to 2
       }
 
       // Always return response that allows moving to next question
       return res.json({
         success: true,
         is_correct: isCorrect,
-        message: isCorrect ? 'Correct answer!' : 'Answer recorded.',
+        message: isCorrect
+          ? (levelCompleted ? 'Correct! You have completed all puzzles in this level.' : 'Correct answer!')
+          : 'Answer recorded.',
         points_earned: isCorrect ? (puzzle.points || 0) : 0,
         next_puzzle: nextPuzzle,
-        game_completed: gameCompleted
+        level_completed: levelCompleted,
+        game_completed: levelCompleted && !nextPuzzle
       });
     }
 
@@ -440,7 +628,26 @@ module.exports = async function handler(req, res) {
       var total = subs ? subs.length : 0;
       var correct = subs ? subs.filter(s => s.is_correct === true).length : 0;
 
+      // Calculate time elapsed
+      var timeElapsed = 0;
+      if (team.start_time) {
+        timeElapsed = Math.floor((Date.now() - new Date(team.start_time).getTime()) / 1000);
+      }
+
       return res.json({
+        success: true,
+        progress: {
+          team_name: team.team_name,
+          current_level: team.level || 1,
+          progress: team.progress || 0,
+          hints_used: team.hints_used || 0,
+          status: team.status,
+          start_time: team.start_time,
+          end_time: team.end_time,
+          completed_puzzles: correct,
+          total_puzzles: total,
+          time_elapsed_seconds: timeElapsed
+        },
         team: mapTeam(team),
         submissions: { total: total, correct: correct }
       });

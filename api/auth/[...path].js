@@ -96,6 +96,9 @@ module.exports = async function handler(req, res) {
       }
 
       const user = users[0];
+      if (!user.password_hash) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
       const isValid = await bcrypt.compare(password, user.password_hash);
       if (!isValid) {
         return res.status(401).json({ error: 'Invalid credentials' });
@@ -211,9 +214,7 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     console.error('Auth API error:', error);
     return res.status(500).json({
-      error: 'Internal server error',
-      details: error.message,
-      stack: error.stack
+      error: 'Internal server error'
     });
   }
 };

@@ -235,6 +235,9 @@ export default function TeamGameplay() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        if (errorData.code === 'LEVEL_ACCESS_DENIED') {
+          throw new Error(errorData.error || errorData.message || 'Level access denied');
+        }
         throw new Error(errorData.error || 'Failed to fetch puzzle');
       }
       return response.json();
@@ -473,9 +476,18 @@ export default function TeamGameplay() {
 
       if (data.game_completed) {
         toast({
-          title: '🎉 Exam Completed!',
+          title: 'Exam Completed!',
           description: 'You have answered all questions!',
           className: 'bg-toxic-green text-black',
+        });
+        return;
+      }
+
+      if (data.level_completed) {
+        toast({
+          title: 'Level Completed!',
+          description: data.message || 'You have completed all puzzles in this level. Please wait for admin evaluation.',
+          className: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50',
         });
         return;
       }
@@ -496,6 +508,12 @@ export default function TeamGameplay() {
       if (error.message.includes('Submissions are closed')) {
         toast({
           title: 'Submissions Closed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else if (error.message.includes('did not qualify') || error.message.includes('LEVEL_ACCESS_DENIED')) {
+        toast({
+          title: 'Access Denied',
           description: error.message,
           variant: 'destructive',
         });
@@ -933,6 +951,14 @@ export default function TeamGameplay() {
       toast({
         title: 'Empty Answer',
         description: 'Please enter an answer',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!puzzle?.id) {
+      toast({
+        title: 'Error',
+        description: 'Puzzle data not loaded yet. Please wait and try again.',
         variant: 'destructive',
       });
       return;

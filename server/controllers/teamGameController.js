@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { supabaseAdmin } = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
+const { checkTeamLevelAccess } = require('../middleware/levelAccess');
 
 const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
 
@@ -114,6 +115,21 @@ exports.getCurrentPuzzle = async (req, res) => {
     }
 
     const currentLevel = teamData.level || 1;
+
+    // Check if team can access their current level (Level 2+ requires qualification + admin unlock)
+    if (currentLevel >= 2) {
+      const accessResult = await checkTeamLevelAccess(teamId, currentLevel);
+      if (!accessResult.allowed) {
+        return res.status(403).json({
+          success: false,
+          message: accessResult.reason,
+          code: 'LEVEL_ACCESS_DENIED',
+          qualification_status: accessResult.qualification_status,
+          results_published: accessResult.results_published !== undefined ? accessResult.results_published : null
+        });
+      }
+    }
+
     let puzzle = null;
 
     // FIX: If a specific puzzle_id is requested via query param, use it directly
@@ -434,6 +450,19 @@ exports.submitAnswer = async (req, res) => {
     if (!puzzleData) return res.status(404).json({ success: false, message: 'Puzzle not found' });
     if (!puzzleData.correct_answer) return res.status(500).json({ success: false, message: 'Puzzle answer not configured' });
 
+    // Check if team can access this puzzle's level (Level 2+ requires qualification + admin unlock)
+    if (puzzleData.level >= 2) {
+      const accessResult = await checkTeamLevelAccess(teamId, puzzleData.level);
+      if (!accessResult.allowed) {
+        return res.status(403).json({
+          success: false,
+          message: accessResult.reason,
+          code: 'LEVEL_ACCESS_DENIED',
+          qualification_status: accessResult.qualification_status
+        });
+      }
+    }
+
     // Get progress (may not exist after game reset - that's OK)
     const { data: progressArr } = await supabaseAdmin
       .from('team_progress')
@@ -454,7 +483,13 @@ exports.submitAnswer = async (req, res) => {
         progressData = { started_at: new Date().toISOString(), attempts: 0 };
       } catch (e) {
         console.log('team_progress insert error (may already exist):', e.message);
-        progressData = { started_at: null, attempts: 0 };
+        // Re-fetch in case another concurrent request created it
+        const { data: retryArr } = await supabaseAdmin
+          .from('team_progress')
+          .select('started_at, attempts')
+          .eq('team_id', teamId)
+          .eq('puzzle_id', puzzle_id);
+        progressData = retryArr?.[0] || { started_at: new Date().toISOString(), attempts: 0 };
       }
     }
 
@@ -534,22 +569,23 @@ exports.submitAnswer = async (req, res) => {
       // Calculate progress
       const { data: totalPuzzles } = await supabaseAdmin
         .from('puzzles').select('id').eq('level', puzzleData.level).eq('is_active', true);
+      const currentLevelPuzzleIds = (totalPuzzles || []).map(p => p.id);
       const { data: completedPuzzles } = await supabaseAdmin
-        .from('team_progress').select('id').eq('team_id', teamId).eq('is_completed', true);
+        .from('team_progress').select('id, puzzle_id').eq('team_id', teamId).eq('is_completed', true);
 
       const totalCount = totalPuzzles?.length || 1;
-      // Count completed in this level
-      const completedInLevel = (completedPuzzles || []).length;
+      // Count completed in this level only (not all levels)
+      const completedInLevel = (completedPuzzles || []).filter(p => currentLevelPuzzleIds.includes(p.puzzle_id)).length;
       const levelProgress = Math.round((completedInLevel / totalCount) * 100);
       await supabaseAdmin.from('teams').update({ progress: levelProgress }).eq('id', teamId);
 
-      // Get next puzzle
+      // Get next puzzle (within current level only - level advancement requires qualification)
       const { data: nextPuzzles } = await supabaseAdmin
         .from('puzzles')
         .select('id, level, puzzle_number, title')
         .eq('is_active', true)
-        .or(`and(level.eq.${puzzleData.level},puzzle_number.gt.${puzzleData.puzzle_number}),level.gt.${puzzleData.level}`)
-        .order('level', { ascending: true })
+        .eq('level', puzzleData.level)
+        .gt('puzzle_number', puzzleData.puzzle_number)
         .order('puzzle_number', { ascending: true })
         .limit(1);
 
@@ -559,15 +595,62 @@ exports.submitAnswer = async (req, res) => {
           points_earned: puzzleData.points, time_taken: timeTaken, next_puzzle: nextPuzzles[0]
         });
       } else {
-        // Game completed
-        await supabaseAdmin.from('teams')
-          .update({ status: 'completed', end_time: new Date().toISOString(), progress: 100 })
-          .eq('id', teamId);
+        // All puzzles in current level completed - mark level as completed
+        // Do NOT auto-advance team.level; admin must evaluate + qualify + unlock next level
+
+        // Mark team_level_status as COMPLETED for this level
+        try {
+          const { data: existingStatus } = await supabaseAdmin
+            .from('team_level_status')
+            .select('id')
+            .eq('team_id', teamId)
+            .eq('level_id', puzzleData.level)
+            .limit(1);
+
+          if (existingStatus && existingStatus.length > 0) {
+            await supabaseAdmin.from('team_level_status')
+              .update({ status: 'COMPLETED', completed_at: new Date().toISOString() })
+              .eq('team_id', teamId)
+              .eq('level_id', puzzleData.level);
+          } else {
+            await supabaseAdmin.from('team_level_status').insert({
+              id: uuidv4(),
+              team_id: teamId,
+              level_id: puzzleData.level,
+              status: 'COMPLETED',
+              completed_at: new Date().toISOString(),
+              qualification_status: 'PENDING'
+            });
+          }
+        } catch (e) {
+          console.log('team_level_status update error:', e.message);
+        }
+
+        // Check if there are higher levels with puzzles
+        const { data: nextLevelPuzzles } = await supabaseAdmin
+          .from('puzzles')
+          .select('id')
+          .eq('is_active', true)
+          .gt('level', puzzleData.level)
+          .limit(1);
+
+        const hasNextLevel = nextLevelPuzzles && nextLevelPuzzles.length > 0;
+
+        if (!hasNextLevel) {
+          // No more levels exist - game truly completed
+          await supabaseAdmin.from('teams')
+            .update({ status: 'completed', end_time: new Date().toISOString(), progress: 100 })
+            .eq('id', teamId);
+        }
 
         return res.json({
           success: true, is_correct: true,
-          message: 'Congratulations! You have completed all puzzles!',
-          game_completed: true, points_earned: puzzleData.points, time_taken: timeTaken
+          message: hasNextLevel
+            ? 'Correct! You have completed all puzzles in this level. Please wait for admin evaluation.'
+            : 'Congratulations! You have completed all puzzles!',
+          level_completed: true,
+          game_completed: !hasNextLevel,
+          points_earned: puzzleData.points, time_taken: timeTaken
         });
       }
     } else {
