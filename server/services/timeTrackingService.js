@@ -840,7 +840,7 @@ async function getSessionState(teamId) {
       try {
         const { data } = await supabaseAdmin
           .from('team_question_progress')
-          .select('puzzle_id, status, time_spent_seconds, started_at, skip_count, time_penalty_seconds')
+          .select('puzzle_id, status, time_spent_seconds, started_at, completed_at')
           .eq('team_id', teamId);
         progressRows = data || [];
       } catch (e) {
@@ -917,8 +917,8 @@ async function getSessionState(teamId) {
           status: normalizedStatus,
           time_spent_seconds: timeSpent +
             ((normalizedStatus === 'active') && progress?.started_at ? Math.floor((now - new Date(progress.started_at)) / 1000) : 0),
-          skip_count: progress?.skip_count || 0,
-          time_penalty_seconds: progress?.time_penalty_seconds || 0
+          skip_count: 0,
+          time_penalty_seconds: 0
         };
       });
 

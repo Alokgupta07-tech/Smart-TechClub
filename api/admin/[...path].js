@@ -943,7 +943,6 @@ module.exports = async function handler(req, res) {
           await supabase.from('submissions')
             .update({
               evaluation_status: 'PENDING',
-              is_correct: null,
               score_awarded: null,
               evaluated_at: null
             })

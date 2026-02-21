@@ -679,7 +679,7 @@ exports.getTeamProgress = async (req, res) => {
     let completedCount = 0;
     try {
       const { data: completed } = await supabaseAdmin
-        .from('team_question_progress').select('id').eq('team_id', teamId).eq('status', 'completed');
+        .from('team_question_progress').select('id').eq('team_id', teamId).eq('status', 'COMPLETED');
       completedCount = completed?.length || 0;
     } catch (err) {
       const { data: completed } = await supabaseAdmin
@@ -698,8 +698,8 @@ exports.getTeamProgress = async (req, res) => {
     let hintsUsed = teamData.hints_used || 0;
     try {
       const { data: hintData } = await supabaseAdmin
-        .from('team_question_progress').select('hints_used').eq('team_id', teamId);
-      const totalHints = (hintData || []).reduce((sum, r) => sum + (r.hints_used || 0), 0);
+        .from('hint_usage').select('id').eq('team_id', teamId);
+      const totalHints = (hintData || []).length;
       if (totalHints > 0) hintsUsed = totalHints;
     } catch (err) { /* use team value */ }
 
@@ -714,7 +714,7 @@ exports.getTeamProgress = async (req, res) => {
     let questionStats = [];
     try {
       const { data: tqpData } = await supabaseAdmin
-        .from('team_question_progress').select('puzzle_id, status, attempts, hints_used, time_spent_seconds, skip_count')
+        .from('team_question_progress').select('puzzle_id, status, attempts, time_spent_seconds')
         .eq('team_id', teamId);
 
       if (tqpData && tqpData.length > 0) {
@@ -879,7 +879,7 @@ exports.getGameSummary = async (req, res) => {
     try {
       const { data: progress } = await supabaseAdmin
         .from('team_question_progress')
-        .select('puzzle_id, status, attempts, started_at, ended_at')
+        .select('puzzle_id, status, attempts, started_at, completed_at')
         .eq('team_id', teamId);
       (progress || []).forEach(p => { progressMap[p.puzzle_id] = p; });
     } catch (e) { /* table might not exist */ }

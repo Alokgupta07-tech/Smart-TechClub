@@ -310,7 +310,7 @@ module.exports = async function handler(req, res) {
       // Always return response that allows moving to next question
       return res.json({
         success: true,
-        is_correct: null,
+        is_correct: false,
         message: 'Answer recorded.',
         points_earned: 0,
         next_puzzle: nextPuzzle,
