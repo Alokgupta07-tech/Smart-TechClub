@@ -16,11 +16,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { GlitchText } from "@/components/GlitchText";
 import { TerminalCard } from "@/components/TerminalCard";
-import { CountdownTimer } from "@/components/CountdownTimer";
 import { BiohazardIcon } from "@/components/BiohazardIcon";
-
-// Event date - set to 7 days from now for demo
-const EVENT_DATE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
 const features = [
   {
@@ -113,14 +109,6 @@ const Index = () => {
               <span className="text-accent"> crack the mainframe</span>, and 
               <span className="text-destructive"> escape the lockdown</span>.
             </p>
-
-            {/* Countdown */}
-            <div className="mb-12 flex flex-col items-center">
-              <p className="text-sm font-terminal text-muted-foreground mb-4 tracking-widest">
-                EVENT STARTS IN
-              </p>
-              <CountdownTimer targetDate={EVENT_DATE} />
-            </div>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
