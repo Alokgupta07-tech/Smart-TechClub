@@ -62,7 +62,7 @@ module.exports = async function handler(req, res) {
           .order('puzzle_number', { ascending: true }),
         supabase
           .from('submissions')
-          .select('puzzle_id, submitted_answer')
+          .select('puzzle_id, submitted_answer, is_correct')
           .eq('team_id', team.id)
       ]);
 
@@ -80,7 +80,9 @@ module.exports = async function handler(req, res) {
       const submittedAnswers = {};
       if (submissionsResult.data) {
         submissionsResult.data.forEach(function (sub) {
-          completedPuzzleIds.add(sub.puzzle_id);
+          if (sub.is_correct) {
+            completedPuzzleIds.add(sub.puzzle_id);
+          }
           submittedAnswers[sub.puzzle_id] = sub.submitted_answer;
         });
       }
