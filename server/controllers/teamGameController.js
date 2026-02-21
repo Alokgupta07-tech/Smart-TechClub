@@ -57,10 +57,14 @@ async function checkTeamTimeLimit(teamId) {
 async function autoEndGameForTeam(teamId) {
   if (USE_SUPABASE) {
     await supabaseAdmin.from('teams').update({ status: 'completed', end_time: new Date().toISOString() }).eq('id', teamId).eq('status', 'active');
-    await supabaseAdmin.from('activity_logs').insert({
-      id: uuidv4(), team_id: teamId, action_type: 'level_complete', type: 'level_complete',
-      description: 'Time limit reached - game auto-ended', message: 'Time limit reached - game auto-ended'
-    });
+    try {
+      await supabaseAdmin.from('activity_logs').insert({
+        id: uuidv4(), team_id: teamId, action_type: 'level_complete',
+        description: 'Time limit reached - game auto-ended'
+      });
+    } catch (e) {
+      console.log('Activity log insert error:', e.message);
+    }
   } else {
     await db.query(`UPDATE teams SET status = 'completed', end_time = NOW() WHERE id = ? AND status = 'active'`, [teamId]);
     await db.query(`INSERT INTO activity_logs (id, team_id, action_type, description) VALUES (?, ?, 'level_complete', 'Time limit reached - game auto-ended')`, [uuidv4(), teamId]);
@@ -344,15 +348,32 @@ exports.submitAnswer = async (req, res) => {
       .single();
 
     if (!puzzleData) return res.status(404).json({ success: false, message: 'Puzzle not found' });
+    if (!puzzleData.correct_answer) return res.status(500).json({ success: false, message: 'Puzzle answer not configured' });
 
-    // Get progress
+    // Get progress (may not exist after game reset - that's OK)
     const { data: progressArr } = await supabaseAdmin
       .from('team_progress')
       .select('started_at, attempts')
       .eq('team_id', teamId)
       .eq('puzzle_id', puzzle_id);
 
-    const progressData = progressArr?.[0];
+    let progressData = progressArr?.[0];
+
+    // If no progress row exists (e.g., after game reset), create one
+    if (!progressData) {
+      try {
+        await supabaseAdmin.from('team_progress').insert({
+          id: uuidv4(), team_id: teamId, puzzle_id: puzzle_id,
+          current_level: puzzleData.level, current_puzzle: puzzleData.puzzle_number,
+          is_completed: false, started_at: new Date().toISOString(), attempts: 0
+        });
+        progressData = { started_at: new Date().toISOString(), attempts: 0 };
+      } catch (e) {
+        console.log('team_progress insert error (may already exist):', e.message);
+        progressData = { started_at: null, attempts: 0 };
+      }
+    }
+
     const timeTaken = progressData?.started_at
       ? Math.floor((Date.now() - new Date(progressData.started_at).getTime()) / 1000)
       : 0;
@@ -360,27 +381,38 @@ exports.submitAnswer = async (req, res) => {
     // Check answer
     const isCorrect = answer.trim().toLowerCase() === puzzleData.correct_answer.trim().toLowerCase();
 
-    // Record submission
-    await supabaseAdmin.from('submissions').insert({
-      id: uuidv4(), team_id: teamId, puzzle_id: puzzle_id,
-      submitted_answer: answer, is_correct: isCorrect, time_taken_seconds: timeTaken,
-      evaluation_status: 'PENDING'
-    });
+    // Record submission - try with evaluation_status first, fallback without
+    try {
+      await supabaseAdmin.from('submissions').insert({
+        id: uuidv4(), team_id: teamId, puzzle_id: puzzle_id,
+        submitted_answer: answer, is_correct: isCorrect, time_taken_seconds: timeTaken,
+        evaluation_status: 'PENDING'
+      });
+    } catch (e) {
+      // evaluation_status column may not exist - retry without it
+      console.log('Submissions insert with evaluation_status failed, retrying without:', e.message);
+      await supabaseAdmin.from('submissions').insert({
+        id: uuidv4(), team_id: teamId, puzzle_id: puzzle_id,
+        submitted_answer: answer, is_correct: isCorrect, time_taken_seconds: timeTaken
+      });
+    }
 
     // Update attempts
     await supabaseAdmin.from('team_progress')
       .update({ attempts: (progressData?.attempts || 0) + 1 })
       .eq('team_id', teamId).eq('puzzle_id', puzzle_id);
 
-    // Log activity
-    await supabaseAdmin.from('activity_logs').insert({
-      id: uuidv4(), team_id: teamId, user_id: req.user.id,
-      action_type: isCorrect ? 'puzzle_solve' : 'puzzle_fail',
-      type: isCorrect ? 'puzzle_solve' : 'puzzle_fail',
-      description: isCorrect ? 'Correct answer submitted' : 'Answer submitted',
-      message: isCorrect ? 'Correct answer submitted' : 'Answer submitted',
-      puzzle_id: puzzle_id
-    });
+    // Log activity - only use columns that exist in the base schema
+    try {
+      await supabaseAdmin.from('activity_logs').insert({
+        id: uuidv4(), team_id: teamId, user_id: req.user.id,
+        action_type: isCorrect ? 'puzzle_solve' : 'puzzle_fail',
+        description: isCorrect ? 'Correct answer submitted' : 'Answer submitted',
+        puzzle_id: puzzle_id
+      });
+    } catch (e) {
+      console.log('Activity log insert error:', e.message);
+    }
 
     // Set start_time if not set
     await supabaseAdmin.from('teams')
@@ -515,12 +547,16 @@ exports.requestHint = async (req, res) => {
     }
 
     // Log activity
-    await supabaseAdmin.from('activity_logs').insert({
-      id: uuidv4(), team_id: teamId, user_id: req.user.id,
-      action_type: 'hint_use', type: 'hint_used',
-      description: `Used hint ${nextHint.hint_number}`, message: `Used hint ${nextHint.hint_number}`,
-      puzzle_id: puzzle_id
-    });
+    try {
+      await supabaseAdmin.from('activity_logs').insert({
+        id: uuidv4(), team_id: teamId, user_id: req.user.id,
+        action_type: 'hint_use',
+        description: `Used hint ${nextHint.hint_number}`,
+        puzzle_id: puzzle_id
+      });
+    } catch (e) {
+      console.log('Activity log insert error:', e.message);
+    }
 
     res.json({
       success: true,
