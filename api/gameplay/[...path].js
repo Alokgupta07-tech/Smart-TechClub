@@ -170,7 +170,12 @@ module.exports = async function handler(req, res) {
 
     // ─── POST /api/gameplay/puzzle/submit ───
     if (req.method === 'POST' && path === '/puzzle/submit') {
-      const { puzzle_id, answer } = req.body;
+      const { puzzle_id, answer } = req.body || {};
+
+      // Input validation
+      if (!puzzle_id || !answer || typeof answer !== 'string') {
+        return res.status(400).json({ success: false, error: 'puzzle_id and answer are required' });
+      }
 
       // Parallel fetch: team + puzzle (reduces latency)
       const [teamResult, puzzleResult] = await Promise.all([
@@ -187,20 +192,14 @@ module.exports = async function handler(req, res) {
       ]);
 
       if (teamResult.error || !teamResult.data) {
-        return res.status(404).json({ error: 'Team not found' });
+        return res.status(404).json({ error: 'Team not found', details: teamResult.error?.message });
       }
       if (puzzleResult.error || !puzzleResult.data) {
-        return res.status(404).json({ error: 'Puzzle not found' });
+        return res.status(404).json({ error: 'Puzzle not found', details: puzzleResult.error?.message });
       }
 
       const team = teamResult.data;
       const puzzle = puzzleResult.data;
-
-      if (!puzzle.correct_answer) {
-        return res.status(500).json({ success: false, error: 'Puzzle answer not configured' });
-      }
-
-      const isCorrect = puzzle.correct_answer.toLowerCase().trim() === answer.toLowerCase().trim();
 
       // Check if a submission already exists for this team+puzzle
       const { data: existingSub } = await supabase
@@ -212,53 +211,42 @@ module.exports = async function handler(req, res) {
 
       let subError = null;
       if (existingSub && existingSub.length > 0) {
-        // Update existing submission instead of inserting duplicate
-        // Try with evaluation columns first, fallback without
+        // Update existing submission
         const { error } = await supabase
           .from('submissions')
-          .update({
-            submitted_answer: answer,
-            is_correct: null
-          })
+          .update({ submitted_answer: answer })
           .eq('id', existingSub[0].id);
         subError = error;
       } else {
-        // Insert new submission - try with evaluation_status, fallback without
+        // Insert new submission
         const { error } = await supabase.from('submissions').insert({
           id: crypto.randomUUID(),
           team_id: team.id,
           puzzle_id: puzzle_id,
           submitted_answer: answer,
-          is_correct: null
+          is_correct: false
         });
-        if (error) {
-          console.error('Submission insert error:', error);
-        }
         subError = error;
       }
 
       if (subError) {
-        console.error('Submission save error:', subError);
+        console.error('Submission save error:', JSON.stringify(subError));
         return res.status(500).json({
           success: false,
           error: 'Failed to save your answer. Please try again.',
-          message: 'Failed to save your answer. Please try again.'
+          details: subError.message || subError.code || 'Unknown DB error'
         });
       }
 
-      // Log activity - only use columns that exist in the base schema
-      try {
-        await supabase.from('activity_logs').insert({
-          id: crypto.randomUUID(),
-          team_id: team.id,
-          user_id: user.userId,
-          action_type: 'puzzle_solve',
-          description: `Submitted answer for puzzle: ${puzzle.title}`,
-          puzzle_id: puzzle_id
-        });
-      } catch (logErr) {
-        console.error('Activity log error:', logErr);
-      }
+      // Log activity (non-blocking, ignore errors)
+      supabase.from('activity_logs').insert({
+        id: crypto.randomUUID(),
+        team_id: team.id,
+        user_id: user.userId,
+        action_type: 'puzzle_solve',
+        description: 'Submitted answer for puzzle: ' + (puzzle.title || puzzle_id),
+        puzzle_id: puzzle_id
+      }).then(function() {}).catch(function() {});
 
       // Also set start_time if not already set
       if (!team.start_time) {
