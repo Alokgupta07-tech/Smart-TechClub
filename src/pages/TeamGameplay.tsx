@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, startTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -334,27 +334,57 @@ export default function TeamGameplay() {
     refetchOnMount: false,
   });
 
-  // Submit answer mutation
+  // Submit answer mutation with retry logic
   const submitAnswer = useMutation({
     mutationFn: async (submittedAnswer: string) => {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/gameplay/puzzle/submit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          puzzle_id: puzzle?.id,
-          answer: submittedAnswer,
-        }),
-      });
+      const MAX_SUBMIT_RETRIES = 2;
+      let lastError: Error | null = null;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to submit answer');
+      for (let attempt = 0; attempt <= MAX_SUBMIT_RETRIES; attempt++) {
+        try {
+          const response = await fetch(`${API_BASE}/gameplay/puzzle/submit`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              puzzle_id: puzzle?.id,
+              answer: submittedAnswer,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMsg = errorData.message || errorData.error || 'Failed to submit answer';
+            // Don't retry on 4xx client errors (except 408 timeout)
+            if (response.status >= 400 && response.status < 500 && response.status !== 408) {
+              throw new Error(errorMsg);
+            }
+            throw new Error(errorMsg);
+          }
+          return response.json();
+        } catch (error) {
+          lastError = error as Error;
+          if (attempt < MAX_SUBMIT_RETRIES) {
+            // Wait before retrying (1s, then 2s)
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+            continue;
+          }
+        }
       }
-      return response.json();
+
+      // All retries failed - save answer locally so it's not lost
+      const savedAnswers = JSON.parse(localStorage.getItem('savedAnswers') || '{}');
+      savedAnswers[puzzle?.id || ''] = {
+        answer: submittedAnswer,
+        timestamp: new Date().toISOString(),
+        pendingSubmit: true,
+      };
+      localStorage.setItem('savedAnswers', JSON.stringify(savedAnswers));
+
+      throw lastError || new Error('Failed to submit answer after retries');
     },
     onSuccess: async (data, submittedAnswer) => {
       // Handle "awaiting evaluation" response - silently move to next question
@@ -456,14 +486,14 @@ export default function TeamGameplay() {
       // Check if this is a submissions_closed error
       if (error.message.includes('Submissions are closed')) {
         toast({
-          title: '🔒 Submissions Closed',
+          title: 'Submissions Closed',
           description: error.message,
           variant: 'destructive',
         });
       } else {
         toast({
-          title: 'Error',
-          description: error.message || 'Failed to submit answer',
+          title: 'Submission Failed',
+          description: (error.message || 'Failed to submit answer') + '. Your answer has been saved locally - please try again.',
           variant: 'destructive',
         });
       }

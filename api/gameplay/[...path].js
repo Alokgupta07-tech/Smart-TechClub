@@ -198,19 +198,48 @@ module.exports = async function handler(req, res) {
 
       const isCorrect = puzzle.correct_answer.toLowerCase().trim() === answer.toLowerCase().trim();
 
-      // Record submission (without validating correctness instantly)
-      const { error: subError } = await supabase.from('submissions').insert({
-        id: crypto.randomUUID(),
-        team_id: team.id,
-        puzzle_id: puzzle_id,
-        submitted_answer: answer,
-        is_correct: null,
-        score_awarded: 0,
-        evaluation_status: 'PENDING'
-      });
+      // Check if a submission already exists for this team+puzzle
+      const { data: existingSub } = await supabase
+        .from('submissions')
+        .select('id')
+        .eq('team_id', team.id)
+        .eq('puzzle_id', puzzle_id)
+        .limit(1);
+
+      let subError = null;
+      if (existingSub && existingSub.length > 0) {
+        // Update existing submission instead of inserting duplicate
+        const { error } = await supabase
+          .from('submissions')
+          .update({
+            submitted_answer: answer,
+            is_correct: null,
+            score_awarded: 0,
+            evaluation_status: 'PENDING'
+          })
+          .eq('id', existingSub[0].id);
+        subError = error;
+      } else {
+        // Insert new submission
+        const { error } = await supabase.from('submissions').insert({
+          id: crypto.randomUUID(),
+          team_id: team.id,
+          puzzle_id: puzzle_id,
+          submitted_answer: answer,
+          is_correct: null,
+          score_awarded: 0,
+          evaluation_status: 'PENDING'
+        });
+        subError = error;
+      }
 
       if (subError) {
-        console.error('Submission insert error:', subError);
+        console.error('Submission save error:', subError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to save your answer. Please try again.',
+          message: 'Failed to save your answer. Please try again.'
+        });
       }
 
       // Log activity
@@ -241,11 +270,13 @@ module.exports = async function handler(req, res) {
         .eq('level', puzzle.level)
         .order('puzzle_number', { ascending: true });
 
-      // Get all submissions for this team (regardless of correctness)
+      // Get all submissions for this team for current level puzzles only
+      const currentLevelPuzzleIds = (allPuzzles || []).map(p => p.id);
       const { data: correctSubs } = await supabase
         .from('submissions')
         .select('puzzle_id')
-        .eq('team_id', team.id);
+        .eq('team_id', team.id)
+        .in('puzzle_id', currentLevelPuzzleIds.length > 0 ? currentLevelPuzzleIds : ['__none__']);
 
       const completedPuzzleIds = new Set((correctSubs || []).map(s => s.puzzle_id));
 
