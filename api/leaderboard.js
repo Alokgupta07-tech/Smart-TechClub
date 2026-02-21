@@ -87,6 +87,13 @@ module.exports = async function handler(req, res) {
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
 
+    function timeToSeconds(startTime, endTime) {
+      if (!startTime) return Infinity;
+      const start = new Date(startTime).getTime();
+      const end = endTime ? new Date(endTime).getTime() : Date.now();
+      return Math.floor((end - start) / 1000);
+    }
+
     // ── Build result rows ─────────────────────────────────────────────────
     var result = teams.map(t => {
       var leaderUser = usersMap[t.user_id];
@@ -101,6 +108,7 @@ module.exports = async function handler(req, res) {
         leaderName: leaderUser?.name || null,
         hintsUsed: t.hints_used || 0,
         totalTime: formatTime(t.start_time, t.end_time),
+        totalTimeSeconds: timeToSeconds(t.start_time, t.end_time),
       };
     });
 
@@ -108,8 +116,8 @@ module.exports = async function handler(req, res) {
     result.sort((a, b) => {
       if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
       if (b.puzzlesSolved !== a.puzzlesSolved) return b.puzzlesSolved - a.puzzlesSolved;
-      // faster time = lower rank number (better)
-      return (a.totalTime < b.totalTime ? -1 : 1);
+      // faster time = lower rank number (better) - use numeric seconds, not string
+      return (a.totalTimeSeconds - b.totalTimeSeconds);
     });
 
     result.forEach((r, i) => {

@@ -44,7 +44,7 @@ async function getAvailableHints(teamId, puzzleId) {
       // Get team's progress on this puzzle
       const { data: progressData, error: progressErr } = await supabaseAdmin
         .from('team_progress')
-        .select('puzzle_started_at, last_hint_number')
+        .select('started_at, hints_used')
         .eq('team_id', teamId)
         .eq('puzzle_id', puzzleId)
         .maybeSingle();
@@ -58,42 +58,29 @@ async function getAvailableHints(teamId, puzzleId) {
     return getAvailableHintsMysql(teamId, puzzleId);
   }
 
-  if (!progress || !progress.puzzle_started_at) {
+  if (!progress || !progress.started_at) {
     return { hints: [], nextHintUnlockIn: null };
   }
 
-  const elapsedSeconds = Math.floor((Date.now() - new Date(progress.puzzle_started_at).getTime()) / 1000);
-  const lastHintNumber = progress.last_hint_number || 0;
+  const elapsedSeconds = Math.floor((Date.now() - new Date(progress.started_at).getTime()) / 1000);
+  const lastHintNumber = progress.hints_used || 0;
 
   // Determine which hints are available
   const availableHints = hints.map((hint, index) => {
-    const isUnlocked = hint.is_used || (
-      index === lastHintNumber &&
-      elapsedSeconds >= hint.unlock_after_seconds
-    );
+    const isUnlocked = hint.is_used || (index < lastHintNumber);
 
     return {
       ...hint,
       isUnlocked,
-      canUnlock: !hint.is_used && index === lastHintNumber && elapsedSeconds >= hint.unlock_after_seconds,
-      unlockAfterSeconds: hint.unlock_after_seconds,
-      penaltySeconds: Math.round(hint.time_penalty_seconds * hint.penalty_multiplier)
+      canUnlock: !hint.is_used && index === lastHintNumber,
+      unlockAfterSeconds: 0,
+      penaltySeconds: hint.time_penalty_seconds || 0
     };
   });
 
-  // Calculate next hint unlock time
-  let nextHintUnlockIn = null;
-  const nextHint = hints[lastHintNumber];
-  if (nextHint && !availableHints[lastHintNumber]?.is_used) {
-    const remainingSeconds = nextHint.unlock_after_seconds - elapsedSeconds;
-    if (remainingSeconds > 0) {
-      nextHintUnlockIn = remainingSeconds;
-    }
-  }
-
   return {
     hints: availableHints,
-    nextHintUnlockIn,
+    nextHintUnlockIn: null,
     elapsedSeconds,
     lastHintNumber
   };
@@ -111,45 +98,33 @@ async function getAvailableHintsMysql(teamId, puzzleId) {
   `, [teamId, puzzleId]);
 
   const [[progress]] = await db.query(`
-    SELECT puzzle_started_at, last_hint_number
+    SELECT started_at, hints_used
     FROM team_progress
     WHERE team_id = ? AND puzzle_id = ?
   `, [teamId, puzzleId]);
 
-  if (!progress || !progress.puzzle_started_at) {
+  if (!progress || !progress.started_at) {
     return { hints: [], nextHintUnlockIn: null };
   }
 
-  const elapsedSeconds = Math.floor((Date.now() - new Date(progress.puzzle_started_at).getTime()) / 1000);
-  const lastHintNumber = progress.last_hint_number || 0;
+  const elapsedSeconds = Math.floor((Date.now() - new Date(progress.started_at).getTime()) / 1000);
+  const lastHintNumber = progress.hints_used || 0;
 
   const availableHints = hints.map((hint, index) => {
-    const isUnlocked = hint.is_used || (
-      index === lastHintNumber &&
-      elapsedSeconds >= hint.unlock_after_seconds
-    );
+    const isUnlocked = hint.is_used || (index < lastHintNumber);
 
     return {
       ...hint,
       isUnlocked,
-      canUnlock: !hint.is_used && index === lastHintNumber && elapsedSeconds >= hint.unlock_after_seconds,
-      unlockAfterSeconds: hint.unlock_after_seconds,
-      penaltySeconds: Math.round(hint.time_penalty_seconds * hint.penalty_multiplier)
+      canUnlock: !hint.is_used && index === lastHintNumber,
+      unlockAfterSeconds: 0,
+      penaltySeconds: hint.time_penalty_seconds || 0
     };
   });
 
-  let nextHintUnlockIn = null;
-  const nextHint = hints[lastHintNumber];
-  if (nextHint && !availableHints[lastHintNumber]?.is_used) {
-    const remainingSeconds = nextHint.unlock_after_seconds - elapsedSeconds;
-    if (remainingSeconds > 0) {
-      nextHintUnlockIn = remainingSeconds;
-    }
-  }
-
   return {
     hints: availableHints,
-    nextHintUnlockIn,
+    nextHintUnlockIn: null,
     elapsedSeconds,
     lastHintNumber
   };
@@ -184,19 +159,19 @@ async function useHint(teamId, puzzleId, hintId) {
       // Verify this is the next sequential hint
       const { data: progress, error: progErr } = await supabaseAdmin
         .from('team_progress')
-        .select('last_hint_number, hints_used')
+        .select('hints_used')
         .eq('team_id', teamId)
         .eq('puzzle_id', puzzleId)
         .maybeSingle();
       if (progErr) throw progErr;
 
-      const lastHintNumber = progress?.last_hint_number || 0;
+      const lastHintNumber = progress?.hints_used || 0;
       if (hint.hint_number !== lastHintNumber + 1) {
         throw new Error('Hints must be unlocked in order');
       }
 
-      // Calculate penalty with multiplier
-      const penaltySeconds = Math.round(hint.time_penalty_seconds * hint.penalty_multiplier);
+      // Calculate penalty
+      const penaltySeconds = hint.time_penalty_seconds || 0;
 
       // Record hint usage
       const { error: insertErr } = await supabaseAdmin
@@ -230,7 +205,6 @@ async function useHint(teamId, puzzleId, hintId) {
       const { error: progUpdateErr } = await supabaseAdmin
         .from('team_progress')
         .update({
-          last_hint_number: hint.hint_number,
           hints_used: currentProgressHints + 1
         })
         .eq('team_id', teamId)
@@ -277,7 +251,7 @@ async function useHintMysql(teamId, puzzleId, hintId) {
   const [[[hint]], [[existing]], [[progress]]] = await Promise.all([
     db.query(`SELECT * FROM hints WHERE id = ? AND puzzle_id = ?`, [hintId, puzzleId]),
     db.query(`SELECT id FROM hint_usage WHERE team_id = ? AND hint_id = ?`, [teamId, hintId]),
-    db.query(`SELECT last_hint_number FROM team_progress WHERE team_id = ? AND puzzle_id = ?`, [teamId, puzzleId])
+    db.query(`SELECT hints_used FROM team_progress WHERE team_id = ? AND puzzle_id = ?`, [teamId, puzzleId])
   ]);
 
   if (!hint) {
@@ -288,12 +262,12 @@ async function useHintMysql(teamId, puzzleId, hintId) {
     throw new Error('Hint already used');
   }
 
-  const lastHintNumber = progress?.last_hint_number || 0;
+  const lastHintNumber = progress?.hints_used || 0;
   if (hint.hint_number !== lastHintNumber + 1) {
     throw new Error('Hints must be unlocked in order');
   }
 
-  const penaltySeconds = Math.round(hint.time_penalty_seconds * hint.penalty_multiplier);
+  const penaltySeconds = hint.time_penalty_seconds || 0;
 
   await db.query(`
     INSERT INTO hint_usage (id, team_id, hint_id, puzzle_id, time_penalty_applied)
@@ -305,10 +279,10 @@ async function useHintMysql(teamId, puzzleId, hintId) {
   `, [teamId]);
 
   await db.query(`
-    UPDATE team_progress 
-    SET last_hint_number = ?, hints_used = hints_used + 1
+    UPDATE team_progress
+    SET hints_used = hints_used + 1
     WHERE team_id = ? AND puzzle_id = ?
-  `, [hint.hint_number, teamId, puzzleId]);
+  `, [teamId, puzzleId]);
 
   await notifyHintPenalty(teamId, hint.hint_number, penaltySeconds);
 

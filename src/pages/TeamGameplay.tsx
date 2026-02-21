@@ -315,7 +315,7 @@ export default function TeamGameplay() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [remainingTime !== null, timeExpired, navigate, toast]);
+  }, [remainingTime, timeExpired, navigate, toast]);
 
   // Helper to format countdown time
   const formatCountdown = (seconds: number): string => {

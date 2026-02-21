@@ -201,6 +201,11 @@ module.exports = async function handler(req, res) {
       const team = teamResult.data;
       const puzzle = puzzleResult.data;
 
+      // Validate answer against correct answer
+      const isCorrect = puzzle.correct_answer
+        ? answer.trim().toLowerCase() === puzzle.correct_answer.trim().toLowerCase()
+        : false;
+
       // Check if a submission already exists for this team+puzzle
       const { data: existingSub } = await supabase
         .from('submissions')
@@ -214,7 +219,7 @@ module.exports = async function handler(req, res) {
         // Update existing submission
         const { error } = await supabase
           .from('submissions')
-          .update({ submitted_answer: answer })
+          .update({ submitted_answer: answer, is_correct: isCorrect })
           .eq('id', existingSub[0].id);
         subError = error;
       } else {
@@ -224,7 +229,7 @@ module.exports = async function handler(req, res) {
           team_id: team.id,
           puzzle_id: puzzle_id,
           submitted_answer: answer,
-          is_correct: false
+          is_correct: isCorrect
         });
         subError = error;
       }
@@ -260,18 +265,42 @@ module.exports = async function handler(req, res) {
         .eq('level', puzzle.level)
         .order('puzzle_number', { ascending: true });
 
-      // Get all submissions for this team for current level puzzles only
+      // Get all submissions for this team for current level puzzles only (correct ones)
       const currentLevelPuzzleIds = (allPuzzles || []).map(p => p.id);
       const { data: correctSubs } = await supabase
         .from('submissions')
         .select('puzzle_id')
         .eq('team_id', team.id)
+        .eq('is_correct', true)
         .in('puzzle_id', currentLevelPuzzleIds.length > 0 ? currentLevelPuzzleIds : ['__none__']);
 
       const completedPuzzleIds = new Set((correctSubs || []).map(s => s.puzzle_id));
 
-      // Add current puzzle because it was submitted
-      completedPuzzleIds.add(puzzle_id);
+      // Add current puzzle only if answer is correct
+      if (isCorrect) {
+        completedPuzzleIds.add(puzzle_id);
+
+        // Update team_question_progress for correct answer
+        try {
+          const { data: existingTqp } = await supabase
+            .from('team_question_progress')
+            .select('id')
+            .eq('team_id', team.id)
+            .eq('puzzle_id', puzzle_id)
+            .limit(1);
+
+          if (existingTqp && existingTqp.length > 0) {
+            await supabase.from('team_question_progress')
+              .update({ status: 'COMPLETED', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+              .eq('team_id', team.id).eq('puzzle_id', puzzle_id);
+          } else {
+            await supabase.from('team_question_progress').insert({
+              id: crypto.randomUUID(), team_id: team.id, puzzle_id: puzzle_id,
+              status: 'COMPLETED', completed_at: new Date().toISOString(), correct: true
+            });
+          }
+        } catch (e) { console.log('team_question_progress update error:', e.message); }
+      }
 
       // Find next incomplete puzzle
       let nextPuzzle = null;
@@ -310,9 +339,9 @@ module.exports = async function handler(req, res) {
       // Always return response that allows moving to next question
       return res.json({
         success: true,
-        is_correct: false,
-        message: 'Answer recorded.',
-        points_earned: 0,
+        is_correct: isCorrect,
+        message: isCorrect ? 'Correct answer!' : 'Answer recorded.',
+        points_earned: isCorrect ? (puzzle.points || 0) : 0,
         next_puzzle: nextPuzzle,
         game_completed: gameCompleted
       });
@@ -403,11 +432,11 @@ module.exports = async function handler(req, res) {
       // Get submission stats
       const { data: subs } = await supabase
         .from('submissions')
-        .select('id')
+        .select('id, is_correct')
         .eq('team_id', team.id);
 
       var total = subs ? subs.length : 0;
-      var correct = total; // Map progress equally for answered questions
+      var correct = subs ? subs.filter(s => s.is_correct === true).length : 0;
 
       return res.json({
         team: mapTeam(team),

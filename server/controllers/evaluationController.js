@@ -690,8 +690,8 @@ exports.evaluateAnswers = async (req, res) => {
     
     // Process each submission
     for (const submission of pendingSubmissions) {
-      const submittedTrimmed = submission.submitted_answer.trim().toLowerCase();
-      const correctTrimmed = submission.correct_answer.trim().toLowerCase();
+      const submittedTrimmed = (submission.submitted_answer || '').trim().toLowerCase();
+      const correctTrimmed = (submission.correct_answer || '').trim().toLowerCase();
       const isCorrect = submittedTrimmed === correctTrimmed;
       
       const scoreAwarded = isCorrect ? submission.points : 0;
