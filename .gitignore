@@ -34,3 +34,6 @@ server/.env
 
 # API node_modules
 api/node_modules
+
+# Claude Code temp files
+tmpclaude-*
