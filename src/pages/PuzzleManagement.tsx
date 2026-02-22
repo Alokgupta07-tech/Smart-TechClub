@@ -507,7 +507,7 @@ export default function PuzzleManagement() {
           
           <div className="grid gap-4 py-4">
             <div>
-              <Label>Title</Label>
+              <Label htmlFor="edit-title">Title</Label>
               <Input
                 id="edit-title"
                 name="title"
@@ -517,7 +517,7 @@ export default function PuzzleManagement() {
             </div>
 
             <div>
-              <Label>Description</Label>
+              <Label htmlFor="edit-description">Description</Label>
               <Textarea
                 id="edit-description"
                 name="description"
@@ -528,7 +528,7 @@ export default function PuzzleManagement() {
             </div>
 
             <div>
-              <Label>Puzzle Content</Label>
+              <Label htmlFor="edit-puzzle-content">Puzzle Content</Label>
               <Textarea
                 id="edit-puzzle-content"
                 name="puzzle_content"
@@ -540,7 +540,7 @@ export default function PuzzleManagement() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Correct Answer</Label>
+                <Label htmlFor="edit-correct-answer">Correct Answer</Label>
                 <Input
                   id="edit-correct-answer"
                   name="correct_answer"
@@ -550,7 +550,7 @@ export default function PuzzleManagement() {
               </div>
 
               <div>
-                <Label>Points</Label>
+                <Label htmlFor="edit-points">Points</Label>
                 <Input
                   id="edit-points"
                   name="points"

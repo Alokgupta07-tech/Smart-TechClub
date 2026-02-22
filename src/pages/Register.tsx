@@ -182,7 +182,7 @@ const Register = () => {
                 <TerminalCard title="TEAM IDENTIFICATION" status="active" className="animate-fade-in">
                   <div className="space-y-6">
                     <div>
-                      <label className="block text-sm font-terminal text-muted-foreground mb-2">
+                      <label htmlFor="team-name" className="block text-sm font-terminal text-muted-foreground mb-2">
                         TEAM NAME
                       </label>
                       <div className="relative">
@@ -205,7 +205,7 @@ const Register = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-terminal text-muted-foreground mb-2">
+                      <label htmlFor="register-password" className="block text-sm font-terminal text-muted-foreground mb-2">
                         CREATE PASSWORD
                       </label>
                       <div className="relative">
@@ -229,7 +229,7 @@ const Register = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-terminal text-muted-foreground mb-2">
+                      <label htmlFor="confirm-password" className="block text-sm font-terminal text-muted-foreground mb-2">
                         CONFIRM PASSWORD
                       </label>
                       <div className="relative">
@@ -305,7 +305,7 @@ const Register = () => {
                     >
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                          <label htmlFor={`member-${index}-name`} className="block text-xs font-terminal text-muted-foreground mb-2">
                             FULL NAME
                           </label>
                           <div className="relative">
@@ -327,7 +327,7 @@ const Register = () => {
                         </div>
 
                         <div>
-                          <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                          <label htmlFor={`member-${index}-email`} className="block text-xs font-terminal text-muted-foreground mb-2">
                             EMAIL
                           </label>
                           <div className="relative">
@@ -350,7 +350,7 @@ const Register = () => {
                         </div>
 
                         <div>
-                          <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                          <label htmlFor={`member-${index}-phone`} className="block text-xs font-terminal text-muted-foreground mb-2">
                             PHONE
                           </label>
                           <div className="relative">

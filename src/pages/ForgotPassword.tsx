@@ -90,7 +90,7 @@ const ForgotPassword = () => {
             <TerminalCard title="PASSWORD RECOVERY" status="active" scanLine>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 <div>
-                  <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                  <label htmlFor="forgot-email" className="block text-xs font-terminal text-muted-foreground mb-2">
                     REGISTERED EMAIL
                   </label>
                   <div className="relative">

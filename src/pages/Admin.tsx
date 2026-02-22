@@ -574,10 +574,13 @@ const Admin = () => {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
+                      id="team-search"
+                      name="team-search"
                       placeholder="Search teams..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-10 bg-background/50 border-primary/20"
+                      aria-label="Search teams"
                     />
                   </div>
                   <Button 

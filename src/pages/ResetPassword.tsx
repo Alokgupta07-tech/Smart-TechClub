@@ -96,7 +96,7 @@ const ResetPassword = () => {
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 {/* OTP */}
                 <div>
-                  <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                  <label htmlFor="reset-otp" className="block text-xs font-terminal text-muted-foreground mb-2">
                     RESET CODE
                   </label>
                   <p className="text-xs text-muted-foreground/70 mb-2 font-terminal">
@@ -124,7 +124,7 @@ const ResetPassword = () => {
 
                 {/* New Password */}
                 <div>
-                  <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                  <label htmlFor="new-password" className="block text-xs font-terminal text-muted-foreground mb-2">
                     NEW PASSWORD
                   </label>
                   <div className="relative">
@@ -156,7 +156,7 @@ const ResetPassword = () => {
 
                 {/* Confirm Password */}
                 <div>
-                  <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                  <label htmlFor="reset-confirm-password" className="block text-xs font-terminal text-muted-foreground mb-2">
                     CONFIRM PASSWORD
                   </label>
                   <div className="relative">

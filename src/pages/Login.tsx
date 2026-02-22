@@ -169,7 +169,7 @@ const Login = () => {
             <TerminalCard title="2FA VERIFICATION" status="active" scanLine>
               <form onSubmit={handle2FASubmit} className="space-y-6">
                 <div>
-                  <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                  <label htmlFor="otp-2fa" className="block text-xs font-terminal text-muted-foreground mb-2">
                     VERIFICATION CODE
                   </label>
                   <p className="text-xs text-muted-foreground/70 mb-2 font-terminal">
@@ -217,7 +217,7 @@ const Login = () => {
             <TerminalCard title="AUTHENTICATION" status="active" scanLine>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div>
-                <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                <label htmlFor="login-email" className="block text-xs font-terminal text-muted-foreground mb-2">
                   TEAM LEADER EMAIL
                 </label>
                 <p className="text-xs text-muted-foreground/70 mb-2 font-terminal">
@@ -244,7 +244,7 @@ const Login = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                <label htmlFor="login-password" className="block text-xs font-terminal text-muted-foreground mb-2">
                   PASSWORD
                 </label>
                 <div className="relative">

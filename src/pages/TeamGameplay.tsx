@@ -1276,6 +1276,7 @@ export default function TeamGameplay() {
                     <Input
                       ref={inputRef}
                       id="answer"
+                      name="answer"
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
                       placeholder={isQuestionCompleted ? "Question already completed" : "Type your answer here..."}

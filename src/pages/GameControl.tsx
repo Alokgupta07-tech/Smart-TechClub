@@ -1002,6 +1002,7 @@ export default function GameControl() {
               </Label>
               <Input
                 id="reset-confirm"
+                name="reset-confirm"
                 value={resetConfirmText}
                 onChange={(e) => setResetConfirmText(e.target.value)}
                 placeholder="Type RESET"

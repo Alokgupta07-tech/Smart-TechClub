@@ -103,7 +103,7 @@ const AdminLogin = () => {
           >
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div>
-                <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                <label htmlFor="admin-email" className="block text-xs font-terminal text-muted-foreground mb-2">
                   ADMIN EMAIL
                 </label>
                 <div className="relative">
@@ -127,7 +127,7 @@ const AdminLogin = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-terminal text-muted-foreground mb-2">
+                <label htmlFor="admin-password" className="block text-xs font-terminal text-muted-foreground mb-2">
                   ADMIN PASSWORD
                 </label>
                 <div className="relative">
