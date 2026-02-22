@@ -53,6 +53,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { GlitchText } from '@/components/GlitchText';
 import { BackButton } from '@/components/BackButton';
+import { fetchWithAuth } from '@/lib/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -224,14 +225,11 @@ export default function TeamGameplay() {
   const { data: puzzleData, isLoading: puzzleLoading, error: puzzleError } = useQuery({
     queryKey: ['currentPuzzle', selectedPuzzleId],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
       // If a specific puzzle is selected, fetch it; otherwise get current
       const url = selectedPuzzleId
         ? `${API_BASE}/gameplay/puzzle/current?puzzle_id=${selectedPuzzleId}`
         : `${API_BASE}/gameplay/puzzle/current`;
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(url);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -267,12 +265,15 @@ export default function TeamGameplay() {
       setRemainingTime(puzzleData.time_remaining_seconds);
 
       // Reset timeExpired if we have fresh time remaining (game was restarted)
-      // Also detect if this is a fresh game by checking if time is close to full (e.g., > 2350 seconds = 39+ minutes)
+      // Detect if this is a fresh game by checking if time is close to full (> 95% of time limit)
+      // Level 1: 40 min = 2400s (95% = 2280s), Level 2: 60 min = 3600s (95% = 3420s)
       if (puzzleData.time_remaining_seconds > 0 && !puzzleData.time_expired && !puzzleData.game_completed) {
         setTimeExpired(false);
 
         // If nearly full time remaining (game just started/restarted), clear ALL old session data
-        if (puzzleData.time_remaining_seconds >= 2350) {
+        const timeLimit = progress?.current_level === 2 ? 3600 : 2400;
+        const freshGameThreshold = timeLimit * 0.95; // 95% of time limit
+        if (puzzleData.time_remaining_seconds >= freshGameThreshold) {
           clearGameLocalStorage();
         }
       }
@@ -281,9 +282,10 @@ export default function TeamGameplay() {
     if (puzzleData?.time_expired || puzzleData?.game_completed) {
       if (puzzleData?.time_expired) {
         setTimeExpired(true);
+        const timeLimit = progress?.current_level === 2 ? 60 : 40;
         toast({
           title: '⏰ Time\'s Up!',
-          description: 'Your 40-minute session has ended.',
+          description: `Your ${timeLimit}-minute session has ended.`,
           variant: 'destructive',
         });
       }
@@ -299,9 +301,10 @@ export default function TeamGameplay() {
         if (prev === null || prev <= 0) {
           clearInterval(interval);
           setTimeExpired(true);
+          const timeLimit = progress?.current_level === 2 ? 60 : 40;
           toast({
             title: '⏰ Time\'s Up!',
-            description: 'Your 40-minute session has ended. Redirecting...',
+            description: `Your ${timeLimit}-minute session has ended. Redirecting...`,
             variant: 'destructive',
           });
           // Redirect after 3 seconds
@@ -344,10 +347,7 @@ export default function TeamGameplay() {
   const { data: progressData } = useQuery({
     queryKey: ['teamProgress'],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/gameplay/progress`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/gameplay/progress`);
 
       if (!response.ok) throw new Error('Failed to fetch progress');
       return response.json();
@@ -360,17 +360,15 @@ export default function TeamGameplay() {
   // Submit answer mutation with retry logic
   const submitAnswer = useMutation({
     mutationFn: async (submittedAnswer: string) => {
-      const token = localStorage.getItem('accessToken');
       const MAX_SUBMIT_RETRIES = 2;
       let lastError: Error | null = null;
 
       for (let attempt = 0; attempt <= MAX_SUBMIT_RETRIES; attempt++) {
         try {
-          const response = await fetch(`${API_BASE}/gameplay/puzzle/submit`, {
+          const response = await fetchWithAuth(`${API_BASE}/gameplay/puzzle/submit`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
               puzzle_id: puzzle?.id,
@@ -543,12 +541,10 @@ export default function TeamGameplay() {
   // Request hint mutation
   const requestHint = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/gameplay/puzzle/hint`, {
+      const response = await fetchWithAuth(`${API_BASE}/gameplay/puzzle/hint`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           puzzle_id: puzzle?.id,
@@ -585,10 +581,7 @@ export default function TeamGameplay() {
   const { data: allPuzzlesData } = useQuery({
     queryKey: ['allPuzzles'],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/session`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/game/time/session`);
 
       if (!response.ok) throw new Error('Failed to fetch puzzles');
       return response.json();
@@ -601,12 +594,10 @@ export default function TeamGameplay() {
   // Skip question mutation
   const skipQuestion = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/game/time/skip-question`, {
+      const response = await fetchWithAuth(`${API_BASE}/game/time/skip-question`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           puzzle_id: puzzle?.id,
@@ -1188,7 +1179,9 @@ export default function TeamGameplay() {
             <p className={`text-2xl font-bold ${remainingTime !== null && remainingTime < 300 ? 'text-red-500' : remainingTime !== null && remainingTime < 600 ? 'text-orange-500' : 'text-blue-500'}`}>
               {remainingTime !== null
                 ? formatCountdown(remainingTime)
-                : '40:00'}
+                : sessionStats?.timeLimitSeconds 
+                  ? formatCountdown(sessionStats.timeLimitSeconds)
+                  : progress?.current_level === 2 ? '60:00' : '40:00'}
             </p>
             {remainingTime !== null && remainingTime < 300 && (
               <p className="text-xs text-red-400 mt-1 animate-pulse">⚠️ Hurry up!</p>
@@ -1200,13 +1193,14 @@ export default function TeamGameplay() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content - Current Puzzle */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Puzzle Card */}
-          <Card className="bg-black/60 border-toxic-green">
+          {/* Puzzle Card - Different colors for Level 2 */}
+          <Card className={`bg-black/60 ${puzzle.level === 2 ? 'border-purple-500' : 'border-toxic-green'}`}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm text-toxic-green font-mono mb-2">
-                    LEVEL {puzzle.level} - PUZZLE {puzzle.puzzle_number}
+                  <div className={`text-sm font-mono mb-2 flex items-center gap-2 ${puzzle.level === 2 ? 'text-purple-400' : 'text-toxic-green'}`}>
+                    {puzzle.level === 2 && <span className="text-lg">🏆</span>}
+                    LEVEL {puzzle.level} {puzzle.level === 2 ? '- FINALS' : ''} - PUZZLE {puzzle.puzzle_number}
                   </div>
                   <CardTitle className="text-2xl">
                     <GlitchText>{puzzle.title}</GlitchText>
@@ -1216,7 +1210,7 @@ export default function TeamGameplay() {
                   </CardDescription>
                 </div>
                 <div className="flex flex-col gap-2 items-end">
-                  <div className="flex items-center gap-2 text-yellow-500">
+                  <div className={`flex items-center gap-2 ${puzzle.level === 2 ? 'text-purple-400' : 'text-yellow-500'}`}>
                     <Award className="w-5 h-5" />
                     <span className="font-bold">{puzzle.points} pts</span>
                   </div>
@@ -1225,8 +1219,8 @@ export default function TeamGameplay() {
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Puzzle Content */}
-              <div className="p-6 bg-black border border-toxic-green/30 rounded-lg">
-                <div className="text-xs text-toxic-green font-mono mb-2">
+              <div className={`p-6 bg-black border rounded-lg ${puzzle.level === 2 ? 'border-purple-500/30' : 'border-toxic-green/30'}`}>
+                <div className={`text-xs font-mono mb-2 ${puzzle.level === 2 ? 'text-purple-400' : 'text-toxic-green'}`}>
                   PUZZLE TYPE: {puzzle.puzzle_type.toUpperCase()}
                 </div>
                 <pre className="text-zinc-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">
@@ -1851,7 +1845,7 @@ export default function TeamGameplay() {
               ⏰ Time's Up!
             </DialogTitle>
             <DialogDescription className="text-zinc-300">
-              Your 40-minute session has ended.
+              Your {progress?.current_level === 2 ? '60' : '40'}-minute session has ended.
             </DialogDescription>
           </DialogHeader>
 

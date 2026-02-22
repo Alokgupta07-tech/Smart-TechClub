@@ -39,7 +39,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Trophy, 
   XCircle, 
@@ -84,28 +83,7 @@ interface Team {
 }
 
 export function AdminQualificationPanel() {
-  return (
-    <Tabs defaultValue="teams" className="w-full">
-      <TabsList className="grid w-full grid-cols-2 mb-4">
-        <TabsTrigger value="teams" className="flex items-center gap-2">
-          <Users className="w-4 h-4" />
-          Team Status
-        </TabsTrigger>
-        <TabsTrigger value="cutoffs" className="flex items-center gap-2">
-          <Settings className="w-4 h-4" />
-          Cutoff Settings
-        </TabsTrigger>
-      </TabsList>
-      
-      <TabsContent value="teams">
-        <TeamQualificationTable />
-      </TabsContent>
-      
-      <TabsContent value="cutoffs">
-        <CutoffSettings />
-      </TabsContent>
-    </Tabs>
-  );
+  return <TeamQualificationTable />;
 }
 
 /**
@@ -413,166 +391,6 @@ function TeamQualificationTable() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
-  );
-}
-
-/**
- * Cutoff Settings Component
- */
-function CutoffSettings() {
-  const [editingLevel, setEditingLevel] = useState<number | null>(null);
-  const [formData, setFormData] = useState({
-    min_score: 60,
-    max_time_seconds: 1800,
-    min_accuracy: 70,
-    max_hints_used: 3,
-  });
-
-  // Default cutoff settings (since the API might not return anything)
-  const defaultCutoffs = [
-    { level_id: 1, min_score: 60, max_time_seconds: 1800, min_accuracy: 70, max_hints_used: 3 },
-    { level_id: 2, min_score: 80, max_time_seconds: 1200, min_accuracy: 80, max_hints_used: 2 },
-  ];
-
-  const handleEdit = (cutoff: any) => {
-    setEditingLevel(cutoff.level_id);
-    setFormData({
-      min_score: cutoff.min_score,
-      max_time_seconds: cutoff.max_time_seconds,
-      min_accuracy: cutoff.min_accuracy,
-      max_hints_used: cutoff.max_hints_used,
-    });
-  };
-
-  const handleSave = () => {
-    toast.success('Cutoff settings saved (demo mode)');
-    setEditingLevel(null);
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Settings className="w-5 h-5" />
-          Qualification Cutoff Settings
-        </CardTitle>
-        <CardDescription>
-          Configure the minimum requirements for qualification at each level
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {defaultCutoffs.map((cutoff) => (
-            <Card key={cutoff.level_id} className="border-border">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Level {cutoff.level_id}</CardTitle>
-                  {editingLevel === cutoff.level_id ? (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingLevel(null)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSave}
-                        className="bg-primary text-black hover:bg-primary/80"
-                      >
-                        <Save className="w-4 h-4 mr-1" />
-                        Save
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(cutoff)}
-                    >
-                      <Edit className="w-4 h-4 mr-1" />
-                      Edit
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Target className="w-3 h-3" />
-                      Min Score
-                    </Label>
-                    {editingLevel === cutoff.level_id ? (
-                      <Input
-                        type="number"
-                        value={formData.min_score}
-                        onChange={(e) => setFormData({ ...formData, min_score: parseInt(e.target.value) })}
-                        className="h-8"
-                      />
-                    ) : (
-                      <p className="font-terminal text-primary">{cutoff.min_score}</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      Max Time (s)
-                    </Label>
-                    {editingLevel === cutoff.level_id ? (
-                      <Input
-                        type="number"
-                        value={formData.max_time_seconds}
-                        onChange={(e) => setFormData({ ...formData, max_time_seconds: parseInt(e.target.value) })}
-                        className="h-8"
-                      />
-                    ) : (
-                      <p className="font-terminal text-primary">{cutoff.max_time_seconds}s</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" />
-                      Min Accuracy (%)
-                    </Label>
-                    {editingLevel === cutoff.level_id ? (
-                      <Input
-                        type="number"
-                        value={formData.min_accuracy}
-                        onChange={(e) => setFormData({ ...formData, min_accuracy: parseFloat(e.target.value) })}
-                        className="h-8"
-                      />
-                    ) : (
-                      <p className="font-terminal text-primary">{cutoff.min_accuracy}%</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" />
-                      Max Hints
-                    </Label>
-                    {editingLevel === cutoff.level_id ? (
-                      <Input
-                        type="number"
-                        value={formData.max_hints_used}
-                        onChange={(e) => setFormData({ ...formData, max_hints_used: parseInt(e.target.value) })}
-                        className="h-8"
-                      />
-                    ) : (
-                      <p className="font-terminal text-primary">{cutoff.max_hints_used}</p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </CardContent>
     </Card>
   );
 }

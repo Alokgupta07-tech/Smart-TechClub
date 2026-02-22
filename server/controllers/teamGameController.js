@@ -48,7 +48,7 @@ async function checkTeamTimeLimit(teamId) {
     return { expired: elapsedSeconds >= timeLimit, remainingSeconds, elapsedSeconds, timeLimit, level: teamData.level };
   } catch (err) {
     console.error('checkTeamTimeLimit error:', err.message);
-    return { expired: false, remainingSeconds: 2400, elapsedSeconds: 0 };
+    return { expired: false, remainingSeconds: LEVEL_TIME_LIMITS[1], elapsedSeconds: 0 };
   }
 }
 
@@ -1001,6 +1001,9 @@ exports.getGameSummary = async (req, res) => {
     const endTime = teamData.end_time ? new Date(teamData.end_time) : new Date();
     const totalTimeSeconds = startTime ? Math.floor((endTime - startTime) / 1000) : 0;
 
+    // Simple qualification: 50% or more correct answers
+    const qualificationThreshold = Math.ceil(totalQuestions / 2);
+
     res.json({
       success: true,
       summary: {
@@ -1010,7 +1013,7 @@ exports.getGameSummary = async (req, res) => {
         },
         stats: {
           totalQuestions, attemptedQuestions, correctAnswers, wrongAnswers, notAttempted,
-          totalTimeSeconds, qualificationThreshold: 8, qualified: correctAnswers >= 8
+          totalTimeSeconds, qualificationThreshold, qualified: correctAnswers >= qualificationThreshold
         },
         questions: questionSummary
       }

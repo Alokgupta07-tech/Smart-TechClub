@@ -32,29 +32,43 @@ function isRetryableError(error: Error | Response): boolean {
 }
 
 /**
- * Try to refresh the access token using the refresh token
+ * Try to refresh the access token using the refresh token.
+ * Uses a shared promise to deduplicate concurrent refresh requests.
  */
+let _refreshPromise: Promise<string | null> | null = null;
+
 async function tryRefreshToken(): Promise<string | null> {
-  const refreshToken = localStorage.getItem('refreshToken');
-  if (!refreshToken) return null;
+  // If a refresh is already in flight, reuse the same promise
+  if (_refreshPromise) return _refreshPromise;
+
+  _refreshPromise = (async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) return null;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      if (data.accessToken) {
+        localStorage.setItem('accessToken', data.accessToken);
+        return data.accessToken;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  })();
 
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    if (data.accessToken) {
-      localStorage.setItem('accessToken', data.accessToken);
-      return data.accessToken;
-    }
-    return null;
-  } catch {
-    return null;
+    return await _refreshPromise;
+  } finally {
+    _refreshPromise = null;
   }
 }
 

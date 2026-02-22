@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { GlitchText } from '@/components/GlitchText';
 import { BackButton } from '@/components/BackButton';
+import { fetchWithAuth } from '@/lib/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -83,10 +84,7 @@ export default function LiveMonitoring() {
   const { data: monitorData, isLoading } = useQuery({
     queryKey: ['liveMonitoring'],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/admin/monitor/live`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/monitor/live`);
       
       if (!response.ok) throw new Error('Failed to fetch live data');
       return response.json();
@@ -98,10 +96,7 @@ export default function LiveMonitoring() {
   const { data: activityData } = useQuery({
     queryKey: ['activityLogs'],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/admin/activity?limit=50`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/activity?limit=50`);
       
       if (!response.ok) throw new Error('Failed to fetch activity logs');
       return response.json();
@@ -113,10 +108,7 @@ export default function LiveMonitoring() {
   const { data: suspiciousData } = useQuery({
     queryKey: ['suspiciousActivity'],
     queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_BASE}/admin/suspicious`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/admin/suspicious`);
       
       if (!response.ok) throw new Error('Failed to fetch suspicious activity');
       return response.json();

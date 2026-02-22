@@ -16,105 +16,36 @@ const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
 
 /**
  * Check if team can access a specific level
+ * SIMPLIFIED: Just check team's current level assignment
  * @param {string} teamId - Team's UUID
  * @param {number} levelId - Level number (1 or 2)
  * @returns {Promise<{allowed: boolean, reason: string, qualification_status?: string}>}
  */
 async function checkTeamLevelAccess(teamId, levelId) {
   try {
-    // Level 1 is always accessible (if team is active)
+    // Get team data
+    const [team] = await db.query(
+      'SELECT status, level FROM teams WHERE id = ?',
+      [teamId]
+    );
+    
+    if (team.length === 0) {
+      return { allowed: false, reason: 'Team not found' };
+    }
+    
+    if (team[0].status !== 'active') {
+      return { allowed: false, reason: 'Team is not active' };
+    }
+
+    const teamLevel = team[0].level || 1;
+
+    // Level 1 is always accessible
     if (levelId === 1) {
-      const [team] = await db.query(
-        'SELECT status FROM teams WHERE id = ?',
-        [teamId]
-      );
-      
-      if (team.length === 0) {
-        return { allowed: false, reason: 'Team not found' };
-      }
-      
-      if (team[0].status !== 'active') {
-        return { allowed: false, reason: 'Team is not active' };
-      }
-      
       return { allowed: true, reason: 'Level 1 accessible' };
     }
     
-    // Level 2+ requires qualification from previous level
-    if (levelId >= 2) {
-      const previousLevel = levelId - 1;
-      
-      // ======= NEW: Check if previous level results are published =======
-      const [evalState] = await db.query(
-        'SELECT evaluation_state FROM level_evaluation_state WHERE level_id = ?',
-        [previousLevel]
-      );
-      
-      if (evalState.length === 0 || evalState[0].evaluation_state !== 'RESULTS_PUBLISHED') {
-        return {
-          allowed: false,
-          reason: `Level ${previousLevel} results have not been published yet. Please wait for admin evaluation.`,
-          qualification_status: 'AWAITING_RESULTS',
-          results_published: false
-        };
-      }
-      // ======= END NEW CODE =======
-      
-      // Check if team qualified previous level
-      const [levelStatus] = await db.query(
-        `SELECT qualification_status, status 
-         FROM team_level_status 
-         WHERE team_id = ? AND level_id = ?`,
-        [teamId, previousLevel]
-      );
-      
-      if (levelStatus.length === 0) {
-        return {
-          allowed: false,
-          reason: `You must complete Level ${previousLevel} before accessing Level ${levelId}`,
-          qualification_status: 'NOT_STARTED'
-        };
-      }
-      
-      const { qualification_status, status } = levelStatus[0];
-      
-      if (status !== 'COMPLETED') {
-        return {
-          allowed: false,
-          reason: `You must complete Level ${previousLevel} before accessing Level ${levelId}`,
-          qualification_status: qualification_status
-        };
-      }
-      
-      if (qualification_status !== 'QUALIFIED') {
-        return {
-          allowed: false,
-          reason: `You must qualify Level ${previousLevel} to access Level ${levelId}`,
-          qualification_status: qualification_status
-        };
-      }
-      
-      // Check if game state allows Level 2
-      if (levelId === 2) {
-        let level2Open = false;
-        if (USE_SUPABASE) {
-          try {
-            const { data: gsRows } = await supabaseAdmin.from('game_state').select('level2_open').limit(1);
-            level2Open = gsRows?.[0]?.level2_open || false;
-          } catch (e) { /* ignore */ }
-        } else {
-          const [gameState] = await db.query('SELECT level_2_unlocked FROM game_state LIMIT 1');
-          level2Open = gameState[0]?.level_2_unlocked || false;
-        }
-        if (!level2Open) {
-          return {
-            allowed: false,
-            reason: 'Level 2 has not been unlocked by the admin yet',
-            qualification_status: 'QUALIFIED'
-          };
-        }
-      }
-      
+    // For Level 2+, check if team is assigned to that level or higher
+    if (teamLevel >= levelId) {
       return {
         allowed: true,
         reason: `Level ${levelId} accessible`,
@@ -122,8 +53,13 @@ async function checkTeamLevelAccess(teamId, levelId) {
         results_published: true
       };
     }
-    
-    return { allowed: false, reason: 'Invalid level' };
+
+    // Team not yet assigned to this level
+    return {
+      allowed: false,
+      reason: `You must be promoted to Level ${levelId} before accessing it`,
+      qualification_status: 'NOT_QUALIFIED'
+    };
   } catch (error) {
     console.error('Error checking level access:', error);
     return { allowed: false, reason: 'Error checking access' };

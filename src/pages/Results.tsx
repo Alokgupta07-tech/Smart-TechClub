@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/card';
 import { GlitchText } from '@/components/GlitchText';
 import { BackButton } from '@/components/BackButton';
+import { fetchWithAuth } from '@/lib/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -69,11 +70,7 @@ export default function Results() {
         throw new Error('Not authenticated');
       }
       
-      const response = await fetch(`${API_BASE}/game/time/game-summary`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetchWithAuth(`${API_BASE}/game/time/game-summary`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch results');

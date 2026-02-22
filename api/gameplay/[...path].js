@@ -23,9 +23,9 @@ function mapTeam(team) {
 }
 
 /**
- * Check if a team can access a specific level (Supabase version of levelAccess middleware)
+ * Check if a team can access a specific level (simplified)
  * Level 1: Always accessible
- * Level 2+: Requires qualification from previous level + admin unlock + results published
+ * Level 2+: Check if team.level >= requested level
  */
 async function checkLevelAccess(supabase, teamId, levelId) {
   // Level 1 is always accessible
@@ -33,103 +33,48 @@ async function checkLevelAccess(supabase, teamId, levelId) {
     return { allowed: true, reason: 'Level 1 accessible' };
   }
 
-  const previousLevel = levelId - 1;
-
-  // Gate 1: Check if previous level results are published
+  // For Level 2+: Check team's current level
   try {
-    const { data: evalState } = await supabase
-      .from('level_evaluation_state')
-      .select('evaluation_state')
-      .eq('level_id', previousLevel)
-      .limit(1);
+    const { data: team } = await supabase
+      .from('teams')
+      .select('level, status')
+      .eq('id', teamId)
+      .single();
 
-    if (!evalState || evalState.length === 0 || evalState[0].evaluation_state !== 'RESULTS_PUBLISHED') {
+    if (!team) {
       return {
         allowed: false,
-        reason: 'Level ' + previousLevel + ' results have not been published yet. Please wait for admin evaluation.',
-        qualification_status: 'AWAITING_RESULTS',
-        results_published: false
+        reason: 'Team not found'
       };
     }
-  } catch (e) {
-    // If table doesn't exist, results not published
+
+    if (team.status !== 'active') {
+      return {
+        allowed: false,
+        reason: 'Team is not active'
+      };
+    }
+
+    const teamLevel = team.level || 1;
+
+    if (teamLevel >= levelId) {
+      return {
+        allowed: true,
+        reason: 'Level ' + levelId + ' accessible'
+      };
+    }
+
     return {
       allowed: false,
-      reason: 'Level ' + previousLevel + ' results have not been published yet.',
-      qualification_status: 'AWAITING_RESULTS',
-      results_published: false
+      reason: 'You must be promoted to Level ' + levelId + ' to access these puzzles. Complete Level ' + (levelId - 1) + ' first.'
+    };
+  } catch (e) {
+    console.error('checkLevelAccess error:', e);
+    return {
+      allowed: false,
+      reason: 'Error checking level access'
     };
   }
-
-  // Gate 2: Check if team qualified previous level
-  try {
-    const { data: levelStatus } = await supabase
-      .from('team_level_status')
-      .select('qualification_status, status')
-      .eq('team_id', teamId)
-      .eq('level_id', previousLevel)
-      .limit(1);
-
-    if (!levelStatus || levelStatus.length === 0) {
-      return {
-        allowed: false,
-        reason: 'You must complete Level ' + previousLevel + ' before accessing Level ' + levelId,
-        qualification_status: 'NOT_STARTED'
-      };
-    }
-
-    const qualStatus = levelStatus[0].qualification_status;
-    const completionStatus = levelStatus[0].status;
-
-    if (completionStatus !== 'COMPLETED') {
-      return {
-        allowed: false,
-        reason: 'You must complete Level ' + previousLevel + ' before accessing Level ' + levelId,
-        qualification_status: qualStatus
-      };
-    }
-
-    if (qualStatus !== 'QUALIFIED') {
-      return {
-        allowed: false,
-        reason: qualStatus === 'DISQUALIFIED'
-          ? 'Your team did not qualify from Level ' + previousLevel + '. You cannot access Level ' + levelId + '.'
-          : 'Your qualification for Level ' + previousLevel + ' is still pending evaluation.',
-        qualification_status: qualStatus
-      };
-    }
-  } catch (e) {
-    // If table doesn't exist, check team.level as fallback
-    // (for setups without the qualification system)
-  }
-
-  // Gate 3: Check if admin unlocked Level 2
-  if (levelId === 2) {
-    try {
-      const { data: gsRows } = await supabase
-        .from('game_state')
-        .select('level2_open')
-        .limit(1);
-
-      const level2Open = gsRows?.[0]?.level2_open || false;
-      if (!level2Open) {
-        return {
-          allowed: false,
-          reason: 'Level 2 has not been unlocked by the admin yet. Please wait.',
-          qualification_status: 'QUALIFIED'
-        };
-      }
-    } catch (e) {
-      // If game_state table doesn't exist, allow access
-    }
-  }
-
-  return {
-    allowed: true,
-    reason: 'Level ' + levelId + ' accessible',
-    qualification_status: 'QUALIFIED',
-    results_published: true
-  };
 }
 
 module.exports = async function handler(req, res) {
@@ -253,8 +198,8 @@ module.exports = async function handler(req, res) {
       const usedHintIds = (usedHintsResult.data || []).map(h => h.hint_id);
       const availableHints = (allHints || []).filter(h => !usedHintIds.includes(h.id));
 
-      // Calculate time remaining (40 minutes = 2400 seconds)
-      const TIME_LIMIT_SECONDS = 40 * 60; // 40 minutes
+      // Calculate time remaining (dynamic based on level: 40 minutes for Level 1, 60 minutes for Level 2)
+      const TIME_LIMIT_SECONDS = (team.level === 2) ? (60 * 60) : (40 * 60);
       let timeRemainingSeconds = TIME_LIMIT_SECONDS;
       let timeExpired = false;
 

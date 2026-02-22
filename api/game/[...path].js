@@ -178,7 +178,8 @@ module.exports = async function handler(req, res) {
       // ─── GET /api/game/session OR /api/game/time/session ───
       if (req.method === 'GET' && (path === '/session' || path === '/time/session')) {
         var totalTime = 0;
-        var TIME_LIMIT = 40 * 60; // 40 minutes in seconds
+        // Level 1: 40 minutes, Level 2: 60 minutes
+        var TIME_LIMIT = (team.level === 2) ? (60 * 60) : (40 * 60);
         var timeRemaining = TIME_LIMIT;
 
         if (team.start_time) {

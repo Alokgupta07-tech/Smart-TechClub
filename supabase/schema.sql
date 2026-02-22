@@ -522,5 +522,55 @@ INSERT INTO qualification_cutoffs (level_id, min_score, min_accuracy, max_time_s
 VALUES (2, 0, 70.00, 5400, 7) ON CONFLICT (level_id) DO NOTHING;
 
 -- =====================================================
+-- SEED DATA: LEVEL 2 PUZZLES
+-- =====================================================
+-- Level 2 Puzzle 1: Advanced Encryption
+INSERT INTO puzzles (level, puzzle_number, title, description, puzzle_type, puzzle_content, correct_answer, points, time_limit_minutes, is_active) 
+VALUES (
+  2, 1, 'Advanced Encryption', 
+  'Decrypt this Base64 encoded message.', 
+  'cipher', 
+  'TG9ja2Rvd24gSFEgQWN0aXZhdGVk', 
+  'Lockdown HQ Activated', 
+  200, 15, true
+) ON CONFLICT (level, puzzle_number) DO NOTHING;
+
+-- Level 2 Puzzle 2: Hex Memory Dump
+INSERT INTO puzzles (level, puzzle_number, title, description, puzzle_type, puzzle_content, correct_answer, points, time_limit_minutes, is_active) 
+VALUES (
+  2, 2, 'Hex Memory Dump', 
+  'Extract the ASCII string from this hexadecimal dump.', 
+  'code', 
+  '53 59 53 54 45 4D 20 42 52 45 41 43 48', 
+  'SYSTEM BREACH', 
+  250, 20, true
+) ON CONFLICT (level, puzzle_number) DO NOTHING;
+
+-- Level 2 Puzzle 3: Code Injection
+INSERT INTO puzzles (level, puzzle_number, title, description, puzzle_type, puzzle_content, correct_answer, points, time_limit_minutes, is_active) 
+VALUES (
+  2, 3, 'Code Injection', 
+  'Find the SQL injection vulnerability. What command gains access?', 
+  'code', 
+  E'Login Form:\nUsername: admin\nPassword: '' OR ''1''=''1', 
+  ''' OR ''1''=''1', 
+  300, 15, true
+) ON CONFLICT (level, puzzle_number) DO NOTHING;
+
+-- Level 2 Puzzle 4: Final Lockdown
+INSERT INTO puzzles (level, puzzle_number, title, description, puzzle_type, puzzle_content, correct_answer, points, time_limit_minutes, is_active) 
+VALUES (
+  2, 4, 'Final Lockdown', 
+  'Combine all the clues from Level 1 and Level 2 to form the master key.', 
+  'text', 
+  E'Clue 1: First puzzle answer\nClue 2: Last letter of puzzle 1-2\nClue 3: Number from puzzle 1-5\nClue 4: First word of puzzle 2-1\nFormat: [Clue1][Clue2][Clue3]-[Clue4]', 
+  'HACKY64-Lockdown', 
+  500, 30, true
+) ON CONFLICT (level, puzzle_number) DO NOTHING;
+
+-- NOTE: Hints for Level 2 puzzles should be added via seed-puzzles.js script
+-- as they require referencing puzzle IDs which are auto-generated
+
+-- =====================================================
 -- DONE! Schema is ready for use with Supabase.
 -- =====================================================
