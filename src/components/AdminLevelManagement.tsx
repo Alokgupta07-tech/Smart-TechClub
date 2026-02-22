@@ -74,6 +74,10 @@ interface Team {
   level1Completed?: boolean;
   level2Completed?: boolean;
   qualifiedForLevel2?: boolean;
+  qualificationStatus?: 'qualified' | 'disqualified';
+  correctAnswers?: number;
+  totalQuestions?: number;
+  qualificationThreshold?: number;
 }
 
 interface LevelStats {
@@ -1068,10 +1072,15 @@ const AdminLevelManagement = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredTeams.map((team: Team, index: number) => (
+                          {filteredTeams.map((team: Team, index: number) => {
+                            const needsPromotion = team.level === 1 && team.qualifiedForLevel2;
+                            return (
                             <tr 
                               key={team.id}
-                              className="border-b border-blue-500/10 hover:bg-blue-500/5 transition-colors"
+                              className={cn(
+                                "border-b border-blue-500/10 hover:bg-blue-500/5 transition-colors",
+                                needsPromotion && "bg-yellow-500/5"
+                              )}
                             >
                               <td className="py-3 px-2">
                                 <span className={cn(
@@ -1084,76 +1093,103 @@ const AdminLevelManagement = () => {
                                 </span>
                               </td>
                               <td className="py-3 px-2">
-                                <span className="font-display text-sm">{team.teamName}</span>
+                                <div className="flex flex-col gap-1">
+                                  <span className="font-display text-sm">{team.teamName}</span>
+                                  {needsPromotion && (
+                                    <span className="text-xs font-terminal text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-1.5 py-0.5 rounded w-fit">
+                                      ★ NEEDS PROMOTION
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="py-3 px-2">{getStatusBadge(team.status)}</td>
                               <td className="py-3 px-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
-                                    <div 
-                                      className={cn(
-                                        "h-full rounded-full",
-                                        team.level2Completed ? "bg-green-500" : "bg-blue-500"
-                                      )}
-                                      style={{ width: `${team.progress}%` }}
-                                    />
+                                {needsPromotion ? (
+                                  <span className="text-xs font-terminal text-yellow-400/70 italic">Awaiting promotion</span>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
+                                      <div 
+                                        className={cn(
+                                          "h-full rounded-full",
+                                          team.level2Completed ? "bg-green-500" : "bg-blue-500"
+                                        )}
+                                        style={{ width: `${team.progress}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs font-terminal">{team.progress}%</span>
                                   </div>
-                                  <span className="text-xs font-terminal">{team.progress}%</span>
-                                </div>
+                                )}
                               </td>
                               <td className="py-3 px-2 font-terminal text-sm">
                                 {team.status === 'waiting' ? '--:--:--' : (team.timeElapsed || "--:--:--")}
                               </td>
                               <td className="py-3 px-2">
                                 <div className="flex gap-2">
-                                  {team.status === "waiting" ? (
+                                  {needsPromotion ? (
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="h-8 w-8 p-0 text-green-400 hover:bg-green-500/20"
-                                      onClick={() => updateTeamStatus(team.id, "active")}
+                                      className="h-8 px-2 text-xs text-yellow-400 hover:bg-yellow-500/20 font-terminal gap-1"
+                                      onClick={() => qualifyTeamForLevel2.mutate(team.id)}
+                                      title="Promote team to Level 2"
                                     >
-                                      <Play className="w-4 h-4" />
-                                    </Button>
-                                  ) : team.status === "active" ? (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-8 w-8 p-0 text-yellow-400 hover:bg-yellow-500/20"
-                                      onClick={() => updateTeamStatus(team.id, "waiting")}
-                                    >
-                                      <Pause className="w-4 h-4" />
-                                    </Button>
-                                  ) : null}
-                                  
-                                  {team.status === "disqualified" ? (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-8 w-8 p-0 text-green-400 hover:bg-green-500/20"
-                                      onClick={() => updateTeamStatus(team.id, "active")}
-                                      title="Qualify team (reverse disqualification)"
-                                    >
-                                      <CheckCircle className="w-4 h-4" />
+                                      <ArrowRight className="w-3 h-3" />
+                                      PROMOTE
                                     </Button>
                                   ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-8 w-8 p-0 text-red-400 hover:bg-red-500/20"
-                                      onClick={() => {
-                                        setSelectedTeam(team);
-                                        setShowDisqualifyDialog(true);
-                                      }}
-                                      title="Disqualify team"
-                                    >
-                                      <Ban className="w-4 h-4" />
-                                    </Button>
+                                    <>
+                                      {team.status === "waiting" ? (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0 text-green-400 hover:bg-green-500/20"
+                                          onClick={() => updateTeamStatus(team.id, "active")}
+                                        >
+                                          <Play className="w-4 h-4" />
+                                        </Button>
+                                      ) : team.status === "active" ? (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0 text-yellow-400 hover:bg-yellow-500/20"
+                                          onClick={() => updateTeamStatus(team.id, "waiting")}
+                                        >
+                                          <Pause className="w-4 h-4" />
+                                        </Button>
+                                      ) : null}
+                                      
+                                      {team.status === "disqualified" ? (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0 text-green-400 hover:bg-green-500/20"
+                                          onClick={() => updateTeamStatus(team.id, "active")}
+                                          title="Qualify team (reverse disqualification)"
+                                        >
+                                          <CheckCircle className="w-4 h-4" />
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0 text-red-400 hover:bg-red-500/20"
+                                          onClick={() => {
+                                            setSelectedTeam(team);
+                                            setShowDisqualifyDialog(true);
+                                          }}
+                                          title="Disqualify team"
+                                        >
+                                          <Ban className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                    </>
                                   )}
                                 </div>
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                           {filteredTeams.length === 0 && (
                             <tr>
                               <td colSpan={6} className="py-8 text-center text-muted-foreground">

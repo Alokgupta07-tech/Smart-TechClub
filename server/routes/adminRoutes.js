@@ -30,6 +30,7 @@ router.get('/monitor/live', adminController.getLiveMonitoring);
 router.get('/activity', adminController.getActivityLogs);
 router.get('/suspicious', adminController.getSuspiciousActivity);
 router.get('/export/results', adminController.exportResults);
+router.get('/team-members', adminController.getTeamMembers);
 
 // Time tracking admin endpoints
 router.get('/team-timings', timeTrackingController.getAdminTeamTimings);

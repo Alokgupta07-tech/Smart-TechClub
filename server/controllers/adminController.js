@@ -118,6 +118,7 @@ async function getAllTeams(req, res) {
       teams = (teamsData || []).map(t => {
         const timeData = calculateTimeElapsed(t.start_time, t.end_time);
         const counts = submissionCounts[t.id] || { total: 0, correct: 0, wrong: 0 };
+        const isPerformanceQualified = counts.correct >= LEVEL1_QUALIFICATION_THRESHOLD;
         return {
           id: t.id,
           team_name: t.team_name,
@@ -133,7 +134,7 @@ async function getAllTeams(req, res) {
           is_verified: t.users?.is_verified,
           time_elapsed: timeData.formatted,
           time_elapsed_seconds: timeData.seconds,
-          qualified_for_level2: t.level >= 2,
+          qualified_for_level2: t.level >= 2 || isPerformanceQualified,
           level1_completed: t.level === 1 && t.progress >= 100,
           level2_completed: t.level === 2 && t.progress >= 100,
           completed_puzzles: puzzleCounts[t.id] || 0,
@@ -1103,6 +1104,110 @@ async function qualifyTeamForLevel2(req, res) {
   }
 }
 
+/**
+ * GET TEAM MEMBERS
+ * GET /api/admin/team-members
+ * Returns all teams with their member lists
+ */
+async function getTeamMembers(req, res) {
+  try {
+    if (USE_SUPABASE) {
+      // Fetch all teams with user (leader) info
+      const { data: teamsData, error: teamsError } = await supabaseAdmin
+        .from('teams')
+        .select(`
+          id,
+          team_name,
+          status,
+          users (
+            name,
+            email
+          )
+        `)
+        .order('created_at', { ascending: true });
+
+      if (teamsError) throw teamsError;
+
+      // Fetch all team_members
+      let allMembers = [];
+      try {
+        const { data: membersData } = await supabaseAdmin
+          .from('team_members')
+          .select('id, team_id, member_name, member_email, member_role, is_leader, created_at')
+          .order('created_at', { ascending: true });
+        allMembers = membersData || [];
+      } catch (e) {
+        console.log('team_members table may not exist:', e.message);
+      }
+
+      // Group members by team
+      const membersByTeam = {};
+      allMembers.forEach(m => {
+        if (!membersByTeam[m.team_id]) membersByTeam[m.team_id] = [];
+        membersByTeam[m.team_id].push(m);
+      });
+
+      const teams = (teamsData || []).map(t => {
+        const members = membersByTeam[t.id] || [];
+        return {
+          teamId: t.id,
+          teamName: t.team_name,
+          status: t.status,
+          leader: t.users ? { name: t.users.name, email: t.users.email } : null,
+          members,
+          totalMembers: members.length
+        };
+      });
+
+      const totalMembers = allMembers.length;
+      return res.json({ teams, totalMembers, totalTeams: teams.length });
+    }
+
+    // MySQL fallback
+    const [rows] = await db.query(`
+      SELECT t.id as team_id, t.team_name, t.status,
+             u.name as leader_name, u.email as leader_email,
+             tm.id as member_id, tm.member_name, tm.member_email, tm.member_role, tm.is_leader, tm.created_at as member_created_at
+      FROM teams t
+      JOIN users u ON t.user_id = u.id
+      LEFT JOIN team_members tm ON tm.team_id = t.id
+      ORDER BY t.created_at, tm.created_at
+    `);
+
+    const teamsMap = {};
+    rows.forEach(row => {
+      if (!teamsMap[row.team_id]) {
+        teamsMap[row.team_id] = {
+          teamId: row.team_id,
+          teamName: row.team_name,
+          status: row.status,
+          leader: { name: row.leader_name, email: row.leader_email },
+          members: [],
+          totalMembers: 0
+        };
+      }
+      if (row.member_id) {
+        teamsMap[row.team_id].members.push({
+          id: row.member_id,
+          member_name: row.member_name,
+          member_email: row.member_email,
+          member_role: row.member_role,
+          is_leader: row.is_leader,
+          created_at: row.member_created_at
+        });
+        teamsMap[row.team_id].totalMembers++;
+      }
+    });
+
+    const teams = Object.values(teamsMap);
+    const totalMembers = teams.reduce((sum, t) => sum + t.totalMembers, 0);
+    res.json({ teams, totalMembers, totalTeams: teams.length });
+  } catch (error) {
+    console.error('Get team members error:', error);
+    res.status(500).json({ error: 'Failed to fetch team members' });
+  }
+}
+
 module.exports = {
   getAudit,
   getAllTeams,
@@ -1116,5 +1221,6 @@ module.exports = {
   getLiveMonitoring,
   getActivityLogs,
   getSuspiciousActivity,
-  exportResults
+  exportResults,
+  getTeamMembers
 };
