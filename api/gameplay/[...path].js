@@ -211,10 +211,13 @@ module.exports = async function handler(req, res) {
         timeExpired = timeRemainingSeconds <= 0;
       }
 
+      // Strip correct_answer before sending to client (security)
+      const { correct_answer: _answer, ...safePuzzle } = currentPuzzle;
+
       return res.json({
         success: true,
         puzzle: {
-          ...currentPuzzle,
+          ...safePuzzle,
           progress: (progress && progress[0]) || { attempts: 0, hints_used: 0 },
           available_hints: availableHints.length,
           total_hints: (allHints || []).length,

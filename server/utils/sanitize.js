@@ -38,6 +38,12 @@ function isValidUUID(id) {
 }
 
 /**
+ * Fields that should NOT be HTML-escaped because they contain user content
+ * that needs to be compared literally (e.g., puzzle answers, messages)
+ */
+const SKIP_ESCAPE_FIELDS = ['password', 'answer', 'submitted_answer', 'message', 'content'];
+
+/**
  * Sanitize object recursively - escapes all string values
  * @param {object} obj - Object to sanitize
  * @returns {object} Sanitized object
@@ -50,9 +56,10 @@ function sanitizeObject(obj) {
   
   const sanitized = {};
   for (const [key, value] of Object.entries(obj)) {
-    // Skip password fields from sanitization (they may contain special chars)
-    if (key.toLowerCase().includes('password')) {
-      sanitized[key] = value;
+    const keyLower = key.toLowerCase();
+    // Skip fields that need literal values (passwords, puzzle answers, messages)
+    if (SKIP_ESCAPE_FIELDS.some(f => keyLower.includes(f))) {
+      sanitized[key] = typeof value === 'string' ? validator.trim(value) : value;
     } else {
       sanitized[key] = sanitizeObject(value);
     }
@@ -132,22 +139,12 @@ function sanitizeBody(req, res, next) {
  * Middleware to validate common inputs
  */
 function validateInputs(req, res, next) {
-  // Check for SQL injection in query params
+  // Check for SQL injection in query params only
+  // (body is safe because all DB queries use parameterized placeholders)
   for (const [key, value] of Object.entries(req.query)) {
     if (hasSQLInjection(String(value))) {
       return res.status(400).json({ error: 'Invalid input detected' });
     }
-  }
-  
-  // Check for SQL injection in body
-  const checkBody = (obj) => {
-    if (typeof obj === 'string') return hasSQLInjection(obj);
-    if (typeof obj !== 'object' || obj === null) return false;
-    return Object.values(obj).some(checkBody);
-  };
-  
-  if (req.body && checkBody(req.body)) {
-    return res.status(400).json({ error: 'Invalid input detected' });
   }
   
   next();

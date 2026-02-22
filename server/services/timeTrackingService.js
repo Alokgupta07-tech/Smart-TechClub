@@ -286,12 +286,14 @@ async function resumeQuestion(teamId, puzzleId, req = null) {
     
     const progress = progressRows[0];
     
-    // Validate state
-    if (progress.status === 'completed') {
+    // Validate state (normalize to uppercase since DB stores uppercase statuses)
+    const statusUpper = (progress.status || '').toUpperCase();
+    
+    if (statusUpper === 'COMPLETED') {
       throw new Error('Question already completed');
     }
     
-    if (progress.status === 'active') {
+    if (statusUpper === 'IN_PROGRESS' || statusUpper === 'ACTIVE') {
       throw new Error('Question already active');
     }
     
@@ -667,7 +669,7 @@ async function unskipQuestion(teamId, puzzleId, req = null) {
     try {
       await db.query(
         `UPDATE team_sessions 
-         SET status = 'active',
+         SET is_active = true,
              last_activity_at = ?
          WHERE team_id = ?`,
         [now, teamId]
@@ -1021,7 +1023,7 @@ async function getSessionState(teamId) {
 
     return {
       session_id: session.id,
-      status: session.status || session.is_active ? 'active' : 'not_started',
+      status: session.status ? session.status : (session.is_active ? 'active' : 'not_started'),
       session_start: session.session_start,
       session_end: session.session_end,
       total_time_seconds: session.total_time_seconds || 0,
@@ -1337,9 +1339,13 @@ async function syncTimer(teamId, puzzleId) {
   const state = await getTimerState(teamId, puzzleId);
   const session = await getSessionState(teamId);
   
-  // Log sync event
-  await logTimeEvent(teamId, puzzleId, 'timer_sync',
-    state.time_spent_seconds, state.time_spent_seconds, {});
+  // Log sync event (non-critical — don't let logging failures break sync)
+  try {
+    await logTimeEvent(teamId, puzzleId, 'timer_sync',
+      state.time_spent_seconds, state.time_spent_seconds, {});
+  } catch (logErr) {
+    console.log('Error logging sync event:', logErr.message);
+  }
   
   return {
     question: state,
@@ -1445,13 +1451,30 @@ async function goToQuestion(teamId, puzzleId, req = null) {
     
     // Clear any existing IN_PROGRESS status for OTHER puzzles on this team
     // This ensures only one puzzle is IN_PROGRESS at a time
+    // First, save elapsed time for the currently active puzzle before resetting it
     try {
-      await db.query(
-        `UPDATE team_question_progress SET status = 'NOT_STARTED', updated_at = ? WHERE team_id = ? AND status = 'IN_PROGRESS' AND puzzle_id != ?`,
-        [now, teamId, puzzleId]
+      const [activeRows] = await db.query(
+        `SELECT puzzle_id, started_at, time_spent_seconds FROM team_question_progress WHERE team_id = ? AND status = 'IN_PROGRESS' AND puzzle_id != ?`,
+        [teamId, puzzleId]
       );
+      if (activeRows.length > 0) {
+        const active = activeRows[0];
+        if (active.started_at) {
+          const elapsed = Math.floor((now - new Date(active.started_at)) / 1000);
+          const newTimeSpent = (active.time_spent_seconds || 0) + Math.max(0, elapsed);
+          await db.query(
+            `UPDATE team_question_progress SET status = 'PAUSED', time_spent_seconds = ?, updated_at = ? WHERE team_id = ? AND puzzle_id = ?`,
+            [newTimeSpent, now, teamId, active.puzzle_id]
+          );
+        } else {
+          await db.query(
+            `UPDATE team_question_progress SET status = 'PAUSED', updated_at = ? WHERE team_id = ? AND status = 'IN_PROGRESS' AND puzzle_id != ?`,
+            [now, teamId, puzzleId]
+          );
+        }
+      }
     } catch (e) {
-      console.log('Error clearing old IN_PROGRESS:', e.message);
+      console.log('Error pausing active question:', e.message);
     }
     
     // Check if progress exists for target puzzle

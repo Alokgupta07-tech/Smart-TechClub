@@ -75,11 +75,6 @@ module.exports = async function handler(req, res) {
       code: error.code,
       details: error.details
     });
-    return res.status(500).json({ 
-      error: 'Internal server error', 
-      message: error.message,
-      code: error.code,
-      details: String(error.details || error.message || error) 
-    });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };

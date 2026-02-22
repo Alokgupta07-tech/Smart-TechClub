@@ -19,7 +19,7 @@ function isTableNotFoundError(error) {
  */
 exports.getNotifications = async (req, res) => {
   try {
-    const teamId = req.user.teamId;
+    const teamId = req.user.teamId || req.user.team_id;
     
     if (!teamId) {
       return res.status(400).json({ error: 'Team ID required' });
@@ -78,7 +78,7 @@ exports.getUnreadNotifications = async (req, res) => {
 exports.markAsRead = async (req, res) => {
   try {
     const { notificationId } = req.params;
-    const teamId = req.user.teamId;
+    const teamId = req.user.teamId || req.user.team_id;
     
     await notificationService.markAsRead(notificationId, teamId);
     res.json({ success: true });
@@ -94,7 +94,7 @@ exports.markAsRead = async (req, res) => {
  */
 exports.markAllAsRead = async (req, res) => {
   try {
-    const teamId = req.user.teamId;
+    const teamId = req.user.teamId || req.user.team_id;
     await notificationService.markAllAsRead(teamId);
     res.json({ success: true });
   } catch (error) {

@@ -22,7 +22,7 @@ router.get('/logs', teamGameController.getActivityLogs);
 // Progressive Hints
 router.get('/puzzle/:puzzleId/hints', async (req, res) => {
   try {
-    const teamId = req.user.teamId;
+    const teamId = req.user.team_id;
     const { puzzleId } = req.params;
     const hints = await hintService.getAvailableHints(teamId, puzzleId);
     res.json(hints);
@@ -34,7 +34,7 @@ router.get('/puzzle/:puzzleId/hints', async (req, res) => {
 
 router.post('/puzzle/:puzzleId/hint/:hintId', async (req, res) => {
   try {
-    const teamId = req.user.teamId;
+    const teamId = req.user.team_id;
     const { puzzleId, hintId } = req.params;
     const result = await hintService.useHint(teamId, puzzleId, hintId);
     res.json(result);
@@ -47,7 +47,7 @@ router.post('/puzzle/:puzzleId/hint/:hintId', async (req, res) => {
 // Puzzle Timer
 router.get('/puzzle/:puzzleId/timer', async (req, res) => {
   try {
-    const teamId = req.user.teamId;
+    const teamId = req.user.team_id;
     const { puzzleId } = req.params;
     const status = await puzzleTimerService.getPuzzleTimerStatus(teamId, puzzleId);
     res.json(status || { error: 'Puzzle not found' });
@@ -59,7 +59,7 @@ router.get('/puzzle/:puzzleId/timer', async (req, res) => {
 
 router.post('/puzzle/:puzzleId/timer/start', async (req, res) => {
   try {
-    const teamId = req.user.teamId;
+    const teamId = req.user.team_id;
     const { puzzleId } = req.params;
     const result = await puzzleTimerService.startPuzzleTimer(teamId, puzzleId);
     res.json(result);

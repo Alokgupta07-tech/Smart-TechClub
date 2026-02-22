@@ -155,7 +155,7 @@ module.exports = async function handler(req, res) {
       }
 
       // ─── GET /api/game/timer/:puzzleId ───
-      var timerMatch = path.match(/^\/timer\/([^\/]+)$/);
+      var timerMatch = path.match(/^(?:\/time)?\/timer\/([^\/]+)$/);
       if (req.method === 'GET' && timerMatch) {
         var timeSpent = 0;
         if (team.start_time) {

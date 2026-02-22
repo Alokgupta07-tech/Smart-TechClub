@@ -44,8 +44,17 @@ module.exports = async function handler(req, res) {
       return res.json({ puzzles: puzzles || [] });
     }
 
-    // ─── GET /api/puzzles/:id ───
+    // ─── GET /api/puzzles/:id (requires admin auth) ───
     if (req.method === 'GET' && path.match(/^\/[^\/]+$/)) {
+      const getAuthResult = verifyAuth(req);
+      if (getAuthResult.error) {
+        return res.status(getAuthResult.status).json({ error: getAuthResult.error });
+      }
+      const getAdminCheck = requireAdmin(getAuthResult.user);
+      if (getAdminCheck) {
+        return res.status(getAdminCheck.status).json({ error: getAdminCheck.error });
+      }
+
       const puzzleId = path.slice(1);
 
       const { data: puzzle, error } = await supabase
@@ -101,19 +110,21 @@ module.exports = async function handler(req, res) {
       const puzzleId = path.slice(1);
       const { title, description, type, level, puzzle_number, points, answer, correct_answer, puzzle_content, puzzle_file_url } = req.body;
 
+      // Build update object with only defined fields to avoid nulling out unset fields
+      const updates = {};
+      if (title !== undefined) updates.title = title;
+      if (description !== undefined) updates.description = description;
+      if (type !== undefined) updates.puzzle_type = type;
+      if (level !== undefined) updates.level = level;
+      if (puzzle_number !== undefined) updates.puzzle_number = puzzle_number;
+      if (points !== undefined) updates.points = points;
+      if (answer !== undefined || correct_answer !== undefined) updates.correct_answer = answer || correct_answer;
+      if (puzzle_content !== undefined) updates.puzzle_content = puzzle_content;
+      if (puzzle_file_url !== undefined) updates.puzzle_file_url = puzzle_file_url;
+
       const { error } = await supabase
         .from('puzzles')
-        .update({ 
-          title, 
-          description, 
-          puzzle_type: type, 
-          level, 
-          puzzle_number, 
-          points, 
-          correct_answer: answer || correct_answer,
-          puzzle_content,
-          puzzle_file_url
-        })
+        .update(updates)
         .eq('id', puzzleId);
       if (error) throw error;
 
@@ -143,11 +154,6 @@ module.exports = async function handler(req, res) {
       details: error.details,
       path: req.url
     });
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message,
-      code: error.code,
-      details: String(error.details || error.message || error)
-    });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -20,12 +20,19 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET') {
       // Try to fetch from notifications table; if it doesn't exist, return empty
       try {
-        const target = teamId || userId;
-        const { data, error } = await supabase
+        let query = supabase
           .from('notifications')
           .select('*')
-          .eq('team_id', target)
-          .eq('is_read', false)
+          .eq('is_read', false);
+
+        // Filter by team_id if available, otherwise by user_id
+        if (teamId) {
+          query = query.eq('team_id', teamId);
+        } else {
+          query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query
           .order('created_at', { ascending: false })
           .limit(20);
 

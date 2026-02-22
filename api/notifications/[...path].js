@@ -56,12 +56,18 @@ module.exports = async function handler(req, res) {
     // ─── PATCH /api/notifications/read-all ───
     if (req.method === 'PATCH' && (path === '/read-all' || path === '/read-all/')) {
       try {
-        const target = teamId || userId;
-        const { error } = await supabase
+        let markAllQuery = supabase
           .from('notifications')
           .update({ is_read: true })
-          .eq('team_id', target)
           .eq('is_read', false);
+
+        if (teamId) {
+          markAllQuery = markAllQuery.eq('team_id', teamId);
+        } else {
+          markAllQuery = markAllQuery.eq('user_id', userId);
+        }
+
+        const { error } = await markAllQuery;
 
         if (error && error.code !== '42P01') throw error;
       } catch (e) {
@@ -75,10 +81,19 @@ module.exports = async function handler(req, res) {
     if (req.method === 'PATCH' && readMatch) {
       const notificationId = readMatch[1];
       try {
-        const { error } = await supabase
+        let markOneQuery = supabase
           .from('notifications')
           .update({ is_read: true })
           .eq('id', notificationId);
+
+        // Add ownership check
+        if (teamId) {
+          markOneQuery = markOneQuery.eq('team_id', teamId);
+        } else {
+          markOneQuery = markOneQuery.eq('user_id', userId);
+        }
+
+        const { error } = await markOneQuery;
 
         if (error && error.code !== '42P01') throw error;
       } catch (e) {
