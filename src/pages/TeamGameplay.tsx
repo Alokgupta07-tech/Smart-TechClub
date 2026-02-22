@@ -240,7 +240,7 @@ export default function TeamGameplay() {
       }
       return response.json();
     },
-    refetchInterval: (data, query) => {
+    refetchInterval: (query) => {
       // Auto-retry every 10 seconds if results not published error
       if (query.state.error && 
           (query.state.error as Error).message?.includes('results have not been published')) {
@@ -356,6 +356,9 @@ export default function TeamGameplay() {
     staleTime: 30000,
     refetchOnMount: false,
   });
+
+  // Derive progress early so useEffect dependency arrays can safely reference it
+  const progress: TeamProgress | null = progressData?.progress || null;
 
   // Submit answer mutation with retry logic
   const submitAnswer = useMutation({
@@ -943,7 +946,6 @@ export default function TeamGameplay() {
       </div>
     );
   }
-  const progress: TeamProgress | null = progressData?.progress || null;
   const sessionStats = allPuzzlesData?.session;
 
   // Get question status counts for exam navigation
