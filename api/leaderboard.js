@@ -40,7 +40,7 @@ module.exports = async function handler(req, res) {
     // ── Parallel: users + submissions ─────────────────────────────────────
     var userIds = [...new Set(teams.map(t => t.user_id).filter(Boolean))];
 
-    const [usersResult, submissionsResult] = await Promise.all([
+    const [usersResult, submissionsResult, puzzleCountResult] = await Promise.all([
       userIds.length > 0
         ? supabase.from('users').select('id, name').in('id', userIds)
         : { data: [] },
@@ -49,8 +49,18 @@ module.exports = async function handler(req, res) {
           .from('submissions')
           .select('team_id, puzzle_id, score_awarded, is_correct, evaluation_status, submitted_at')
           .in('team_id', teamIds)
-        : { data: [] }
+        : { data: [] },
+      supabase.from('puzzles').select('id, level')
     ]);
+
+    // Count puzzles per level
+    var puzzleCounts = {};
+    var totalPuzzleCount = 0;
+    (puzzleCountResult.data || []).forEach(p => {
+      if (!puzzleCounts[p.level]) puzzleCounts[p.level] = 0;
+      puzzleCounts[p.level]++;
+      totalPuzzleCount++;
+    });
 
     // ── Build lookup maps ─────────────────────────────────────────────────
     var usersMap = {};
@@ -97,13 +107,20 @@ module.exports = async function handler(req, res) {
     // ── Build result rows ─────────────────────────────────────────────────
     var result = teams.map(t => {
       var leaderUser = usersMap[t.user_id];
+      var teamLevel = t.level || 1;
+      // Total questions = sum of puzzles for all levels up to and including team's current level
+      var teamTotalQuestions = 0;
+      for (var lvl = 1; lvl <= teamLevel; lvl++) {
+        teamTotalQuestions += puzzleCounts[lvl] || 0;
+      }
       return {
         id: t.id,
         teamName: t.team_name,
         totalScore: teamScores[t.id] || 0,
-        level: t.level || 1,
+        level: teamLevel,
         puzzlesSolved: teamSolved[t.id] || 0,
         puzzlesSubmitted: teamSubmitted[t.id] || 0,
+        totalQuestions: teamTotalQuestions,
         status: t.status,
         leaderName: leaderUser?.name || null,
         hintsUsed: t.hints_used || 0,

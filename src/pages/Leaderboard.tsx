@@ -204,7 +204,7 @@ const Leaderboard = () => {
                           </td>
                           <td className="py-4 px-4 hidden md:table-cell">
                             <span className={cn("font-terminal text-sm", team.puzzlesSolved > 0 ? "text-success" : "text-muted-foreground")}>
-                              {team.puzzlesSolved || 0} / {team.puzzlesSubmitted || 0}
+                              {team.puzzlesSolved || 0} / {team.totalQuestions || team.puzzlesSubmitted || 0}
                             </span>
                           </td>
                           <td className="py-4 px-4">
