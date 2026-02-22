@@ -97,12 +97,9 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
 
       // On 401, try refreshing the token once (don't count as retry)
       if (response.status === 401) {
-        const errorData = await response.json().catch(() => ({}));
-        if (errorData.code === 'TOKEN_EXPIRED') {
-          const newToken = await tryRefreshToken();
-          if (newToken) {
-            response = await makeRequest(newToken);
-          }
+        const newToken = await tryRefreshToken();
+        if (newToken) {
+          response = await makeRequest(newToken);
         }
       }
 
@@ -230,13 +227,10 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
   let response = await fetch(url, { ...options, headers });
 
   if (response.status === 401) {
-    const errorData = await response.clone().json().catch(() => ({}));
-    if (errorData.code === 'TOKEN_EXPIRED') {
-      const newToken = await tryRefreshToken();
-      if (newToken) {
-        headers.Authorization = `Bearer ${newToken}`;
-        response = await fetch(url, { ...options, headers });
-      }
+    const newToken = await tryRefreshToken();
+    if (newToken) {
+      headers.Authorization = `Bearer ${newToken}`;
+      response = await fetch(url, { ...options, headers });
     }
   }
 
