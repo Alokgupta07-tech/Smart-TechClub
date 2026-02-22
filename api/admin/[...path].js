@@ -313,17 +313,15 @@ module.exports = async function handler(req, res) {
         .order('level', { ascending: false });
       if (allErr) throw allErr;
 
-      // Calculate stats from all teams
+      // Calculate basic stats from all teams (activeTeams, completedTeams)
+      // avgProgress will be computed from submission-based progress below
       var totalTeams = (allTeams || []).length;
       var activeTeams = 0;
       var completedTeams = 0;
-      var totalProgress = 0;
       (allTeams || []).forEach(function (t) {
         if (t.status === 'active' || t.status === 'paused') activeTeams++;
         if (t.status === 'completed') completedTeams++;
-        totalProgress += t.progress || 0;
       });
-      var avgProgress = totalTeams > 0 ? (totalProgress / totalTeams) : 0;
 
       // Show ALL teams in the table (not just active/paused)
       var liveTeams = allTeams || [];
@@ -348,23 +346,38 @@ module.exports = async function handler(req, res) {
         .select('team_id, puzzle_id, is_correct, score_awarded, submitted_at')
         .in('team_id', teamIds) : { data: [] };
 
-      // Get puzzles for progress calculation
+      // Get puzzles for progress calculation (per-level counts)
       const { data: puzzles } = await supabase
         .from('puzzles')
-        .select('id')
+        .select('id, level')
         .eq('is_active', true);
       var totalPuzzles = (puzzles || []).length || 10;
 
+      // Build per-level puzzle counts and puzzle-to-level map
+      var puzzlesPerLevel = {};
+      var puzzleLevelMap = {};
+      (puzzles || []).forEach(function (p) {
+        var lvl = p.level || 1;
+        puzzlesPerLevel[lvl] = (puzzlesPerLevel[lvl] || 0) + 1;
+        puzzleLevelMap[p.id] = lvl;
+      });
+
       var scoreMap = {};
       var correctMap = {};
+      var correctPerLevelMap = {}; // { team_id: { level: count } }
       var attemptMap = {};
       var lastActivityMap = {};
       (submissions || []).forEach(function (s) {
         if (!scoreMap[s.team_id]) scoreMap[s.team_id] = 0;
         if (!correctMap[s.team_id]) correctMap[s.team_id] = 0;
+        if (!correctPerLevelMap[s.team_id]) correctPerLevelMap[s.team_id] = {};
         if (!attemptMap[s.team_id]) attemptMap[s.team_id] = 0;
         scoreMap[s.team_id] += s.score_awarded || 0;
-        if (s.is_correct) correctMap[s.team_id]++;
+        if (s.is_correct) {
+          correctMap[s.team_id]++;
+          var pLevel = puzzleLevelMap[s.puzzle_id] || 1;
+          correctPerLevelMap[s.team_id][pLevel] = (correctPerLevelMap[s.team_id][pLevel] || 0) + 1;
+        }
         attemptMap[s.team_id]++;
         if (s.submitted_at) {
           if (!lastActivityMap[s.team_id] || new Date(s.submitted_at) > new Date(lastActivityMap[s.team_id])) {
@@ -385,13 +398,17 @@ module.exports = async function handler(req, res) {
         var elapsed = hrs.toString().padStart(2, '0') + ':' + mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
 
         var correctCount = correctMap[t.id] || 0;
-        var progressPct = totalPuzzles > 0 ? Math.round((correctCount / totalPuzzles) * 100) : 0;
+        // Progress based on team's current level puzzles
+        var teamLevel = t.level || 1;
+        var levelCorrect = (correctPerLevelMap[t.id] && correctPerLevelMap[t.id][teamLevel]) || 0;
+        var levelTotal = puzzlesPerLevel[teamLevel] || totalPuzzles;
+        var progressPct = levelTotal > 0 ? Math.round((levelCorrect / levelTotal) * 100) : 0;
 
         return {
           id: t.id,
           team_name: t.team_name,
-          current_level: t.level,
-          current_puzzle: correctCount + 1,
+          current_level: teamLevel,
+          current_puzzle: levelCorrect + 1,
           progress: progressPct,
           completed_puzzles: correctCount,
           total_attempts: attemptMap[t.id] || 0,
@@ -404,6 +421,14 @@ module.exports = async function handler(req, res) {
           leader_name: liveUsersMap[t.user_id] ? liveUsersMap[t.user_id].name : null
         };
       }).sort((a, b) => b.total_score - a.total_score);
+
+      // Compute average progress from actual submission-based progress
+      var avgProgress = 0;
+      if (liveResult.length > 0) {
+        var sumProgress = 0;
+        liveResult.forEach(function (r) { sumProgress += r.progress; });
+        avgProgress = sumProgress / liveResult.length;
+      }
 
       return res.json({
         teams: liveResult,
