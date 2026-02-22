@@ -69,7 +69,7 @@ interface GameState {
 // NEW: Interface for evaluation status
 interface EvaluationStatus {
   level_id: number;
-  evaluation_state: 'IN_PROGRESS' | 'SUBMISSIONS_CLOSED' | 'EVALUATING' | 'RESULTS_PUBLISHED';
+  evaluation_state: 'IN_PROGRESS' | 'SUBMISSIONS_CLOSED' | 'EVALUATING' | 'RESULTS_PUBLISHED' | 'NOT_UNLOCKED';
   submissions: {
     total_submissions: number;
     pending: number;
@@ -1056,66 +1056,79 @@ export default function GameControl() {
             </div>
           </div>
 
-          {/* Evaluation Status Display */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-zinc-900 border-zinc-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-zinc-400">Current State</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className={`text-lg font-bold ${evaluationStatus?.evaluation_state === 'RESULTS_PUBLISHED' ? 'text-green-500' :
-                    evaluationStatus?.evaluation_state === 'EVALUATING' ? 'text-yellow-500' :
-                      evaluationStatus?.evaluation_state === 'SUBMISSIONS_CLOSED' ? 'text-orange-500' :
-                        'text-cyan-500'
-                  }`}>
-                  {evaluationStatus?.evaluation_state?.replace(/_/g, ' ') || 'IN PROGRESS'}
-                </p>
-              </CardContent>
-            </Card>
+          {/* Check if Level 2 is not unlocked */}
+          {evaluationStatus?.evaluation_state === 'NOT_UNLOCKED' ? (
+            <div className="p-6 border border-zinc-700 rounded-lg bg-zinc-900/50">
+              <div className="flex items-center gap-3 mb-2">
+                <Lock className="w-6 h-6 text-zinc-500" />
+                <h3 className="text-lg font-semibold text-zinc-400">Level {selectedLevel} Not Unlocked</h3>
+              </div>
+              <p className="text-zinc-500">
+                Complete and publish Level 1 results before accessing Level {selectedLevel} evaluation controls.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Evaluation Status Display */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="bg-zinc-900 border-zinc-700">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-zinc-400">Current State</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className={`text-lg font-bold ${evaluationStatus?.evaluation_state === 'RESULTS_PUBLISHED' ? 'text-green-500' :
+                        evaluationStatus?.evaluation_state === 'EVALUATING' ? 'text-yellow-500' :
+                          evaluationStatus?.evaluation_state === 'SUBMISSIONS_CLOSED' ? 'text-orange-500' :
+                            'text-cyan-500'
+                      }`}>
+                      {evaluationStatus?.evaluation_state?.replace(/_/g, ' ') || 'IN PROGRESS'}
+                    </p>
+                  </CardContent>
+                </Card>
 
-            <Card className="bg-zinc-900 border-zinc-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-zinc-400">Submissions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-lg font-bold text-cyan-500">
-                  {evaluationStatus?.submissions?.total_submissions || 0}
-                </p>
-                <p className="text-xs text-zinc-500">
-                  {evaluationStatus?.submissions?.pending || 0} pending
-                </p>
-              </CardContent>
-            </Card>
+                <Card className="bg-zinc-900 border-zinc-700">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-zinc-400">Submissions</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg font-bold text-cyan-500">
+                      {evaluationStatus?.submissions?.total_submissions || 0}
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      {evaluationStatus?.submissions?.pending || 0} pending
+                    </p>
+                  </CardContent>
+                </Card>
 
-            <Card className="bg-zinc-900 border-zinc-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-zinc-400">Teams</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-lg font-bold text-cyan-500">
-                  {evaluationStatus?.submissions?.teams_with_submissions || 0}
-                </p>
-                <p className="text-xs text-zinc-500">with submissions</p>
-              </CardContent>
-            </Card>
+                <Card className="bg-zinc-900 border-zinc-700">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-zinc-400">Teams</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg font-bold text-cyan-500">
+                      {evaluationStatus?.submissions?.teams_with_submissions || 0}
+                    </p>
+                    <p className="text-xs text-zinc-500">with submissions</p>
+                  </CardContent>
+                </Card>
 
-            <Card className="bg-zinc-900 border-zinc-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-zinc-400">Qualified</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-lg font-bold text-green-500">
-                  {evaluationStatus?.teams?.qualified || 0}
-                </p>
-                <p className="text-xs text-zinc-500">
-                  {evaluationStatus?.teams?.disqualified || 0} disqualified
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+                <Card className="bg-zinc-900 border-zinc-700">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-zinc-400">Qualified</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg font-bold text-green-500">
+                      {evaluationStatus?.teams?.qualified || 0}
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      {evaluationStatus?.teams?.disqualified || 0} disqualified
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
 
-          {/* Sequential Action Buttons */}
-          <div className="space-y-4">
+              {/* Sequential Action Buttons */}
+              <div className="space-y-4">
             {/* Step 1: Close Submissions */}
             <div className={`flex items-center justify-between p-4 border rounded-lg ${evaluationStatus?.actions?.can_close_submissions || evaluationStatus?.actions?.can_reopen_submissions ? 'border-orange-500/30' : 'border-zinc-700 opacity-50'
               }`}>
@@ -1209,7 +1222,7 @@ export default function GameControl() {
           </div>
 
           {/* Status Timeline */}
-          {evaluationStatus && (
+          {evaluationStatus && evaluationStatus.evaluation_state !== 'NOT_UNLOCKED' && (
             <div className="mt-4 p-4 bg-zinc-900 rounded-lg border border-zinc-700">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-semibold text-zinc-400">Timeline</h4>
@@ -1250,6 +1263,8 @@ export default function GameControl() {
                 )}
               </div>
             </div>
+          )}
+            </>
           )}
         </CardContent>
       </Card>

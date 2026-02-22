@@ -93,6 +93,60 @@ exports.getEvaluationStatus = async (req, res) => {
     const { levelId } = req.params;
     const levelIdInt = parseInt(levelId);
 
+    // Check if Level 2 is unlocked before returning its status
+    if (levelIdInt === 2) {
+      try {
+        if (USE_SUPABASE) {
+          const { data: gameStateData } = await supabaseAdmin
+            .from('game_state')
+            .select('level2_open')
+            .limit(1);
+          const level2Open = gameStateData?.[0]?.level2_open || false;
+          
+          if (!level2Open) {
+            return res.json({
+              success: true,
+              level_id: levelIdInt,
+              evaluation_state: 'NOT_UNLOCKED',
+              timestamps: {},
+              submissions: { total_submissions: 0, pending: 0, evaluated: 0, teams_with_submissions: 0 },
+              teams: { total: 0, qualified: 0, disqualified: 0, pending: 0 },
+              actions: {
+                can_close_submissions: false,
+                can_reopen_submissions: false,
+                can_evaluate: false,
+                can_publish: false
+              }
+            });
+          }
+        } else {
+          const [gameStateRows] = await db.query(
+            'SELECT level2_open FROM game_state LIMIT 1'
+          );
+          const level2Open = gameStateRows?.[0]?.level2_open || false;
+          
+          if (!level2Open) {
+            return res.json({
+              success: true,
+              level_id: levelIdInt,
+              evaluation_state: 'NOT_UNLOCKED',
+              timestamps: {},
+              submissions: { total_submissions: 0, pending: 0, evaluated: 0, teams_with_submissions: 0 },
+              teams: { total: 0, qualified: 0, disqualified: 0, pending: 0 },
+              actions: {
+                can_close_submissions: false,
+                can_reopen_submissions: false,
+                can_evaluate: false,
+                can_publish: false
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.log('Error checking level2_open status:', error.message);
+      }
+    }
+
     // ---- SUPABASE BRANCH ----
     if (USE_SUPABASE) {
       let levelState = null;
