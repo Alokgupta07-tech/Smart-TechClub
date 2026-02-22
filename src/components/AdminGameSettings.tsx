@@ -163,18 +163,22 @@ export function AdminGameSettings() {
   
   // Save all changes
   const saveAllChanges = async () => {
-    const promises = Object.keys(localSettings).map(key => {
-      const serverValue = data?.[key]?.value;
-      const localValue = localSettings[key].value;
+    try {
+      const promises = Object.keys(localSettings).map(key => {
+        const serverValue = data?.[key]?.value;
+        const localValue = localSettings[key].value;
+        
+        if (serverValue !== localValue) {
+          return updateSettingMutation.mutateAsync({ key, value: localValue });
+        }
+        return Promise.resolve();
+      });
       
-      if (serverValue !== localValue) {
-        return updateSettingMutation.mutateAsync({ key, value: localValue });
-      }
-      return Promise.resolve();
-    });
-    
-    await Promise.all(promises);
-    setHasChanges(false);
+      await Promise.all(promises);
+      setHasChanges(false);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+    }
   };
   
   // Format time helper

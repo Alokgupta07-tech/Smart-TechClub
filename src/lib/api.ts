@@ -78,14 +78,15 @@ async function tryRefreshToken(): Promise<string | null> {
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const accessToken = localStorage.getItem('accessToken');
 
+  const { headers: optHeaders, ...restOptions } = options || {};
   const makeRequest = async (token: string | null) =>
     fetch(`${API_BASE_URL}${endpoint}`, {
+      ...restOptions,
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options?.headers || {}),
+        ...((optHeaders as Record<string, string>) || {}),
       },
-      ...options,
     });
 
   let lastError: Error | null = null;

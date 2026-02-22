@@ -554,7 +554,7 @@ module.exports = async function handler(req, res) {
           hint_number: nextHint.hint_number,
           time_penalty_seconds: nextHint.time_penalty_seconds || 300
         },
-        hintsRemaining: 2 - (team.hints_used || 0),
+        hintsRemaining: Math.max(0, 3 - ((team.hints_used || 0) + 1)),
         penaltyApplied: nextHint.time_penalty_seconds || 300
       });
     }

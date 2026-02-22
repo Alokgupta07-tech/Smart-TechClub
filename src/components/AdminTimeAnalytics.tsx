@@ -181,6 +181,7 @@ export function AdminTimeAnalytics() {
     a.href = url;
     a.download = `team-timings-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    URL.revokeObjectURL(url);
   };
   
   // Get status badge

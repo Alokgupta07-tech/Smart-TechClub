@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface CountdownTimerProps {
@@ -18,16 +18,15 @@ export const CountdownTimer = ({
   onComplete 
 }: CountdownTimerProps) => {
   const [timeLeft, setTimeLeft] = useState<TimeUnit[]>([]);
+  const completedFiredRef = useRef(false);
 
   useEffect(() => {
-    let completedFired = false;
-
     const calculateTimeLeft = () => {
       const difference = targetDate.getTime() - new Date().getTime();
       
       if (difference <= 0) {
-        if (!completedFired) {
-          completedFired = true;
+        if (!completedFiredRef.current) {
+          completedFiredRef.current = true;
           onComplete?.();
         }
         return [

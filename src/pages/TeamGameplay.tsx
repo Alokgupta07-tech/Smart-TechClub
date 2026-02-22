@@ -1570,7 +1570,7 @@ export default function TeamGameplay() {
                   </p>
                   <div className="space-y-2">
                     {allQuestions
-                      .filter((q: any) => q.status === 'skipped')
+                      .filter((q: any) => q.status === 'skipped' || (skippedQuestions.has(q.puzzle_id || q.id) && q.status !== 'completed'))
                       .map((q: any, i: number) => (
                         <button
                           key={q.puzzle_id || q.id}
@@ -1821,13 +1821,8 @@ export default function TeamGameplay() {
             </Button>
             <Button
               onClick={() => {
-                // Navigate to results or submit endpoint
-                toast({
-                  title: '✅ Quiz Summary Viewed',
-                  description: 'Continue working or check the leaderboard for your current standing.',
-                  className: 'bg-toxic-green text-black',
-                });
                 setIsSubmitDialogOpen(false);
+                navigate('/leaderboard');
               }}
               className="bg-toxic-green text-black hover:bg-toxic-green/80"
             >

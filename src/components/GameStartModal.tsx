@@ -55,10 +55,10 @@ export const GameStartModal = ({
 
     if (countdown <= 0) {
       setPhase('starting');
-      setTimeout(() => {
+      const startTimer = setTimeout(() => {
         onStart();
       }, 1000);
-      return;
+      return () => clearTimeout(startTimer);
     }
 
     const timer = setTimeout(() => {

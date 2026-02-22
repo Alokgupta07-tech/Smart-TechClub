@@ -384,7 +384,7 @@ export default function PuzzleManagement() {
                   name="puzzle_number"
                   type="number"
                   value={formData.puzzle_number}
-                  onChange={(e) => setFormData({ ...formData, puzzle_number: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, puzzle_number: parseInt(e.target.value) || 0 })}
                 />
               </div>
             </div>
@@ -441,7 +441,7 @@ export default function PuzzleManagement() {
                   name="points"
                   type="number"
                   value={formData.points}
-                  onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) || 0 })}
                 />
               </div>
             </div>
@@ -477,7 +477,7 @@ export default function PuzzleManagement() {
                   name="time_limit"
                   type="number"
                   value={formData.time_limit_minutes}
-                  onChange={(e) => setFormData({ ...formData, time_limit_minutes: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, time_limit_minutes: parseInt(e.target.value) || 0 })}
                 />
               </div>
             </div>
@@ -556,7 +556,7 @@ export default function PuzzleManagement() {
                   name="points"
                   type="number"
                   value={formData.points}
-                  onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) || 0 })}
                 />
               </div>
             </div>

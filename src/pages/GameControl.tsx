@@ -1062,7 +1062,7 @@ export default function GameControl() {
             onCloseSubmissions={() => closeSubmissions.mutate(1)}
             onReopenSubmissions={() => reopenSubmissions.mutate(1)}
             onEvaluateAnswers={() => showConfirm(
-              'EvaluateLevel 1',
+              'Evaluate Level 1',
               'Evaluate all Level 1 answers? This will calculate scores and qualification status.',
               () => evaluateAnswers.mutate(1)
             )}

@@ -51,17 +51,26 @@ interface StatCardProps {
   color?: string;
 }
 
-const StatCard = ({ icon, label, value, subValue, trend, color = 'primary' }: StatCardProps) => (
+const colorClasses: Record<string, { border: string; bg: string; text: string }> = {
+  primary: { border: 'border-primary/20', bg: 'bg-primary/5', text: 'text-primary' },
+  success: { border: 'border-success/20', bg: 'bg-success/5', text: 'text-success' },
+  destructive: { border: 'border-destructive/20', bg: 'bg-destructive/5', text: 'text-destructive' },
+  warning: { border: 'border-warning/20', bg: 'bg-warning/5', text: 'text-warning' },
+};
+
+const StatCard = ({ icon, label, value, subValue, trend, color = 'primary' }: StatCardProps) => {
+  const cc = colorClasses[color] || colorClasses.primary;
+  return (
   <div className={cn(
     "p-3 rounded-lg border",
-    `border-${color}/20 bg-${color}/5`
+    cc.border, cc.bg
   )}>
     <div className="flex items-center gap-2 mb-1">
-      <span className={`text-${color}`}>{icon}</span>
+      <span className={cc.text}>{icon}</span>
       <span className="text-xs font-terminal text-muted-foreground uppercase">{label}</span>
     </div>
     <div className="flex items-baseline gap-2">
-      <span className={cn("text-xl font-mono font-bold", `text-${color}`)}>
+      <span className={cn("text-xl font-mono font-bold", cc.text)}>
         {value}
       </span>
       {trend && (
@@ -79,7 +88,8 @@ const StatCard = ({ icon, label, value, subValue, trend, color = 'primary' }: St
       <span className="text-[10px] text-muted-foreground">{subValue}</span>
     )}
   </div>
-);
+  );
+};
 
 interface PuzzleAnalyticsPanelProps {
   puzzleId: string;
