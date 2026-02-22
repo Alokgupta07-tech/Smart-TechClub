@@ -118,7 +118,7 @@ module.exports = async function handler(req, res) {
       if (level !== undefined) updates.level = level;
       if (puzzle_number !== undefined) updates.puzzle_number = puzzle_number;
       if (points !== undefined) updates.points = points;
-      if (answer !== undefined || correct_answer !== undefined) updates.correct_answer = answer || correct_answer;
+      if (answer !== undefined || correct_answer !== undefined) updates.correct_answer = answer !== undefined ? answer : correct_answer;
       if (puzzle_content !== undefined) updates.puzzle_content = puzzle_content;
       if (puzzle_file_url !== undefined) updates.puzzle_file_url = puzzle_file_url;
 

@@ -831,18 +831,17 @@ module.exports = async function handler(req, res) {
       var teamsWithSubmissions = 0;
 
       if (puzzleIds.length > 0) {
-        const { count } = await supabase
+        const { data: allSubs } = await supabase
           .from('submissions')
-          .select('*', { count: 'exact', head: true })
+          .select('team_id, evaluation_status')
           .in('puzzle_id', puzzleIds);
-        totalSubmissions = count || 0;
+        totalSubmissions = (allSubs || []).length;
+        pendingSubmissions = (allSubs || []).filter(function (s) {
+          return s.evaluation_status === 'PENDING' || !s.evaluation_status;
+        }).length;
 
-        const { data: teamSubs } = await supabase
-          .from('submissions')
-          .select('team_id')
-          .in('puzzle_id', puzzleIds);
         var uniqueTeams = {};
-        (teamSubs || []).forEach(function (s) { uniqueTeams[s.team_id] = true; });
+        (allSubs || []).forEach(function (s) { uniqueTeams[s.team_id] = true; });
         teamsWithSubmissions = Object.keys(uniqueTeams).length;
       }
 
@@ -1051,18 +1050,29 @@ module.exports = async function handler(req, res) {
 
       if (puzzleIds.length > 0) {
         try {
-          // Get puzzles with their points for score calculation
+          // Get puzzles with their points and correct answers for evaluation
           const { data: puzzlesWithPoints } = await supabase.from('puzzles')
-            .select('id, points')
+            .select('id, points, correct_answer')
             .in('id', puzzleIds);
           const pointsMap = {};
-          (puzzlesWithPoints || []).forEach(function(p) { pointsMap[p.id] = p.points || 0; });
+          const answerMap = {};
+          (puzzlesWithPoints || []).forEach(function(p) {
+            pointsMap[p.id] = p.points || 0;
+            answerMap[p.id] = (p.correct_answer || '').trim().toLowerCase();
+          });
 
           // Count how many we are evaluating
           const { data: subs } = await supabase.from('submissions')
-            .select('id, puzzle_id, is_correct')
+            .select('id, puzzle_id, is_correct, submitted_answer')
             .in('puzzle_id', puzzleIds)
             .eq('evaluation_status', 'PENDING');
+
+          // Re-evaluate is_correct against current puzzle answers
+          (subs || []).forEach(function(s) {
+            var submittedTrimmed = (s.submitted_answer || '').trim().toLowerCase();
+            var correctTrimmed = answerMap[s.puzzle_id] || '';
+            s.is_correct = submittedTrimmed === correctTrimmed;
+          });
 
           evalCount = (subs || []).length;
           correctCount = (subs || []).filter(s => s.is_correct).length;
@@ -1082,6 +1092,7 @@ module.exports = async function handler(req, res) {
             for (const [pid, subIds] of Object.entries(puzzleGroups)) {
               await supabase.from('submissions')
                 .update({
+                  is_correct: true,
                   evaluation_status: 'EVALUATED',
                   score_awarded: pointsMap[pid] || 0,
                   evaluated_at: new Date().toISOString()
@@ -1093,6 +1104,7 @@ module.exports = async function handler(req, res) {
           if (incorrectIds.length > 0) {
             await supabase.from('submissions')
               .update({
+                is_correct: false,
                 evaluation_status: 'EVALUATED',
                 score_awarded: 0,
                 evaluated_at: new Date().toISOString()

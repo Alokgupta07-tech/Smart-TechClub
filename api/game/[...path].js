@@ -199,16 +199,18 @@ module.exports = async function handler(req, res) {
           .eq('level', team.level || 1)
           .order('puzzle_number', { ascending: true });
 
-        // Get submissions for this team
+        // Get submissions for this team (only correct ones count as completed)
         const { data: submissions } = await supabase
           .from('submissions')
-          .select('puzzle_id, submitted_answer')
+          .select('puzzle_id, submitted_answer, is_correct')
           .eq('team_id', team.id);
 
         const successfulPuzzles = new Map();
         if (submissions) {
           submissions.forEach(function (sub) {
-            successfulPuzzles.set(sub.puzzle_id, sub.submitted_answer);
+            if (sub.is_correct) {
+              successfulPuzzles.set(sub.puzzle_id, sub.submitted_answer);
+            }
           });
         }
 
