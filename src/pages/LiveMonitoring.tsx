@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback, useTransition, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
@@ -77,8 +77,99 @@ interface MonitorStats {
   average_progress: number;
 }
 
+// Memoized team row to prevent re-render when other teams change
+const TeamRow = memo(function TeamRow({
+  team,
+  index,
+  getStatusBadge,
+  formatElapsedTime,
+  formatTimestamp,
+}: {
+  team: TeamStatus;
+  index: number;
+  getStatusBadge: (status: string) => JSX.Element;
+  formatElapsedTime: (seconds?: number) => string;
+  formatTimestamp: (timestamp: string | null | undefined) => string;
+}) {
+  return (
+    <TableRow key={team.id || team.team_id || index} className="border-toxic-green/10">
+      <TableCell className="font-semibold text-toxic-green">
+        {team.team_name}
+      </TableCell>
+      <TableCell>{getStatusBadge(team.status)}</TableCell>
+      <TableCell>
+        <div className="text-sm">
+          <div className="font-mono">L{team.current_level}-P{team.current_puzzle}</div>
+          <div className="text-zinc-500 text-xs">{team.puzzle_title || ''}</div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="w-24">
+          <Progress value={team.progress || 0} className="h-2" />
+          <div className="text-xs text-zinc-400 mt-1">{team.progress || 0}%</div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className="text-yellow-500 border-yellow-500/50">
+          {team.total_attempts || team.current_attempts || 0}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className="text-blue-500 border-blue-500/50">
+          {team.hints_used || team.total_hints_used || 0}
+        </Badge>
+      </TableCell>
+      <TableCell className="font-mono text-sm">
+        {team.status === 'waiting'
+          ? '--:--:--'
+          : (team.time_elapsed || formatElapsedTime(team.elapsed_seconds))}
+      </TableCell>
+      <TableCell className="text-sm text-zinc-400">
+        {team.last_activity ? formatTimestamp(team.last_activity) : '-'}
+      </TableCell>
+    </TableRow>
+  );
+});
+
+// Memoized activity item
+const ActivityItem = memo(function ActivityItem({
+  log,
+  getActivityIcon,
+  formatTimestamp,
+}: {
+  log: ActivityLog;
+  getActivityIcon: (type: string) => JSX.Element;
+  formatTimestamp: (timestamp: string | null | undefined) => string;
+}) {
+  return (
+    <div className="p-3 bg-black/40 border border-toxic-green/10 rounded-lg hover:border-toxic-green/30 transition-colors">
+      <div className="flex items-start gap-3">
+        {getActivityIcon(log.activity_type)}
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-toxic-green text-sm">
+              {log.team_name}
+            </span>
+            <span className="text-xs text-zinc-500">
+              {formatTimestamp(log.timestamp)}
+            </span>
+          </div>
+          <p className="text-sm text-zinc-300 mt-1">{log.description}</p>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export default function LiveMonitoring() {
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [isPending, startTransition] = useTransition();
+
+  const handleToggleAutoRefresh = useCallback(() => {
+    startTransition(() => {
+      setAutoRefresh(prev => !prev);
+    });
+  }, []);
 
   // Fetch live team data
   const { data: monitorData, isLoading } = useQuery({
@@ -146,17 +237,17 @@ export default function LiveMonitoring() {
     },
   });
 
-  const teams: TeamStatus[] = monitorData?.teams || [];
-  const stats: MonitorStats = monitorData?.stats || {
+  const teams: TeamStatus[] = useMemo(() => monitorData?.teams || [], [monitorData]);
+  const stats: MonitorStats = useMemo(() => monitorData?.stats || {
     total_teams: 0,
     active_teams: 0,
     completed_teams: 0,
     average_progress: 0,
-  };
-  const activities: ActivityLog[] = activityData?.logs || [];
-  const suspicious: SuspiciousActivity[] = suspiciousData?.activities || [];
+  }, [monitorData]);
+  const activities: ActivityLog[] = useMemo(() => activityData?.logs || [], [activityData]);
+  const suspicious: SuspiciousActivity[] = useMemo(() => suspiciousData?.activities || [], [suspiciousData]);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = useCallback((status: string) => {
     const variants: { [key: string]: { color: string; icon: any } } = {
       active: { color: 'bg-green-500', icon: Activity },
       completed: { color: 'bg-blue-500', icon: CheckCircle },
@@ -174,9 +265,9 @@ export default function LiveMonitoring() {
         {status.toUpperCase()}
       </Badge>
     );
-  };
+  }, []);
 
-  const getActivityIcon = (type: string) => {
+  const getActivityIcon = useCallback((type: string) => {
     switch (type) {
       case 'puzzle_completed':
       case 'puzzle_solve':
@@ -198,9 +289,9 @@ export default function LiveMonitoring() {
       default:
         return <Activity className="w-4 h-4 text-blue-500" />;
     }
-  };
+  }, []);
 
-  const formatTimestamp = (timestamp: string | null | undefined) => {
+  const formatTimestamp = useCallback((timestamp: string | null | undefined) => {
     if (!timestamp) return 'No activity yet';
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return 'No activity yet';
@@ -213,15 +304,15 @@ export default function LiveMonitoring() {
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return date.toLocaleString();
-  };
+  }, []);
 
-  const formatElapsedTime = (seconds?: number) => {
+  const formatElapsedTime = useCallback((seconds?: number) => {
     if (!seconds) return '00:00:00';
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
   if (isLoading) {
     return (
@@ -254,7 +345,8 @@ export default function LiveMonitoring() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setAutoRefresh(!autoRefresh)}
+            onClick={handleToggleAutoRefresh}
+            disabled={isPending}
           >
             {autoRefresh ? 'Pause' : 'Resume'}
           </Button>
@@ -367,42 +459,14 @@ export default function LiveMonitoring() {
             </TableHeader>
             <TableBody>
               {teams.map((team, index) => (
-                <TableRow key={team.id || team.team_id || index} className="border-toxic-green/10">
-                  <TableCell className="font-semibold text-toxic-green">
-                    {team.team_name}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(team.status)}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="font-mono">L{team.current_level}-P{team.current_puzzle}</div>
-                      <div className="text-zinc-500 text-xs">{team.puzzle_title || ''}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="w-24">
-                      <Progress value={team.progress || 0} className="h-2" />
-                      <div className="text-xs text-zinc-400 mt-1">{team.progress || 0}%</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-yellow-500 border-yellow-500/50">
-                      {team.total_attempts || team.current_attempts || 0}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-blue-500 border-blue-500/50">
-                      {team.hints_used || team.total_hints_used || 0}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {team.status === 'waiting' 
-                      ? '--:--:--' 
-                      : (team.time_elapsed || formatElapsedTime(team.elapsed_seconds))}
-                  </TableCell>
-                  <TableCell className="text-sm text-zinc-400">
-                    {team.last_activity ? formatTimestamp(team.last_activity) : '-'}
-                  </TableCell>
-                </TableRow>
+                <TeamRow
+                  key={team.id || team.team_id || index}
+                  team={team}
+                  index={index}
+                  getStatusBadge={getStatusBadge}
+                  formatElapsedTime={formatElapsedTime}
+                  formatTimestamp={formatTimestamp}
+                />
               ))}
             </TableBody>
           </Table>
@@ -423,25 +487,12 @@ export default function LiveMonitoring() {
         <CardContent>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {activities.map((log) => (
-              <div
+              <ActivityItem
                 key={log.id}
-                className="p-3 bg-black/40 border border-toxic-green/10 rounded-lg hover:border-toxic-green/30 transition-colors"
-              >
-                <div className="flex items-start gap-3">
-                  {getActivityIcon(log.activity_type)}
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-toxic-green text-sm">
-                        {log.team_name}
-                      </span>
-                      <span className="text-xs text-zinc-500">
-                        {formatTimestamp(log.timestamp)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-zinc-300 mt-1">{log.description}</p>
-                  </div>
-                </div>
-              </div>
+                log={log}
+                getActivityIcon={getActivityIcon}
+                formatTimestamp={formatTimestamp}
+              />
             ))}
           </div>
         </CardContent>
