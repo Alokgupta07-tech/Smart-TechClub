@@ -87,16 +87,19 @@ export default function LiveMonitoring() {
       const response = await fetchWithAuth(`${API_BASE}/admin/monitor/live`);
       
       if (!response.ok) {
-        if (response.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to fetch live data');
       }
       return response.json();
     },
     refetchInterval: (query) => {
-      if (query.state.error?.message === 'Unauthorized') return false;
+      const msg = query.state.error?.message || '';
+      if (msg.includes('Unauthorized') || msg.includes('Session expired')) return false;
       return autoRefresh ? 3000 : false;
     },
-    retry: (_, error) => !(error as Error).message?.includes('Unauthorized'),
+    retry: (_, error) => {
+      const msg = (error as Error).message || '';
+      return !msg.includes('Unauthorized') && !msg.includes('Session expired');
+    },
   });
 
   // Fetch activity logs
@@ -106,16 +109,19 @@ export default function LiveMonitoring() {
       const response = await fetchWithAuth(`${API_BASE}/admin/activity?limit=50`);
       
       if (!response.ok) {
-        if (response.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to fetch activity logs');
       }
       return response.json();
     },
     refetchInterval: (query) => {
-      if (query.state.error?.message === 'Unauthorized') return false;
+      const msg = query.state.error?.message || '';
+      if (msg.includes('Unauthorized') || msg.includes('Session expired')) return false;
       return autoRefresh ? 5000 : false;
     },
-    retry: (_, error) => !(error as Error).message?.includes('Unauthorized'),
+    retry: (_, error) => {
+      const msg = (error as Error).message || '';
+      return !msg.includes('Unauthorized') && !msg.includes('Session expired');
+    },
   });
 
   // Fetch suspicious activity
@@ -125,16 +131,19 @@ export default function LiveMonitoring() {
       const response = await fetchWithAuth(`${API_BASE}/admin/suspicious`);
       
       if (!response.ok) {
-        if (response.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to fetch suspicious activity');
       }
       return response.json();
     },
     refetchInterval: (query) => {
-      if (query.state.error?.message === 'Unauthorized') return false;
+      const msg = query.state.error?.message || '';
+      if (msg.includes('Unauthorized') || msg.includes('Session expired')) return false;
       return autoRefresh ? 10000 : false;
     },
-    retry: (_, error) => !(error as Error).message?.includes('Unauthorized'),
+    retry: (_, error) => {
+      const msg = (error as Error).message || '';
+      return !msg.includes('Unauthorized') && !msg.includes('Session expired');
+    },
   });
 
   const teams: TeamStatus[] = monitorData?.teams || [];

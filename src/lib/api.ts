@@ -242,6 +242,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
       if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/admin-login')) {
         window.location.href = '/login';
       }
+      throw new Error('Session expired. Please login again.');
     }
   }
 

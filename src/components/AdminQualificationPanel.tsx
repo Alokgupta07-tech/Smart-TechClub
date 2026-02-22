@@ -105,7 +105,9 @@ function TeamQualificationTable() {
       const data = await response.json();
       return data.teams || data || [];
     },
-    refetchInterval: 5000,
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+    retry: 1,
   });
 
   // Qualify team for Level 2 mutation

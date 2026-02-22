@@ -141,6 +141,8 @@ const AdminLevelManagement = () => {
       const data = await response.json();
       return data.gameState || data;
     },
+    staleTime: 20_000,
+    retry: 1,
   });
 
   // Fetch teams for specific level
@@ -163,7 +165,9 @@ const AdminLevelManagement = () => {
         }
       });
     },
-    refetchInterval: 5000,
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+    retry: 1,
   });
 
   // Calculate level-specific stats from teams
@@ -186,6 +190,8 @@ const AdminLevelManagement = () => {
       const data = await response.json();
       return (data.puzzles || []).sort((a: Puzzle, b: Puzzle) => a.puzzle_number - b.puzzle_number);
     },
+    staleTime: 20_000,
+    retry: 1,
   });
 
   // Create puzzle mutation
