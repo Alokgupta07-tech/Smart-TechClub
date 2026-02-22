@@ -509,7 +509,9 @@ VALUES (
 ) ON CONFLICT (email) DO NOTHING;
 
 -- Initialize Level 1 and Level 2 evaluation states
-INSERT INTO level_evaluation_state (level_id, evaluation_state) VALUES (1, 'IN_PROGRESS') ON CONFLICT (level_id) DO NOTHING;
+-- Level 1 starts as RESULTS_PUBLISHED to allow immediate access (no qualification needed for Level 1)
+INSERT INTO level_evaluation_state (level_id, evaluation_state, results_published_at) 
+VALUES (1, 'RESULTS_PUBLISHED', NOW()) ON CONFLICT (level_id) DO NOTHING;
 INSERT INTO level_evaluation_state (level_id, evaluation_state) VALUES (2, 'IN_PROGRESS') ON CONFLICT (level_id) DO NOTHING;
 
 -- Initialize default qualification cutoffs

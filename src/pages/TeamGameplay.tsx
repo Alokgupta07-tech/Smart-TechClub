@@ -230,8 +230,21 @@ export default function TeamGameplay() {
       }
       return response.json();
     },
-    refetchInterval: 30000, // Optimized: 30s instead of 10s for 200+ users
-    retry: 1,
+    refetchInterval: (data, query) => {
+      // Auto-retry every 10 seconds if results not published error
+      if (query.state.error && 
+          (query.state.error as Error).message?.includes('results have not been published')) {
+        return 10000; // 10 seconds for polling when waiting for results
+      }
+      return 30000; // Normal 30s refresh
+    },
+    retry: (failureCount, error) => {
+      // Keep retrying if it's a "results not published" error
+      if ((error as Error).message?.includes('results have not been published')) {
+        return true; // Infinite retries for this specific error
+      }
+      return failureCount < 1; // Only 1 retry for other errors
+    },
     staleTime: 20000,
     refetchOnMount: false,
   });
@@ -811,6 +824,8 @@ export default function TeamGameplay() {
   // Handle puzzle loading error with dedicated UI
   if (puzzleError) {
     const errorMessage = (puzzleError as Error).message || 'Failed to load puzzle';
+    const isResultsNotPublished = errorMessage.includes('results have not been published');
+    
     return (
       <div className="container mx-auto p-6">
         <BackButton />
@@ -825,15 +840,33 @@ export default function TeamGameplay() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {isResultsNotPublished && (
+              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <p className="text-sm text-blue-400 font-medium flex items-center gap-2">
+                  <Clock className="w-4 h-4 animate-pulse" />
+                  Auto-retrying every 10 seconds...
+                </p>
+              </div>
+            )}
             <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
               <p className="text-sm text-muted-foreground mb-2">
                 <strong>Possible reasons:</strong>
               </p>
               <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-                <li>The game has not started yet</li>
-                <li>Network connectivity issues</li>
-                <li>API server is temporarily unavailable</li>
-                <li>Your session may have expired</li>
+                {isResultsNotPublished ? (
+                  <>
+                    <li>The game has not started yet</li>
+                    <li>The game was reset by the admin</li>
+                    <li>Admin is still evaluating previous level submissions</li>
+                  </>
+                ) : (
+                  <>
+                    <li>The game has not started yet</li>
+                    <li>Network connectivity issues</li>
+                    <li>API server is temporarily unavailable</li>
+                    <li>Your session may have expired</li>
+                  </>
+                )}
               </ul>
             </div>
             <div className="flex gap-2">
@@ -841,7 +874,7 @@ export default function TeamGameplay() {
                 onClick={() => startTransition(() => { queryClient.invalidateQueries({ queryKey: ['currentPuzzle'] }); })}
                 className="bg-toxic-green text-black hover:bg-toxic-green/80"
               >
-                Retry
+                Retry Now
               </Button>
               <Button
                 onClick={() => navigate('/dashboard')}
