@@ -35,13 +35,9 @@ class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
     
-    // Log error to console in development
-    if (import.meta.env.DEV) {
-      console.error('ErrorBoundary caught an error:', error, errorInfo);
-    }
-    
-    // In production, you could send this to an error reporting service
-    // Example: logErrorToService(error, errorInfo);
+    // Always log errors to console for debugging (including production)
+    console.error('ErrorBoundary caught an error:', error);
+    console.error('Component stack:', errorInfo?.componentStack);
   }
 
   handleReset = () => {
@@ -74,7 +70,7 @@ class ErrorBoundary extends Component<Props, State> {
               An unexpected error occurred. Please try refreshing the page.
             </p>
             
-            {import.meta.env.DEV && this.state.error && (
+            {this.state.error && (
               <div className="mb-6 p-4 bg-destructive/10 rounded text-left overflow-auto max-h-40">
                 <p className="text-sm font-mono text-destructive">
                   {this.state.error.toString()}

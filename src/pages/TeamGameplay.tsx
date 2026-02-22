@@ -1202,19 +1202,19 @@ export default function TeamGameplay() {
                 <div>
                   <div className={`text-sm font-mono mb-2 flex items-center gap-2 ${puzzle.level === 2 ? 'text-purple-400' : 'text-toxic-green'}`}>
                     {puzzle.level === 2 && <span className="text-lg">🏆</span>}
-                    LEVEL {puzzle.level} {puzzle.level === 2 ? '- FINALS' : ''} - PUZZLE {puzzle.puzzle_number}
+                    LEVEL {puzzle.level ?? 1} {puzzle.level === 2 ? '- FINALS' : ''} - PUZZLE {puzzle.puzzle_number ?? '?'}
                   </div>
                   <CardTitle className="text-2xl">
-                    <GlitchText>{puzzle.title}</GlitchText>
+                    <GlitchText>{puzzle.title || 'Untitled Puzzle'}</GlitchText>
                   </CardTitle>
                   <CardDescription className="mt-2 text-base">
-                    {puzzle.description}
+                    {puzzle.description || 'No description available.'}
                   </CardDescription>
                 </div>
                 <div className="flex flex-col gap-2 items-end">
                   <div className={`flex items-center gap-2 ${puzzle.level === 2 ? 'text-purple-400' : 'text-yellow-500'}`}>
                     <Award className="w-5 h-5" />
-                    <span className="font-bold">{puzzle.points} pts</span>
+                    <span className="font-bold">{puzzle.points ?? 0} pts</span>
                   </div>
                 </div>
               </div>
@@ -1223,10 +1223,10 @@ export default function TeamGameplay() {
               {/* Puzzle Content */}
               <div className={`p-6 bg-black border rounded-lg ${puzzle.level === 2 ? 'border-purple-500/30' : 'border-toxic-green/30'}`}>
                 <div className={`text-xs font-mono mb-2 ${puzzle.level === 2 ? 'text-purple-400' : 'text-toxic-green'}`}>
-                  PUZZLE TYPE: {puzzle.puzzle_type.toUpperCase()}
+                  PUZZLE TYPE: {(puzzle.puzzle_type || 'GENERAL').toUpperCase()}
                 </div>
                 <pre className="text-zinc-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">
-                  {puzzle.puzzle_content}
+                  {puzzle.puzzle_content || 'No content available.'}
                 </pre>
               </div>
 
@@ -1236,7 +1236,7 @@ export default function TeamGameplay() {
                 <div>
                   Hints Available:
                   <span className="text-yellow-500 ml-1">
-                    {puzzle.available_hints} / {puzzle.total_hints}
+                    {puzzle.available_hints ?? 0} / {puzzle.total_hints ?? 0}
                   </span>
                 </div>
               </div>
