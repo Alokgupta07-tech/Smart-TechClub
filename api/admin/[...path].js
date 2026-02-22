@@ -281,8 +281,9 @@ module.exports = async function handler(req, res) {
       const { error } = await supabase
         .from('teams')
         .update({
-          status: 'qualified',
-          level: 2
+          status: 'waiting',
+          level: 2,
+          progress: 0
         })
         .eq('id', qualifyTeamId);
       if (error) throw error;
