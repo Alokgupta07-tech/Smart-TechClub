@@ -105,6 +105,8 @@ export default function GameControl() {
   const [selectedLevel, setSelectedLevel] = useState<number>(1); // NEW: Track selected level for evaluation
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
+  const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Generic confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -524,6 +526,48 @@ export default function GameControl() {
       toast({
         title: 'Error',
         description: 'Failed to restart game',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Delete all teams and users mutation
+  const deleteAllData = useMutation({
+    mutationFn: async (confirmationCode: string) => {
+      const response = await fetchWithAuth(`${API_BASE}/game/delete-all-data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ confirmationCode }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to delete all data');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['gameState'] });
+        queryClient.invalidateQueries({ queryKey: ['adminStats'] });
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+      });
+
+      toast({
+        title: 'Data Deleted',
+        description: 'All team and user data has been permanently deleted. Admin accounts preserved.',
+        className: 'bg-red-500 text-white',
+      });
+      
+      setIsDeleteAllDialogOpen(false);
+      setDeleteConfirmText('');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
         variant: 'destructive',
       });
     },
@@ -949,6 +993,27 @@ export default function GameControl() {
               {restartGame.isPending ? 'Resetting...' : 'Reset Game'}
             </Button>
           </div>
+
+          {/* Delete All Teams and Users */}
+          <div className="flex items-center justify-between p-4 border-2 border-red-500/40 bg-red-500/10 rounded-lg">
+            <div className="flex-1">
+              <h3 className="font-semibold text-red-500 flex items-center gap-2">
+                <Square className="w-5 h-5" />
+                Delete ALL Teams & Users
+              </h3>
+              <p className="text-sm text-zinc-400 mt-1">
+                🔥 EXTREME DANGER: This will permanently DELETE all teams and team users from the database. Admin accounts will be preserved. This action CANNOT be undone!
+              </p>
+            </div>
+            <Button
+              onClick={() => setIsDeleteAllDialogOpen(true)}
+              disabled={deleteAllData.isPending}
+              className="bg-red-500 text-white hover:bg-red-600 min-w-[140px]"
+            >
+              <Square className="w-4 h-4 mr-2" />
+              {deleteAllData.isPending ? 'Deleting...' : 'Delete All Data'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -1018,6 +1083,86 @@ export default function GameControl() {
               className="bg-orange-500 text-white hover:bg-orange-600"
             >
               {restartGame.isPending ? 'Resetting...' : 'Reset Game'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete All Data Confirmation Dialog */}
+      <Dialog open={isDeleteAllDialogOpen} onOpenChange={setIsDeleteAllDialogOpen}>
+        <DialogContent className="bg-zinc-900 border-red-500/50">
+          <DialogHeader>
+            <DialogTitle className="text-red-500 flex items-center gap-2">
+              <Square className="w-5 h-5" />
+              🔥 EXTREME DANGER: Delete ALL Teams & Users
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              This will PERMANENTLY DELETE all teams and team user accounts from the database. This is NOT reversible!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <p className="text-sm text-red-400">
+                <strong>This will PERMANENTLY DELETE:</strong>
+              </p>
+              <ul className="text-sm text-red-300 list-disc list-inside mt-2">
+                <li>All team accounts</li>
+                <li>All team users (role: 'team')</li>
+                <li>All team members</li>
+                <li>All submissions and progress</li>
+                <li>All activity logs and tokens</li>
+                <li>All evaluation data</li>
+              </ul>
+              <p className="text-sm text-green-400 mt-2">
+                <strong>Preserved:</strong> Admin accounts
+              </p>
+            </div>
+            <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <p className="text-sm text-yellow-400">
+                ⚠️ This action is irreversible. Use only when resetting for a new event.
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="delete-confirm" className="text-zinc-400">
+                Type <span className="text-red-500 font-bold">DELETE_ALL_DATA</span> to confirm:
+              </Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE_ALL_DATA"
+                className="mt-2 bg-zinc-800 border-zinc-700"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteAllDialogOpen(false);
+                setDeleteConfirmText('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (deleteConfirmText === 'DELETE_ALL_DATA') {
+                  startTransition(() => {
+                    deleteAllData.mutate('DELETE_ALL_DATA');
+                  });
+                } else {
+                  toast({
+                    title: 'Invalid Confirmation',
+                    description: 'Please type DELETE_ALL_DATA exactly to confirm.',
+                    variant: 'destructive',
+                  });
+                }
+              }}
+              disabled={deleteConfirmText !== 'DELETE_ALL_DATA' || deleteAllData.isPending}
+              className="bg-red-500 text-white hover:bg-red-600"
+            >
+              {deleteAllData.isPending ? 'Deleting...' : 'Permanently Delete All Data'}
             </Button>
           </DialogFooter>
         </DialogContent>

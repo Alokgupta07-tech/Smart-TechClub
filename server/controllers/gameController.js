@@ -890,3 +890,150 @@ exports.resetTeamProgress = async (req, res) => {
     });
   }
 };
+
+/**
+ * COMPLETE DATA CLEANUP - DELETE ALL TEAMS AND USERS
+ * WARNING: This permanently deletes all team and user data!
+ * Use this to reset the system for a new event.
+ */
+exports.deleteAllTeamsAndUsers = async (req, res) => {
+  try {
+    const { confirmationCode } = req.body;
+    
+    // Require confirmation code to prevent accidental deletion
+    if (confirmationCode !== 'DELETE_ALL_DATA') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid confirmation code. Type DELETE_ALL_DATA to confirm.'
+      });
+    }
+
+    if (USE_SUPABASE) {
+      // Delete in correct order to respect foreign key constraints
+      
+      // Delete team question progress
+      try {
+        await supabaseAdmin.from('team_question_progress').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('team_question_progress cleanup:', e.message);
+      }
+
+      // Delete team level status
+      try {
+        await supabaseAdmin.from('team_level_status').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('team_level_status cleanup:', e.message);
+      }
+
+      // Delete evaluation audit logs
+      try {
+        await supabaseAdmin.from('evaluation_audit_log').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('evaluation_audit_log cleanup:', e.message);
+      }
+
+      // Delete hint usage
+      try {
+        await supabaseAdmin.from('hint_usage').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('hint_usage cleanup:', e.message);
+      }
+
+      // Delete team progress
+      try {
+        await supabaseAdmin.from('team_progress').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('team_progress cleanup:', e.message);
+      }
+
+      // Delete submissions
+      try {
+        await supabaseAdmin.from('submissions').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('submissions cleanup:', e.message);
+      }
+
+      // Delete activity logs
+      try {
+        await supabaseAdmin.from('activity_logs').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('activity_logs cleanup:', e.message);
+      }
+
+      // Delete refresh tokens
+      try {
+        await supabaseAdmin.from('refresh_tokens').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('refresh_tokens cleanup:', e.message);
+      }
+
+      // Delete email OTPs
+      try {
+        await supabaseAdmin.from('email_otps').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('email_otps cleanup:', e.message);
+      }
+
+      // Delete team members
+      try {
+        await supabaseAdmin.from('team_members').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('team_members cleanup:', e.message);
+      }
+
+      // Delete teams
+      try {
+        await supabaseAdmin.from('teams').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('teams cleanup:', e.message);
+      }
+
+      // Delete team users (keep admins)
+      try {
+        await supabaseAdmin.from('users').delete().eq('role', 'team');
+      } catch (e) {
+        console.log('users cleanup:', e.message);
+      }
+
+      // Optional: Reset evaluation state
+      try {
+        await supabaseAdmin.from('level_evaluation_state').delete().not('id', 'is', null);
+      } catch (e) {
+        console.log('level_evaluation_state cleanup:', e.message);
+      }
+
+      return res.json({
+        success: true,
+        message: 'All team and user data deleted successfully. Admin accounts preserved.'
+      });
+    }
+
+    // MySQL implementation
+    await db.query('DELETE FROM team_question_progress');
+    await db.query('DELETE FROM team_level_status');
+    await db.query('DELETE FROM evaluation_audit_log');
+    await db.query('DELETE FROM hint_usage');
+    await db.query('DELETE FROM team_progress');
+    await db.query('DELETE FROM submissions');
+    await db.query('DELETE FROM activity_logs');
+    await db.query('DELETE FROM refresh_tokens WHERE user_id IN (SELECT id FROM users WHERE role = "team")');
+    await db.query('DELETE FROM email_otps');
+    await db.query('DELETE FROM team_members');
+    await db.query('DELETE FROM teams');
+    await db.query('DELETE FROM users WHERE role = "team"');
+    
+    // Optional: Reset evaluation state
+    await db.query('DELETE FROM level_evaluation_state');
+
+    res.json({
+      success: true,
+      message: 'All team and user data deleted successfully. Admin accounts preserved.'
+    });
+  } catch (error) {
+    console.error('Error deleting all data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete all data: ' + error.message
+    });
+  }
+};

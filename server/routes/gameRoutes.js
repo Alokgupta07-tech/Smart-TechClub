@@ -16,6 +16,9 @@ router.post('/end', authenticateToken, requireRole('admin'), gameController.endG
 router.post('/restart', authenticateToken, requireRole('admin'), gameController.restartGame);
 router.post('/broadcast', authenticateToken, requireRole('admin'), gameController.broadcastMessage);
 
+// Dangerous: Delete all team and user data (requires confirmation)
+router.post('/delete-all-data', authenticateToken, requireRole('admin'), gameController.deleteAllTeamsAndUsers);
+
 // Team-specific controls (admin only)
 router.post('/team/:teamId/pause', authenticateToken, requireRole('admin'), gameController.pauseTeam);
 router.post('/team/:teamId/resume', authenticateToken, requireRole('admin'), gameController.resumeTeam);
