@@ -259,6 +259,23 @@ export default function TeamGameplay() {
     refetchOnMount: false,
   });
 
+  // Fetch team progress (must be before useEffects that reference `progress`)
+  const { data: progressData } = useQuery({
+    queryKey: ['teamProgress'],
+    queryFn: async () => {
+      const response = await fetchWithAuth(`${API_BASE}/gameplay/progress`);
+
+      if (!response.ok) throw new Error('Failed to fetch progress');
+      return response.json();
+    },
+    refetchInterval: 45000, // Optimized: 45s instead of 15s for 200+ users
+    staleTime: 30000,
+    refetchOnMount: false,
+  });
+
+  // Derive progress early so useEffect dependency arrays can safely reference it
+  const progress: TeamProgress | null = progressData?.progress || null;
+
   // Sync remaining time from API response
   useEffect(() => {
     if (puzzleData?.time_remaining_seconds !== undefined) {
@@ -342,23 +359,6 @@ export default function TeamGameplay() {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
-
-  // Fetch team progress
-  const { data: progressData } = useQuery({
-    queryKey: ['teamProgress'],
-    queryFn: async () => {
-      const response = await fetchWithAuth(`${API_BASE}/gameplay/progress`);
-
-      if (!response.ok) throw new Error('Failed to fetch progress');
-      return response.json();
-    },
-    refetchInterval: 45000, // Optimized: 45s instead of 15s for 200+ users
-    staleTime: 30000,
-    refetchOnMount: false,
-  });
-
-  // Derive progress early so useEffect dependency arrays can safely reference it
-  const progress: TeamProgress | null = progressData?.progress || null;
 
   // Submit answer mutation with retry logic
   const submitAnswer = useMutation({
