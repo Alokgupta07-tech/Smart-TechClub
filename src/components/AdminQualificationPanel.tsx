@@ -185,9 +185,9 @@ function TeamQualificationTable() {
     );
   };
 
-  // Updated qualification status based on 8/10 correct answers
+  // Updated qualification status based on 50% correct answers
   const getQualificationBadge = (team: Team) => {
-    const isQualified = team.correctAnswers >= (team.qualificationThreshold ?? 8);
+    const isQualified = team.correctAnswers >= (team.qualificationThreshold ?? Math.ceil((team.totalQuestions || 10) / 2));
     
     if (isQualified) {
       return (
@@ -260,7 +260,7 @@ function TeamQualificationTable() {
               </TableHeader>
               <TableBody>
                 {filteredTeams.map((team: Team, index: number) => (
-                  <TableRow key={team.id} className={team.correctAnswers >= (team.qualificationThreshold ?? 8) ? 'bg-green-500/5' : 'bg-red-500/5'}>
+                  <TableRow key={team.id} className={team.correctAnswers >= (team.qualificationThreshold ?? Math.ceil((team.totalQuestions || 10) / 2)) ? 'bg-green-500/5' : 'bg-red-500/5'}>
                     <TableCell className="font-terminal font-bold">{index + 1}</TableCell>
                     <TableCell>
                       <div>
@@ -317,7 +317,7 @@ function TeamQualificationTable() {
                             <Pause className="w-4 h-4" />
                           </Button>
                         )}
-                        {!team.qualifiedForLevel2 && team.level === 1 && team.correctAnswers >= (team.qualificationThreshold ?? 8) && (
+                        {!team.qualifiedForLevel2 && team.level === 1 && team.correctAnswers >= (team.qualificationThreshold ?? Math.ceil((team.totalQuestions || 10) / 2)) && (
                           <Button
                             size="sm"
                             variant="ghost"

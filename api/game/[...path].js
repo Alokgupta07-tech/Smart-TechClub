@@ -425,8 +425,8 @@ module.exports = async function handler(req, res) {
               wrongAnswers: wrongAnswers,
               notAttempted: notAttempted,
               totalTimeSeconds: totalTimeSeconds,
-              qualificationThreshold: 8,
-              qualified: correctAnswers >= 8
+              qualificationThreshold: Math.ceil(totalQuestions / 2),
+              qualified: correctAnswers >= Math.ceil(totalQuestions / 2)
             },
             questions: questionSummary
           }

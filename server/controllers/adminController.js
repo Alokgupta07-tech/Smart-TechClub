@@ -53,9 +53,25 @@ function calculateTimeElapsed(startTime, endTime) {
  */
 async function getAllTeams(req, res) {
   try {
-    // Level 1 has 10 questions - team qualifies if they answer 8+ correctly
-    const LEVEL1_TOTAL_QUESTIONS = 10;
-    const LEVEL1_QUALIFICATION_THRESHOLD = 8;
+    // Dynamic qualification: 50% or more correct answers
+    let LEVEL1_TOTAL_QUESTIONS = 10;
+    let LEVEL1_QUALIFICATION_THRESHOLD = 8;
+
+    // Fetch actual puzzle count for accurate threshold
+    try {
+      if (USE_SUPABASE) {
+        const { count } = await supabaseAdmin
+          .from('puzzles')
+          .select('*', { count: 'exact', head: true })
+          .eq('level', 1);
+        if (count != null) {
+          LEVEL1_TOTAL_QUESTIONS = count;
+          LEVEL1_QUALIFICATION_THRESHOLD = Math.ceil(count / 2);
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching puzzle count, using defaults:', e);
+    }
 
     let teams = [];
 
