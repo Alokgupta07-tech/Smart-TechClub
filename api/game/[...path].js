@@ -199,31 +199,36 @@ module.exports = async function handler(req, res) {
           .eq('level', team.level || 1)
           .order('puzzle_number', { ascending: true });
 
-        // Get submissions for this team (only correct ones count as completed)
+        // Get ALL submissions for this team (correct and incorrect)
         const { data: submissions } = await supabase
           .from('submissions')
           .select('puzzle_id, submitted_answer, is_correct')
           .eq('team_id', team.id);
 
         const successfulPuzzles = new Map();
+        const attemptedPuzzles = new Map();
         if (submissions) {
           submissions.forEach(function (sub) {
             if (sub.is_correct) {
               successfulPuzzles.set(sub.puzzle_id, sub.submitted_answer);
+            } else {
+              // Track attempted (wrong answer) puzzles too
+              attemptedPuzzles.set(sub.puzzle_id, sub.submitted_answer);
             }
           });
         }
 
-        // Map puzzles with status
+        // Map puzzles with status: completed > attempted > not_visited
         const puzzlesList = (puzzles || []).map(function (p) {
           const isCompleted = successfulPuzzles.has(p.id);
-          const submission = successfulPuzzles.get(p.id);
+          const isAttempted = attemptedPuzzles.has(p.id);
+          const submission = successfulPuzzles.get(p.id) || attemptedPuzzles.get(p.id);
           return {
             id: p.id,
             puzzle_number: p.puzzle_number,
             title: p.title,
             points: p.points,
-            status: isCompleted ? 'completed' : 'not_visited',
+            status: isCompleted ? 'completed' : isAttempted ? 'attempted' : 'not_visited',
             submitted_answer: submission || null
           };
         });

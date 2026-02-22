@@ -104,6 +104,7 @@ export default function TeamGameplay() {
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set());
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [skippedQuestions, setSkippedQuestions] = useState<Set<string>>(new Set());
+  const [visitedQuestions, setVisitedQuestions] = useState<Set<string>>(new Set());
   const [showTabWarning, setShowTabWarning] = useState(false);
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [isEndQuizDialogOpen, setIsEndQuizDialogOpen] = useState(false);
@@ -136,6 +137,7 @@ export default function TeamGameplay() {
         const session = JSON.parse(savedSession);
         setMarkedForReview(new Set(session.markedForReview || []));
         setSkippedQuestions(new Set(session.skippedQuestions || []));
+        setVisitedQuestions(new Set(session.visitedQuestions || []));
         setTabSwitchCount(session.tabSwitchCount || 0);
         if (!sessionRestored) {
           toast({
@@ -157,6 +159,7 @@ export default function TeamGameplay() {
       const session = {
         markedForReview: Array.from(markedForReview),
         skippedQuestions: Array.from(skippedQuestions),
+        visitedQuestions: Array.from(visitedQuestions),
         tabSwitchCount,
         lastActive: new Date().toISOString(),
       };
@@ -440,12 +443,28 @@ export default function TeamGameplay() {
 
         // Navigate to next question - either from backend or find it ourselves
         if (data.next_puzzle && data.next_puzzle.id) {
-          goToQuestion.mutate(data.next_puzzle.id);
+          // If backend points to same puzzle (last Q, wrap-around), show feedback
+          if (data.next_puzzle.id === puzzle?.id) {
+            toast({
+              title: '✅ Answer Submitted',
+              description: 'Your answer has been recorded.',
+              className: 'bg-blue-500/20 text-blue-400 border border-blue-500/50',
+            });
+          } else {
+            goToQuestion.mutate(data.next_puzzle.id);
+          }
         } else {
           // Find next question from allQuestions
           const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id);
           if (currentIndex >= 0 && currentIndex < allQuestions.length - 1) {
             goToQuestion.mutate(allQuestions[currentIndex + 1].puzzle_id || allQuestions[currentIndex + 1].id);
+          } else {
+            // Last question - no next question to navigate to
+            toast({
+              title: '✅ Answer Submitted',
+              description: 'Your answer has been recorded.',
+              className: 'bg-blue-500/20 text-blue-400 border border-blue-500/50',
+            });
           }
         }
         return;
@@ -508,12 +527,28 @@ export default function TeamGameplay() {
 
       // ALWAYS navigate to next question after submit
       if (data.next_puzzle && data.next_puzzle.id) {
-        goToQuestion.mutate(data.next_puzzle.id);
+        // If backend points to same puzzle (last Q, wrap-around), show feedback instead
+        if (data.next_puzzle.id === puzzle?.id) {
+          toast({
+            title: '✅ Answer Submitted',
+            description: 'Your answer has been recorded.',
+            className: 'bg-blue-500/20 text-blue-400 border border-blue-500/50',
+          });
+        } else {
+          goToQuestion.mutate(data.next_puzzle.id);
+        }
       } else {
         // Find next question from allQuestions list
         const currentIndex = allQuestions.findIndex((q: any) => (q.puzzle_id || q.id) === puzzle?.id);
         if (currentIndex >= 0 && currentIndex < allQuestions.length - 1) {
           goToQuestion.mutate(allQuestions[currentIndex + 1].puzzle_id || allQuestions[currentIndex + 1].id);
+        } else {
+          // Last question or no next available - show feedback
+          toast({
+            title: '✅ Answer Submitted',
+            description: 'Your answer has been recorded.',
+            className: 'bg-blue-500/20 text-blue-400 border border-blue-500/50',
+          });
         }
       }
     },
@@ -697,6 +732,18 @@ export default function TeamGameplay() {
   });
 
   const puzzle: Puzzle | null = puzzleData?.puzzle || null;
+
+  // Track visited questions when puzzle changes
+  useEffect(() => {
+    if (puzzle?.id) {
+      setVisitedQuestions(prev => {
+        if (prev.has(puzzle.id)) return prev;
+        const newSet = new Set(prev);
+        newSet.add(puzzle.id);
+        return newSet;
+      });
+    }
+  }, [puzzle?.id]);
 
   // Memoize allQuestions to prevent unnecessary re-renders and satisfy Rules of Hooks
   const allQuestions = useMemo(
@@ -951,14 +998,21 @@ export default function TeamGameplay() {
   // Get question status counts for exam navigation
   const getQuestionStats = () => {
     const answered = allQuestions.filter((q: { status?: string }) => q.status === 'completed').length;
+    const attempted = allQuestions.filter((q: { status?: string }) => q.status === 'attempted').length;
     const current = 1; // Exam UX only shows 1 current at a time structurally
     // FIX 5: merge backend status with frontend skippedQuestions set (backend never returns 'skipped')
     const skipped = allQuestions.filter((q: any) => {
       const qId = q.puzzle_id || q.id;
-      return q.status === 'skipped' || (skippedQuestions.has(qId) && q.status !== 'completed');
+      return q.status === 'skipped' || (skippedQuestions.has(qId) && q.status !== 'completed' && q.status !== 'attempted');
     }).length;
-    const notVisited = allQuestions.length - answered - skipped - current;
-    return { answered, skipped, current, notVisited: notVisited > 0 ? notVisited : 0, total: allQuestions.length };
+    // Count visited questions (navigated to but not answered/skipped)
+    const visited = allQuestions.filter((q: any) => {
+      const qId = q.puzzle_id || q.id;
+      return visitedQuestions.has(qId) && q.status !== 'completed' && q.status !== 'attempted' &&
+        q.status !== 'skipped' && !skippedQuestions.has(qId);
+    }).length;
+    const notVisited = allQuestions.length - answered - attempted - skipped - visited - current;
+    return { answered, attempted, skipped, visited, current, notVisited: notVisited > 0 ? notVisited : 0, total: allQuestions.length };
   };
 
   const questionStats = getQuestionStats();
@@ -1502,8 +1556,16 @@ export default function TeamGameplay() {
                   <span className="text-zinc-400">Answered ({questionStats.answered})</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <span className="text-zinc-400">Attempted ({questionStats.attempted})</span>
+                </div>
+                <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-orange-500"></div>
                   <span className="text-zinc-400">Skipped ({questionStats.skipped})</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="text-zinc-400">Visited ({questionStats.visited})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-cyan-500 animate-pulse"></div>
@@ -1520,10 +1582,12 @@ export default function TeamGameplay() {
                 {allQuestions.map((q: any, index: number) => {
                   const qId = q.puzzle_id || q.id;
                   const isAnswered = q.status === 'completed';
+                  const isAttempted = q.status === 'attempted';
                   // FIX 5: merge frontend skippedQuestions set since backend never returns 'skipped'
-                  const isSkipped = q.status === 'skipped' || (skippedQuestions.has(qId) && q.status !== 'completed');
+                  const isSkipped = q.status === 'skipped' || (skippedQuestions.has(qId) && q.status !== 'completed' && q.status !== 'attempted');
                   const isCurrent = qId === puzzle?.id;
-                  const isNotStarted = !isAnswered && !isSkipped && (q.status === 'not_started' || q.status === 'not_visited');
+                  const isVisited = !isAnswered && !isAttempted && !isSkipped && visitedQuestions.has(qId);
+                  const isNotStarted = !isAnswered && !isAttempted && !isSkipped && !isVisited && (q.status === 'not_started' || q.status === 'not_visited');
                   const isReview = markedForReview.has(qId);
                   // Allow navigation to answered questions so users can view them
                   const canNavigate = !isCurrent;
@@ -1541,12 +1605,14 @@ export default function TeamGameplay() {
                         w-10 h-10 rounded-lg font-bold text-sm transition-all
                         flex items-center justify-center relative
                         ${isAnswered ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50 hover:bg-blue-500/30 cursor-pointer' : ''}
+                        ${isAttempted && !isCurrent ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 hover:bg-yellow-500/30 cursor-pointer' : ''}
                         ${isSkipped ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 hover:bg-orange-500/30 cursor-pointer' : ''}
-                        ${isCurrent && !isAnswered && !isSkipped ? 'bg-cyan-500/20 text-cyan-400 border-2 border-cyan-500 animate-pulse cursor-default' : ''}
+                        ${isCurrent && !isAnswered ? 'bg-cyan-500/20 text-cyan-400 border-2 border-cyan-500 animate-pulse cursor-default' : ''}
+                        ${isVisited && !isCurrent ? 'bg-green-500/20 text-green-400 border border-green-500/50 hover:bg-green-500/30 cursor-pointer' : ''}
                         ${isNotStarted && !isCurrent ? 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:bg-zinc-700/50 hover:text-zinc-300 cursor-pointer' : ''}
                         ${isReview && !isCurrent ? 'ring-2 ring-purple-500 ring-offset-1 ring-offset-black' : ''}
                       `}
-                      title={`Q${index + 1}: ${q.title} (${q.status})${isReview ? ' [Marked for Review]' : ''}${isAnswered ? ' - Answered (click to view)' : canNavigate ? ' - Click to navigate' : ' (current)'}`}
+                      title={`Q${index + 1}: ${q.title} (${isAnswered ? 'answered' : isAttempted ? 'attempted' : isSkipped ? 'skipped' : isVisited ? 'visited' : 'not visited'})${isReview ? ' [Marked for Review]' : ''}${isAnswered ? ' - Answered (click to view)' : canNavigate ? ' - Click to navigate' : ' (current)'}`}
                     >
                       {/* Review marker */}
                       {isReview && (
@@ -1554,6 +1620,8 @@ export default function TeamGameplay() {
                       )}
                       {isAnswered ? (
                         <CheckCircle2 className="w-5 h-5 text-blue-500 drop-shadow-[0_0_2px_rgba(59,130,246,0.8)]" />
+                      ) : isAttempted ? (
+                        <Circle className="w-5 h-5 text-yellow-500" />
                       ) : isSkipped ? (
                         <SkipForward className="w-4 h-4" />
                       ) : (
@@ -1573,7 +1641,7 @@ export default function TeamGameplay() {
                   </p>
                   <div className="space-y-2">
                     {allQuestions
-                      .filter((q: any) => q.status === 'skipped' || (skippedQuestions.has(q.puzzle_id || q.id) && q.status !== 'completed'))
+                      .filter((q: any) => q.status === 'skipped' || (skippedQuestions.has(q.puzzle_id || q.id) && q.status !== 'completed' && q.status !== 'attempted'))
                       .map((q: any, i: number) => (
                         <button
                           key={q.puzzle_id || q.id}
@@ -1648,6 +1716,10 @@ export default function TeamGameplay() {
                   <span className="text-green-400">{questionStats.answered} questions</span>
                 </div>
                 <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Attempted</span>
+                  <span className="text-yellow-400">{questionStats.attempted} questions</span>
+                </div>
+                <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Skipped</span>
                   <span className="text-orange-400">{questionStats.skipped} puzzles</span>
                 </div>
@@ -1700,10 +1772,14 @@ export default function TeamGameplay() {
 
           <div className="space-y-4">
             {/* Progress Summary - Only counts, no correct/wrong info */}
-            <div className="grid grid-cols-3 gap-3 p-4 bg-zinc-900 rounded-lg">
+            <div className="grid grid-cols-2 gap-3 p-4 bg-zinc-900 rounded-lg">
               <div className="text-center">
                 <div className="text-xl font-bold text-green-400">{questionStats.answered}</div>
                 <div className="text-xs text-zinc-400">Answered</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl font-bold text-yellow-400">{questionStats.attempted}</div>
+                <div className="text-xs text-zinc-400">Attempted</div>
               </div>
               <div className="text-center">
                 <div className="text-xl font-bold text-orange-400">{questionStats.skipped}</div>
