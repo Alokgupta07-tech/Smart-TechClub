@@ -189,25 +189,25 @@ export default function GameControl() {
   const level2Evaluation: EvaluationStatus | undefined = level2EvaluationData;
 
   // Close Submissions mutation
-  const closeSubmiss, levelId) => {
-      startTransition(() => {
-        queryClient.invalidateQueries({ queryKey: ['evaluationStatus', levelId] });
+  const closeSubmissions = useMutation({
+    mutationFn: async (levelId: number) => {
+      const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/close-submissions`, {
+        method: 'POST',
       });
-      toast({
-        title: 'Submissions Closed',
-        description: `Level ${levelId
+
+      if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to close submissions');
       }
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data, levelId) => {
       startTransition(() => {
-        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus', levelId] });
       });
       toast({
         title: 'Submissions Closed',
-        description: `Level ${selectedLevel} submissions are now closed. ${data.teams_affected} teams affected.`,
+        description: `Level ${levelId} submissions are now closed. ${data.teams_affected} teams affected.`,
       });
     },
     onError: (error: Error) => {
