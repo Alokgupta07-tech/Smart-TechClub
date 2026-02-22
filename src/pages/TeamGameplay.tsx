@@ -290,7 +290,7 @@ export default function TeamGameplay() {
         });
       }
     }
-  }, [puzzleData, toast, clearGameLocalStorage]);
+  }, [puzzleData, progress, toast, clearGameLocalStorage]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -771,7 +771,7 @@ export default function TeamGameplay() {
       // Ctrl + Enter: Submit answer
       if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
-        if (answer.trim()) {
+        if (answer.trim() && puzzleData?.puzzle?.id) {
           submitAnswer.mutate(answer);
         }
       }
@@ -1274,6 +1274,7 @@ export default function TeamGameplay() {
 
                   <div className="flex gap-2 mt-2">
                     <Input
+                      ref={inputRef}
                       id="answer"
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
@@ -1736,7 +1737,7 @@ export default function TeamGameplay() {
               onClick={() => {
                 setIsEndQuizDialogOpen(false);
                 // Navigate to results page after ending
-                window.location.href = '/results';
+                navigate('/results');
               }}
               className="bg-red-500 text-white hover:bg-red-600"
             >

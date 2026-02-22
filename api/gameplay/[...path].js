@@ -256,10 +256,10 @@ module.exports = async function handler(req, res) {
       ]);
 
       if (teamResult.error || !teamResult.data) {
-        return res.status(404).json({ error: 'Team not found', details: teamResult.error?.message });
+        return res.status(404).json({ error: 'Team not found' });
       }
       if (puzzleResult.error || !puzzleResult.data) {
-        return res.status(404).json({ error: 'Puzzle not found', details: puzzleResult.error?.message });
+        return res.status(404).json({ error: 'Puzzle not found' });
       }
 
       const team = teamResult.data;
@@ -284,13 +284,23 @@ module.exports = async function handler(req, res) {
       // Check if a submission already exists for this team+puzzle
       const { data: existingSub } = await supabase
         .from('submissions')
-        .select('id')
+        .select('id, is_correct')
         .eq('team_id', team.id)
         .eq('puzzle_id', puzzle_id)
         .limit(1);
 
       let subError = null;
       if (existingSub && existingSub.length > 0) {
+        // Don't overwrite a correct answer with a wrong one
+        if (existingSub[0].is_correct && !isCorrect) {
+          return res.json({
+            success: true,
+            is_correct: true,
+            message: 'You have already answered this question correctly!',
+            points_earned: puzzle.points || 0,
+            already_correct: true
+          });
+        }
         // Update existing submission
         const { error } = await supabase
           .from('submissions')
@@ -313,8 +323,7 @@ module.exports = async function handler(req, res) {
         console.error('Submission save error:', JSON.stringify(subError));
         return res.status(500).json({
           success: false,
-          error: 'Failed to save your answer. Please try again.',
-          details: subError.message || subError.code || 'Unknown DB error'
+          error: 'Failed to save your answer. Please try again.'
         });
       }
 

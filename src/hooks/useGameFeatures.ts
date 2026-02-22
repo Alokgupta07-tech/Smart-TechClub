@@ -36,9 +36,9 @@ export interface LeaderboardEntry {
   effectiveTime: number;
 }
 
-export function useLeaderboard() {
+export function useLiveLeaderboard() {
   return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard'],
+    queryKey: ['live-leaderboard'],
     queryFn: async () => {
       const response = await fetchWithAuth(`${API_BASE}/leaderboard`);
       if (!response.ok) throw new Error('Failed to fetch leaderboard');

@@ -460,6 +460,11 @@ async function skipQuestion(teamId, puzzleId, req = null) {
       console.log('Error checking skip count, assuming 0');
     }
     
+    // Enforce maximum skips limit
+    if (currentSkips >= maxSkips) {
+      throw new Error(`Maximum skips reached (${maxSkips}). You cannot skip any more questions.`);
+    }
+    
     // Get or create progress record
     let progress;
     try {
@@ -1099,8 +1104,20 @@ async function recalculateTeamEffectiveTime(teamId) {
       console.log('hint_usage table not available');
     }
     
+    // Get skip penalties from event log (non-critical)
+    let skipPenaltyTime = 0;
+    try {
+      const [skipPenalty] = await db.query(
+        `SELECT SUM(JSON_EXTRACT(metadata, '$.penalty_applied')) as total FROM time_event_log WHERE team_id = ? AND event_type = 'question_skip'`,
+        [teamId]
+      );
+      skipPenaltyTime = skipPenalty[0]?.total || 0;
+    } catch (err) {
+      console.log('Skip penalty calculation not available');
+    }
+    
     const activeTime = totalTime[0]?.total || 0;
-    const effectiveTime = activeTime + hintPenaltyTime;
+    const effectiveTime = activeTime + hintPenaltyTime + skipPenaltyTime;
     
     // Update session (non-critical - table may not exist)
     try {

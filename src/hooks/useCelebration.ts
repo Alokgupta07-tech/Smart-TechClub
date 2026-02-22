@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLeaderboard } from './useAdminData';
 import { ResultData, WinnerRank } from '@/types/celebration';
+import { fetchWithAuth } from '@/lib/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -70,7 +71,7 @@ export function useCelebration(currentTeamId: string | null) {
       // You should replace this with actual backend check
 
       try {
-        const response = await fetch(`${API_BASE}/game/features`);
+        const response = await fetchWithAuth(`${API_BASE}/game/features`);
         if (response.ok) {
           const data = await response.json();
           return {

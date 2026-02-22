@@ -128,7 +128,8 @@ export default function GameControl() {
       if (!response.ok) {
         throw new Error('Failed to fetch game state');
       }
-      return response.json();
+      const data = await response.json();
+      return data.gameState || data;
     },
     refetchInterval: 10000, // Refresh every 10 seconds (reduced from 5)
     staleTime: 8000, // Consider data fresh for 8 seconds

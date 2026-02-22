@@ -1051,20 +1051,54 @@ module.exports = async function handler(req, res) {
 
       if (puzzleIds.length > 0) {
         try {
+          // Get puzzles with their points for score calculation
+          const { data: puzzlesWithPoints } = await supabase.from('puzzles')
+            .select('id, points')
+            .in('id', puzzleIds);
+          const pointsMap = {};
+          (puzzlesWithPoints || []).forEach(function(p) { pointsMap[p.id] = p.points || 0; });
+
           // Count how many we are evaluating
           const { data: subs } = await supabase.from('submissions')
-            .select('is_correct')
+            .select('id, puzzle_id, is_correct')
             .in('puzzle_id', puzzleIds)
             .eq('evaluation_status', 'PENDING');
 
           evalCount = (subs || []).length;
           correctCount = (subs || []).filter(s => s.is_correct).length;
 
-          // Update them
-          await supabase.from('submissions')
-            .update({ evaluation_status: 'EVALUATED', evaluated_at: new Date().toISOString() })
-            .in('puzzle_id', puzzleIds)
-            .eq('evaluation_status', 'PENDING');
+          // Update correct submissions with score_awarded = puzzle points
+          const correctIds = (subs || []).filter(s => s.is_correct).map(s => s.id);
+          const incorrectIds = (subs || []).filter(s => !s.is_correct).map(s => s.id);
+
+          if (correctIds.length > 0) {
+            // Group by puzzle to set correct score for each
+            const puzzleGroups = {};
+            (subs || []).filter(s => s.is_correct).forEach(function(s) {
+              if (!puzzleGroups[s.puzzle_id]) puzzleGroups[s.puzzle_id] = [];
+              puzzleGroups[s.puzzle_id].push(s.id);
+            });
+
+            for (const [pid, subIds] of Object.entries(puzzleGroups)) {
+              await supabase.from('submissions')
+                .update({
+                  evaluation_status: 'EVALUATED',
+                  score_awarded: pointsMap[pid] || 0,
+                  evaluated_at: new Date().toISOString()
+                })
+                .in('id', subIds);
+            }
+          }
+
+          if (incorrectIds.length > 0) {
+            await supabase.from('submissions')
+              .update({
+                evaluation_status: 'EVALUATED',
+                score_awarded: 0,
+                evaluated_at: new Date().toISOString()
+              })
+              .in('id', incorrectIds);
+          }
 
           // Try updating level_evaluation_state if exists
           await supabase.from('level_evaluation_state')
@@ -1119,6 +1153,6 @@ module.exports = async function handler(req, res) {
 
   } catch (error) {
     console.error('Admin API error:', error);
-    return res.status(500).json({ error: 'Internal server error', details: error.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };

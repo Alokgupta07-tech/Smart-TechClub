@@ -269,6 +269,20 @@ module.exports = async function handler(req, res) {
 
       // ─── POST /api/game/skip-question OR /api/game/time/skip-question ───
       if (req.method === 'POST' && (path === '/skip-question' || path === '/time/skip-question')) {
+        const currentPuzzleId = req.body.puzzle_id;
+
+        // Log the skip activity
+        if (currentPuzzleId) {
+          supabase.from('activity_logs').insert({
+            id: crypto.randomUUID(),
+            team_id: team.id,
+            user_id: user.userId,
+            action_type: 'question_skip',
+            description: 'Skipped question',
+            puzzle_id: currentPuzzleId
+          }).then(function() {}).catch(function() {});
+        }
+
         // Get all puzzles for current level
         const { data: puzzles } = await supabase
           .from('puzzles')
@@ -277,8 +291,6 @@ module.exports = async function handler(req, res) {
           .order('puzzle_number', { ascending: true });
 
         if (puzzles && puzzles.length > 0) {
-          // Find current puzzle and next puzzle
-          const currentPuzzleId = req.body.puzzle_id;
           const currentIndex = puzzles.findIndex(function (p) { return p.id === currentPuzzleId; });
           const nextIndex = currentIndex >= 0 && currentIndex < puzzles.length - 1 ? currentIndex + 1 : 0;
 
@@ -320,6 +332,20 @@ module.exports = async function handler(req, res) {
 
       // ─── POST /api/game/complete-question OR /api/game/time/complete-question ───
       if (req.method === 'POST' && (path === '/complete-question' || path === '/time/complete-question')) {
+        const completePuzzleId = req.body.puzzle_id;
+
+        // Log the completion activity
+        if (completePuzzleId) {
+          supabase.from('activity_logs').insert({
+            id: crypto.randomUUID(),
+            team_id: team.id,
+            user_id: user.userId,
+            action_type: 'question_complete',
+            description: 'Completed question',
+            puzzle_id: completePuzzleId
+          }).then(function() {}).catch(function() {});
+        }
+
         return res.json({ success: true, message: 'Question completed' });
       }
 

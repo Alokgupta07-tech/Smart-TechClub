@@ -20,11 +20,16 @@ export const CountdownTimer = ({
   const [timeLeft, setTimeLeft] = useState<TimeUnit[]>([]);
 
   useEffect(() => {
+    let completedFired = false;
+
     const calculateTimeLeft = () => {
       const difference = targetDate.getTime() - new Date().getTime();
       
       if (difference <= 0) {
-        onComplete?.();
+        if (!completedFired) {
+          completedFired = true;
+          onComplete?.();
+        }
         return [
           { value: 0, label: "DAYS" },
           { value: 0, label: "HRS" },
@@ -50,7 +55,7 @@ export const CountdownTimer = ({
   return (
     <div className={cn("flex gap-3 md:gap-6", className)}>
       {timeLeft.map((unit, index) => (
-        <div key={unit.label} className="flex flex-col items-center">
+        <div key={unit.label} className="flex flex-col items-center relative">
           <div className="relative">
             <div className="w-16 h-20 md:w-24 md:h-28 flex items-center justify-center rounded-lg border border-primary/30 bg-background/50 backdrop-blur-sm">
               <span className="text-2xl md:text-4xl font-display font-bold text-primary text-glow-toxic">

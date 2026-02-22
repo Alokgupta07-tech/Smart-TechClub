@@ -57,8 +57,10 @@ export const LeaderboardPanel = ({ currentTeamId }: { currentTeamId?: string }) 
       });
       setPreviousRanks(prev => {
         if (Object.keys(prev).length === 0) return newRanks;
-        return prev;
+        return prev;  // keep original snapshot for trend comparison
       });
+      // Note: To make rank trends live-updating, replace the above with:
+      // setPreviousRanks(currentRanks); and track currentRanks separately
     }
   }, [leaderboard]);
 

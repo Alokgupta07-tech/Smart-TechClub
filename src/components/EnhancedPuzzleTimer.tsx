@@ -94,6 +94,7 @@ export function EnhancedPuzzleTimer({
   // Interval ref for timer
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeUpFiredRef = useRef(false);
   
   // Format time helper
   const formatTime = useCallback((seconds: number) => {
@@ -164,10 +165,16 @@ export function EnhancedPuzzleTimer({
     };
   }, [isRunning]);
   
-  // Check time limit
+  // Reset time-up guard when puzzle changes
+  useEffect(() => {
+    timeUpFiredRef.current = false;
+  }, [puzzleId]);
+
+  // Check time limit (fires only once per puzzle)
   useEffect(() => {
     const limitSeconds = timeLimitMinutes * 60;
-    if (displayTime >= limitSeconds && isRunning) {
+    if (displayTime >= limitSeconds && isRunning && !timeUpFiredRef.current) {
+      timeUpFiredRef.current = true;
       onTimeUp?.();
       toast({
         title: '⏰ Time\'s Up!',

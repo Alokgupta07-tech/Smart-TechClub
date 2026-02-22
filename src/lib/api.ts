@@ -232,6 +232,16 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
       headers.Authorization = `Bearer ${newToken}`;
       response = await fetch(url, { ...options, headers });
     }
+
+    // If still 401 after refresh attempt, session is truly expired
+    if (response.status === 401) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('userRole');
+      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/admin-login')) {
+        window.location.href = '/login';
+      }
+    }
   }
 
   return response;
