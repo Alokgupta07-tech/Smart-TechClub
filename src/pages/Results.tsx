@@ -54,6 +54,8 @@ interface GameSummary {
     totalTimeSeconds: number;
     qualificationThreshold: number;
     qualified: boolean;
+    isFinalLevel?: boolean;
+    rank?: number | null;
   };
   questions: QuestionResult[];
 }
@@ -136,25 +138,48 @@ export default function Results() {
       </div>
 
       <div className="max-w-4xl mx-auto p-6 space-y-6">
-        {/* Qualification Status Banner */}
-        <Card className={`border-2 ${summary.stats.qualified ? 'border-green-500 bg-green-500/10' : 'border-red-500 bg-red-500/10'}`}>
-          <CardContent className="p-6 text-center">
-            <div className="flex items-center justify-center gap-3 mb-2">
-              {summary.stats.qualified ? (
-                <Trophy className="w-10 h-10 text-green-400" />
-              ) : (
-                <XCircle className="w-10 h-10 text-red-400" />
+        {/* Status Banner */}
+        {summary.stats.isFinalLevel ? (
+          <Card className="border-2 border-yellow-500 bg-yellow-500/10">
+            <CardContent className="p-6 text-center">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <Trophy className="w-10 h-10 text-yellow-400" />
+                <h1 className="text-3xl font-bold text-yellow-400">
+                  GAME COMPLETE!
+                </h1>
+                <Trophy className="w-10 h-10 text-yellow-400" />
+              </div>
+              <p className="text-zinc-300 text-lg mb-2">
+                Congratulations! You scored {summary.stats.correctAnswers} out of {summary.stats.totalQuestions} questions correctly.
+              </p>
+              {summary.stats.rank && (
+                <div className="mt-4 inline-flex items-center gap-2 bg-yellow-500/20 px-6 py-3 rounded-full border border-yellow-500/40">
+                  <Award className="w-6 h-6 text-yellow-400" />
+                  <span className="text-2xl font-bold text-yellow-400">Rank #{summary.stats.rank}</span>
+                </div>
               )}
-              <h1 className={`text-3xl font-bold ${summary.stats.qualified ? 'text-green-400' : 'text-red-400'}`}>
-                {summary.stats.qualified ? 'QUALIFIED!' : 'NOT QUALIFIED'}
-              </h1>
-            </div>
-            <p className="text-zinc-400">
-              You scored {summary.stats.correctAnswers} out of {summary.stats.totalQuestions} questions correctly
-              {!summary.stats.qualified && ` (Need ${summary.stats.qualificationThreshold} to qualify)`}
-            </p>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className={`border-2 ${summary.stats.qualified ? 'border-green-500 bg-green-500/10' : 'border-red-500 bg-red-500/10'}`}>
+            <CardContent className="p-6 text-center">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                {summary.stats.qualified ? (
+                  <Trophy className="w-10 h-10 text-green-400" />
+                ) : (
+                  <XCircle className="w-10 h-10 text-red-400" />
+                )}
+                <h1 className={`text-3xl font-bold ${summary.stats.qualified ? 'text-green-400' : 'text-red-400'}`}>
+                  {summary.stats.qualified ? 'QUALIFIED!' : 'NOT QUALIFIED'}
+                </h1>
+              </div>
+              <p className="text-zinc-400">
+                You scored {summary.stats.correctAnswers} out of {summary.stats.totalQuestions} questions correctly
+                {!summary.stats.qualified && ` (Need ${summary.stats.qualificationThreshold} to qualify)`}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Overview */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

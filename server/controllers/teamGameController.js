@@ -1001,8 +1001,23 @@ exports.getGameSummary = async (req, res) => {
     const endTime = teamData.end_time ? new Date(teamData.end_time) : new Date();
     const totalTimeSeconds = startTime ? Math.floor((endTime - startTime) / 1000) : 0;
 
-    // Simple qualification: 50% or more correct answers
-    const qualificationThreshold = Math.ceil(totalQuestions / 2);
+    // Level 2 is the final level - no qualification needed, game ends here
+    const isFinalLevel = teamData.level === 2;
+    
+    // Simple qualification: 50% or more correct answers (only relevant for level 1)
+    const qualificationThreshold = isFinalLevel ? 0 : Math.ceil(totalQuestions / 2);
+    const qualified = isFinalLevel ? true : correctAnswers >= qualificationThreshold;
+
+    // For final level, fetch team rank from leaderboard
+    let rank = null;
+    if (isFinalLevel) {
+      try {
+        const leaderboardService = require('../services/leaderboardService');
+        rank = await leaderboardService.getTeamRank(teamId);
+      } catch (e) {
+        console.error('Error fetching team rank:', e);
+      }
+    }
 
     res.json({
       success: true,
@@ -1013,7 +1028,9 @@ exports.getGameSummary = async (req, res) => {
         },
         stats: {
           totalQuestions, attemptedQuestions, correctAnswers, wrongAnswers, notAttempted,
-          totalTimeSeconds, qualificationThreshold, qualified: correctAnswers >= qualificationThreshold
+          totalTimeSeconds, qualificationThreshold, qualified,
+          isFinalLevel,
+          rank
         },
         questions: questionSummary
       }
