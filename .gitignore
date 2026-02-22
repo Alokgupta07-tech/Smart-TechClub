@@ -37,3 +37,12 @@ api/node_modules
 
 # Claude Code temp files
 tmpclaude-*
+
+# Worktrees
+*.worktrees/
+
+# Build output
+dist/
+
+# Environment files (production)
+.env.production
