@@ -95,55 +95,51 @@ exports.getEvaluationStatus = async (req, res) => {
 
     // Check if Level 2 is unlocked before returning its status
     if (levelIdInt === 2) {
+      let level2Open = false;
+      
       try {
         if (USE_SUPABASE) {
-          const { data: gameStateData } = await supabaseAdmin
+          const { data: gameStateData, error } = await supabaseAdmin
             .from('game_state')
             .select('level2_open')
             .limit(1);
-          const level2Open = gameStateData?.[0]?.level2_open || false;
           
-          if (!level2Open) {
-            return res.json({
-              success: true,
-              level_id: levelIdInt,
-              evaluation_state: 'NOT_UNLOCKED',
-              timestamps: {},
-              submissions: { total_submissions: 0, pending: 0, evaluated: 0, teams_with_submissions: 0 },
-              teams: { total: 0, qualified: 0, disqualified: 0, pending: 0 },
-              actions: {
-                can_close_submissions: false,
-                can_reopen_submissions: false,
-                can_evaluate: false,
-                can_publish: false
-              }
-            });
+          if (error) {
+            console.log('Error checking level2_open status:', error.message);
+            // Fail safe: treat as not unlocked on error
+            level2Open = false;
+          } else {
+            level2Open = gameStateData?.[0]?.level2_open || false;
           }
         } else {
+          // MySQL uses different column name: level_2_unlocked
           const [gameStateRows] = await db.query(
-            'SELECT level2_open FROM game_state LIMIT 1'
+            'SELECT level_2_unlocked FROM game_state LIMIT 1'
           );
-          const level2Open = gameStateRows?.[0]?.level2_open || false;
-          
-          if (!level2Open) {
-            return res.json({
-              success: true,
-              level_id: levelIdInt,
-              evaluation_state: 'NOT_UNLOCKED',
-              timestamps: {},
-              submissions: { total_submissions: 0, pending: 0, evaluated: 0, teams_with_submissions: 0 },
-              teams: { total: 0, qualified: 0, disqualified: 0, pending: 0 },
-              actions: {
-                can_close_submissions: false,
-                can_reopen_submissions: false,
-                can_evaluate: false,
-                can_publish: false
-              }
-            });
-          }
+          level2Open = gameStateRows?.[0]?.level_2_unlocked || false;
         }
       } catch (error) {
         console.log('Error checking level2_open status:', error.message);
+        // Fail safe: treat as not unlocked on error
+        level2Open = false;
+      }
+      
+      // If Level 2 is not unlocked, return NOT_UNLOCKED state
+      if (!level2Open) {
+        return res.json({
+          success: true,
+          level_id: levelIdInt,
+          evaluation_state: 'NOT_UNLOCKED',
+          timestamps: {},
+          submissions: { total_submissions: 0, pending: 0, evaluated: 0, teams_with_submissions: 0 },
+          teams: { total: 0, qualified: 0, disqualified: 0, pending: 0 },
+          actions: {
+            can_close_submissions: false,
+            can_reopen_submissions: false,
+            can_evaluate: false,
+            can_publish: false
+          }
+        });
       }
     }
 
