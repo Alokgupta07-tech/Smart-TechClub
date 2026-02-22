@@ -163,17 +163,9 @@ module.exports = async function handler(req, res) {
         return res.status(404).json({ error: 'Team not found' });
       }
 
-      // Check if team can access their current level (Level 2+ requires qualification + admin unlock)
-      const levelCheck = await checkLevelAccess(supabase, team.id, team.level);
-      if (!levelCheck.allowed) {
-        return res.status(403).json({
-          success: false,
-          error: levelCheck.reason,
-          code: 'LEVEL_ACCESS_DENIED',
-          qualification_status: levelCheck.qualification_status,
-          results_published: levelCheck.results_published !== undefined ? levelCheck.results_published : null
-        });
-      }
+      // Teams can always access puzzles for their currently assigned level (team.level)
+      // The assignment itself (via admin or qualification) already verified access rights
+      // No need to re-check level access for current level gameplay
 
       // Parallel fetch: puzzles + submissions (reduces latency by ~50%)
       const [puzzlesResult, submissionsResult] = await Promise.all([
