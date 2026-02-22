@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BackButton } from '@/components/BackButton';
+import { LevelEvaluationPanel } from '@/components/LevelEvaluationPanel';
 import {
   Card,
   CardContent,
@@ -102,7 +103,6 @@ export default function GameControl() {
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
-  const [selectedLevel, setSelectedLevel] = useState<number>(1); // NEW: Track selected level for evaluation
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
 
@@ -152,38 +152,50 @@ export default function GameControl() {
     staleTime: 8000,
   });
 
-  // ======= NEW: Fetch evaluation status for selected level =======
-  const { data: evaluationData } = useQuery({
-    queryKey: ['evaluationStatus', selectedLevel],
+  // ======= NEW: Fetch evaluation status for BOTH levels independently =======
+  const { data: level1EvaluationData } = useQuery({
+    queryKey: ['evaluationStatus', 1],
     queryFn: async () => {
       try {
-        const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${selectedLevel}/status`);
-
-        if (!response.ok) {
-          // Evaluation endpoints not implemented yet - return null silently
-          return null;
-        }
+        const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/1/status`);
+        if (!response.ok) return null;
         return response.json();
       } catch (error) {
-        // Silently fail if endpoint doesn't exist
         return null;
       }
     },
-    refetchInterval: 10000, // Poll every 10 seconds
+    refetchInterval: 10000,
     staleTime: 5000,
-    retry: false, // Don't retry on 404
+    retry: false,
   });
 
-  const evaluationStatus: EvaluationStatus | undefined = evaluationData;
+  const { data: level2EvaluationData } = useQuery({
+    queryKey: ['evaluationStatus', 2],
+    queryFn: async () => {
+      try {
+        const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/2/status`);
+        if (!response.ok) return null;
+        return response.json();
+      } catch (error) {
+        return null;
+      }
+    },
+    refetchInterval: 10000,
+    staleTime: 5000,
+    retry: false,
+  });
+
+  const level1Evaluation: EvaluationStatus | undefined = level1EvaluationData;
+  const level2Evaluation: EvaluationStatus | undefined = level2EvaluationData;
 
   // Close Submissions mutation
-  const closeSubmissions = useMutation({
-    mutationFn: async (levelId: number) => {
-      const response = await fetchWithAuth(`${API_BASE}/admin/evaluation/level/${levelId}/close-submissions`, {
-        method: 'POST',
+  const closeSubmiss, levelId) => {
+      startTransition(() => {
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus', levelId] });
       });
-
-      if (!response.ok) {
+      toast({
+        title: 'Submissions Closed',
+        description: `Level ${levelId
         const error = await response.json();
         throw new Error(error.message || 'Failed to close submissions');
       }
@@ -220,13 +232,13 @@ export default function GameControl() {
       }
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data, levelId) => {
       startTransition(() => {
-        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus', levelId] });
       });
       toast({
         title: 'Evaluation Complete',
-        description: `${data?.stats?.submissions_evaluated || 0} submissions evaluated. ${data?.stats?.correct_answers || 0} correct.`,
+        description: `Level ${levelId}: ${data?.stats?.submissions_evaluated || 0} submissions evaluated.`,
       });
     },
     onError: (error: Error) => {
@@ -251,14 +263,14 @@ export default function GameControl() {
       }
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data, levelId) => {
       startTransition(() => {
-        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus', levelId] });
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
       });
       toast({
         title: 'Results Published!',
-        description: `Level ${selectedLevel} results are now visible. ${data?.stats?.qualified || 0} qualified, ${data?.stats?.disqualified || 0} disqualified.`,
+        description: `Level ${levelId} results are now visible. ${data?.stats?.qualified || 0} qualified, ${data?.stats?.disqualified || 0} disqualified.`,
         className: 'bg-green-500 text-white',
       });
     },
@@ -284,13 +296,13 @@ export default function GameControl() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, levelId) => {
       startTransition(() => {
-        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus', levelId] });
       });
       toast({
         title: 'Submissions Reopened',
-        description: `Level ${selectedLevel} submissions are now open again.`,
+        description: `Level ${levelId} submissions are now open again.`,
       });
     },
     onError: (error: Error) => {
@@ -315,15 +327,15 @@ export default function GameControl() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, levelId) => {
       startTransition(() => {
-        queryClient.invalidateQueries({ queryKey: ['evaluationStatus'] });
+        queryClient.invalidateQueries({ queryKey: ['evaluationStatus', levelId] });
         queryClient.invalidateQueries({ queryKey: ['gameState'] });
         queryClient.invalidateQueries({ queryKey: ['qualification'] });
       });
       toast({
         title: 'Evaluation Reset',
-        description: `Level ${selectedLevel} evaluation has been reset. You can now re-evaluate.`,
+        description: `Level ${levelId} evaluation has been reset. You can now re-evaluate.`,
       });
     },
     onError: (error: Error) => {
@@ -1031,251 +1043,68 @@ export default function GameControl() {
         </DialogContent>
       </Dialog>
 
-      {/* Level Evaluation Controls */}
-      <Card className="bg-black/40 border-cyan-500/30">
-        <CardHeader>
-          <CardTitle className="text-cyan-500 flex items-center gap-2">
-            <FileCheck className="w-5 h-5" />
-            Evaluation Controls
-          </CardTitle>
-          <CardDescription>
-            Control answer evaluation and result publication per level
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Level Selector */}
-          <div className="flex items-center gap-4 p-4 border border-zinc-700 rounded-lg">
-            <Label className="text-zinc-400">Select Level:</Label>
-            <div className="flex gap-2">
-              <Button
-                variant={selectedLevel === 1 ? 'default' : 'outline'}
-                onClick={() => setSelectedLevel(1)}
-                className={selectedLevel === 1 ? 'bg-cyan-500 text-black' : ''}
-              >
-                Level 1
-              </Button>
-              <Button
-                variant={selectedLevel === 2 ? 'default' : 'outline'}
-                onClick={() => setSelectedLevel(2)}
-                className={selectedLevel === 2 ? 'bg-cyan-500 text-black' : ''}
-              >
-                Level 2
-              </Button>
-            </div>
-          </div>
-
-          {/* Check if Level 2 is not unlocked */}
-          {evaluationStatus?.evaluation_state === 'NOT_UNLOCKED' ? (
-            <div className="p-6 border border-zinc-700 rounded-lg bg-zinc-900/50">
-              <div className="flex items-center gap-3 mb-2">
-                <Lock className="w-6 h-6 text-zinc-500" />
-                <h3 className="text-lg font-semibold text-zinc-400">Level {selectedLevel} Not Unlocked</h3>
-              </div>
-              <p className="text-zinc-500">
-                Complete and publish Level 1 results before accessing Level {selectedLevel} evaluation controls.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Evaluation Status Display */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="bg-zinc-900 border-zinc-700">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-zinc-400">Current State</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className={`text-lg font-bold ${evaluationStatus?.evaluation_state === 'RESULTS_PUBLISHED' ? 'text-green-500' :
-                        evaluationStatus?.evaluation_state === 'EVALUATING' ? 'text-yellow-500' :
-                          evaluationStatus?.evaluation_state === 'SUBMISSIONS_CLOSED' ? 'text-orange-500' :
-                            'text-cyan-500'
-                      }`}>
-                      {evaluationStatus?.evaluation_state?.replace(/_/g, ' ') || 'IN PROGRESS'}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-zinc-900 border-zinc-700">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-zinc-400">Submissions</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-lg font-bold text-cyan-500">
-                      {evaluationStatus?.submissions?.total_submissions || 0}
-                    </p>
-                    <p className="text-xs text-zinc-500">
-                      {evaluationStatus?.submissions?.pending || 0} pending
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-zinc-900 border-zinc-700">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-zinc-400">Teams</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-lg font-bold text-cyan-500">
-                      {evaluationStatus?.submissions?.teams_with_submissions || 0}
-                    </p>
-                    <p className="text-xs text-zinc-500">with submissions</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-zinc-900 border-zinc-700">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-zinc-400">Qualified</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-lg font-bold text-green-500">
-                      {evaluationStatus?.teams?.qualified || 0}
-                    </p>
-                    <p className="text-xs text-zinc-500">
-                      {evaluationStatus?.teams?.disqualified || 0} disqualified
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Sequential Action Buttons */}
-              <div className="space-y-4">
-            {/* Step 1: Close Submissions */}
-            <div className={`flex items-center justify-between p-4 border rounded-lg ${evaluationStatus?.actions?.can_close_submissions || evaluationStatus?.actions?.can_reopen_submissions ? 'border-orange-500/30' : 'border-zinc-700 opacity-50'
-              }`}>
-              <div>
-                <h3 className="font-semibold text-orange-500 flex items-center gap-2">
-                  <Lock className="w-4 h-4" />
-                  Step 1: {evaluationStatus?.evaluation_state === 'IN_PROGRESS' ? 'Close' : 'Reopen'} Submissions
-                </h3>
-                <p className="text-sm text-zinc-400">
-                  {evaluationStatus?.evaluation_state === 'IN_PROGRESS'
-                    ? `Lock further answer submissions for Level ${selectedLevel}`
-                    : `Reopen submissions for Level ${selectedLevel} (will reset evaluation if already done)`
-                  }
-                </p>
-              </div>
-              <div className="flex gap-2">
-                {evaluationStatus?.actions?.can_close_submissions && (
-                  <Button
-                    onClick={() => closeSubmissions.mutate(selectedLevel)}
-                    disabled={closeSubmissions.isPending}
-                    className="bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
-                  >
-                    <Lock className="w-4 h-4 mr-2" />
-                    {closeSubmissions.isPending ? 'Closing...' : 'Close Submissions'}
-                  </Button>
-                )}
-                {evaluationStatus?.actions?.can_reopen_submissions && (
-                  <Button
-                    variant="outline"
-                    onClick={() => reopenSubmissions.mutate(selectedLevel)}
-                    disabled={reopenSubmissions.isPending}
-                    className="border-green-500 text-green-400 hover:bg-green-500/20"
-                  >
-                    {reopenSubmissions.isPending ? 'Reopening...' : 'Reopen Submissions'}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Step 2: Evaluate Answers */}
-            <div className={`flex items-center justify-between p-4 border rounded-lg ${evaluationStatus?.actions?.can_evaluate ? 'border-yellow-500/30' : 'border-zinc-700 opacity-50'
-              }`}>
-              <div>
-                <h3 className="font-semibold text-yellow-500 flex items-center gap-2">
-                  <ClipboardCheck className="w-4 h-4" />
-                  Step 2: Evaluate Answers
-                </h3>
-                <p className="text-sm text-zinc-400">
-                  Run evaluation logic on all submitted answers
-                </p>
-              </div>
-              <Button
-                onClick={() => showConfirm(
-                  'Evaluate Answers',
-                  `Evaluate all answers for Level ${selectedLevel}? This will calculate scores and qualification.`,
-                  () => evaluateAnswers.mutate(selectedLevel)
-                )}
-                disabled={!evaluationStatus?.actions?.can_evaluate || evaluateAnswers.isPending}
-                className="bg-yellow-500 text-black hover:bg-yellow-600 disabled:opacity-50"
-              >
-                <ClipboardCheck className="w-4 h-4 mr-2" />
-                {evaluateAnswers.isPending ? 'Evaluating...' : 'Evaluate Answers'}
-              </Button>
-            </div>
-
-            {/* Step 3: Publish Results */}
-            <div className={`flex items-center justify-between p-4 border rounded-lg ${evaluationStatus?.actions?.can_publish ? 'border-green-500/30' : 'border-zinc-700 opacity-50'
-              }`}>
-              <div>
-                <h3 className="font-semibold text-green-500 flex items-center gap-2">
-                  <Eye className="w-4 h-4" />
-                  Step 3: Publish Results
-                </h3>
-                <p className="text-sm text-zinc-400">
-                  Make results visible to teams (cannot be undone)
-                </p>
-              </div>
-              <Button
-                onClick={() => showConfirm(
-                  'Publish Results',
-                  `Publish Level ${selectedLevel} results? Teams will see their scores and qualification status.`,
-                  () => publishResults.mutate(selectedLevel)
-                )}
-                disabled={!evaluationStatus?.actions?.can_publish || publishResults.isPending}
-                className="bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                {publishResults.isPending ? 'Publishing...' : 'Publish Results'}
-              </Button>
-            </div>
-          </div>
-
-          {/* Status Timeline */}
-          {evaluationStatus && evaluationStatus.evaluation_state !== 'NOT_UNLOCKED' && (
-            <div className="mt-4 p-4 bg-zinc-900 rounded-lg border border-zinc-700">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-zinc-400">Timeline</h4>
-                {(evaluationStatus.evaluation_state === 'EVALUATING' || evaluationStatus.evaluation_state === 'RESULTS_PUBLISHED') && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => showConfirm(
-                      'Reset Evaluation',
-                      `Reset evaluation for Level ${selectedLevel}? This will allow you to re-evaluate all submissions.`,
-                      () => resetEvaluation.mutate(selectedLevel)
-                    )}
-                    disabled={resetEvaluation.isPending}
-                    className="border-red-500/50 text-red-400 hover:bg-red-500/20"
-                  >
-                    {resetEvaluation.isPending ? 'Resetting...' : 'Reset Evaluation'}
-                  </Button>
-                )}
-              </div>
-              <div className="space-y-1 text-sm">
-                {evaluationStatus.timestamps?.submissions_closed_at && (
-                  <p className="text-orange-400">
-                    ● Submissions closed: {new Date(evaluationStatus.timestamps.submissions_closed_at).toLocaleString()}
-                  </p>
-                )}
-                {evaluationStatus.timestamps?.evaluated_at && (
-                  <p className="text-yellow-400">
-                    ● Evaluation completed: {new Date(evaluationStatus.timestamps.evaluated_at).toLocaleString()}
-                  </p>
-                )}
-                {evaluationStatus.timestamps?.results_published_at && (
-                  <p className="text-green-400">
-                    ● Results published: {new Date(evaluationStatus.timestamps.results_published_at).toLocaleString()}
-                  </p>
-                )}
-                {!evaluationStatus.timestamps?.submissions_closed_at && (
-                  <p className="text-zinc-500">● Submissions open - waiting for close</p>
-                )}
-              </div>
-            </div>
-          )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {/* Separated Level Evaluation Controls */}
+      <div className="space-y-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FileCheck className="w-5 h-5 text-cyan-500" />
+          <h2 className="text-xl font-bold text-cyan-500">Independent Level Evaluation</h2>
+        </div>
+        <p className="text-zinc-400 text-sm mb-4">
+          Each level has its own evaluation workflow. Actions on one level do not affect the other.
+        </p>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Level 1 Evaluation Panel */}
+          <LevelEvaluationPanel
+            level={1}
+            evaluationStatus={level1Evaluation}
+            onCloseSubmissions={() => closeSubmissions.mutate(1)}
+            onReopenSubmissions={() => reopenSubmissions.mutate(1)}
+            onEvaluateAnswers={() => showConfirm(
+              'EvaluateLevel 1',
+              'Evaluate all Level 1 answers? This will calculate scores and qualification status.',
+              () => evaluateAnswers.mutate(1)
+            )}
+            onPublishResults={() => showConfirm(
+              'Publish Level 1 Results',
+              'Publish Level 1 results? Teams will see their scores and qualification status. This cannot be undone.',
+              () => publishResults.mutate(1)
+            )}
+            onResetEvaluation={() => showConfirm(
+              'Reset Level 1 Evaluation',
+              'Reset Level 1 evaluation? This will allow you to re-evaluate all submissions.',
+              () => resetEvaluation.mutate(1),
+              'destructive'
+            )}
+            accentColor="blue"
+          />
+          
+          {/* Level 2 Evaluation Panel */}
+          <LevelEvaluationPanel
+            level={2}
+            evaluationStatus={level2Evaluation}
+            onCloseSubmissions={() => closeSubmissions.mutate(2)}
+            onReopenSubmissions={() => reopenSubmissions.mutate(2)}
+            onEvaluateAnswers={() => showConfirm(
+              'Evaluate Level 2',
+              'Evaluate all Level 2 answers? This will calculate scores and qualification status.',
+              () => evaluateAnswers.mutate(2)
+            )}
+            onPublishResults={() => showConfirm(
+              'Publish Level 2 Results',
+              'Publish Level 2 results? Teams will see their scores and final rankings. This cannot be undone.',
+              () => publishResults.mutate(2)
+            )}
+            onResetEvaluation={() => showConfirm(
+              'Reset Level 2 Evaluation',
+              'Reset Level 2 evaluation? This will allow you to re-evaluate all submissions.',
+              () => resetEvaluation.mutate(2),
+              'destructive'
+            )}
+            accentColor="purple"
+          />
+        </div>
+      </div>
 
       {/* Broadcast Dialog */}
       <Dialog open={isBroadcastOpen} onOpenChange={setIsBroadcastOpen}>
